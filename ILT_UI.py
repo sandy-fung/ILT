@@ -20,19 +20,19 @@ bottom_frame.pack(side = "bottom", fill = "both", expand = True)
 
 text_frame = tk.Frame(bottom_frame, bg = "white")
 text_frame.pack(side = "left", fill = "both", expand = True)
-text_label = tk.Label(text_frame, text = "This is the text area", bg = "gray") #label的顯示區
-text_label.pack(side = "top", fill = "y", expand = True)
+text_label = tk.Label(text_frame, text = "This is the text area", bg = "gray", relief = "sunken" ) #label的顯示區
+text_label.pack(side = "top", fill = "both", expand = True, padx = 20, pady = 20)
 reselect_button = tk.Button(text_frame, width = 16, height = 1, text = "Reselect folders", bg = "lightgray", bd = 2, relief = "raised")
 reselect_button.pack(side = "bottom")
 
 
 hint_frame = tk.Frame(bottom_frame, bg = "gray")
 hint_frame.pack(side = "right", fill = "both", expand = True)
-hint_label = tk.Label(hint_frame, text = "This is the hint area", bg = "white") #hint的顯示區
-hint_label.grid(row = 0, column = 1, sticky = "se", padx = 10, pady = 10)
+hint_label = tk.Label(hint_frame, text = "This is the hint area", justify = "left") #hint的顯示區
+hint_label.grid(row = 0, column = 0, columnspan = 2, sticky = "nsew", padx = 20, pady = 20)
 crop_button = tk.Button(hint_frame, width = 4, height = 1, text = "Crop", bg = "lightgray", bd = 2, relief = "raised")
-crop_button.grid(row = 1, column = 0, sticky = "se", padx = 10, pady = 10)
+crop_button.grid(row = 2, column = 0, sticky = "s")
 add_button = tk.Button(hint_frame, width = 3, height = 1, text = "Add", bg = "lightgray", bd = 2, relief = "raised")
-add_button.grid(row = 1, column = 1, sticky = "se", padx = 10, pady = 10)
+add_button.grid(row = 2, column = 1, sticky = "s")
 
 window.mainloop()
