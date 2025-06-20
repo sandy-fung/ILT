@@ -1,44 +1,108 @@
 import tkinter as tk
 
-window_width = 1920
-window_height = 1080
+class Initial:
+    def __init__(self):
+        self.window_width = 1920
+        self.window_height = 1080
 
-# Create the main window
-window = tk.Tk()
-window.title("ILT UI")
-window.geometry(f"{window_width}x{window_height}")
+        # Create the main window
+        self.window = tk.Tk()
+        self.window.title("ILT UI")
+        self.window.geometry(f"{self.window_width}x{self.window_height}")
 
-#上半的圖片
-image_frame = tk.Frame(window, bg = "black")
-image_frame.pack(side = "top", fill = "both", expand = True)
-canvas = tk.Canvas(image_frame, bg = "black")
-canvas.pack(fill = "both", expand = True)
+        self.setup_ui()
+        self.setup_events()
+        self.ctrl_pressed = False
 
-#下半區
-bottom_frame = tk.Frame(window, bg = "gray")
-bottom_frame.pack(side = "bottom", fill = "both", expand = True)
+        self.window.mainloop()
+    
+    def setup_ui(self):
+        self.create_top_area()
+        self.create_bottom_area()
 
-text_frame = tk.Frame(bottom_frame, bg = "white")
-text_frame.pack(side = "left", fill = "both", expand = True)
-text_label = tk.Label(text_frame, text = "This is the text area", bg = "gray", relief = "sunken" ) #label的顯示區
-text_label.pack(side = "top", fill = "both", expand = True, padx = 20, pady = 20)
-reselect_button = tk.Button(text_frame, width = 16, height = 1, text = "Reselect folders", bg = "lightgray", bd = 2, relief = "raised")
-reselect_button.pack(side = "bottom")
+    def create_top_area(self):
+        self.image_frame = tk.Frame(self.window, bg = "black")
+        self.image_frame.pack(side = "top", fill = "both", expand = True)
+        self.canvas = tk.Canvas(self.image_frame, bg = "black")
+        self.canvas.pack(fill = "both", expand = True)
 
-hint_frame = tk.Frame(bottom_frame, bg = "gray")
-hint_frame.pack(side = "right", fill = "both", expand = True)
+    def create_bottom_area(self): 
+        self.bottom_frame = tk.Frame(self.window, bg = "gray")
+        self.bottom_frame.pack(side = "bottom", fill = "both", expand = True)
 
-hint_text = (
-    "← 上一張\n"
-    "→ 下一張\n"
-    "滑鼠左鍵：選取box\n"
-    "滑鼠右鍵：刪除box\n"
-    "Ctrl + 滑鼠左鍵：繪製box")
-hint_label = tk.Label(hint_frame, text = hint_text, justify = "left") #hint的顯示區
-hint_label.grid(row = 0, column = 0, columnspan = 2, sticky = "s",  padx = 20, pady = 20)
-crop_button = tk.Button(hint_frame, width = 4, height = 1, text = "Crop", bg = "lightgray", bd = 2, relief = "raised")
-crop_button.grid(row = 2, column = 0, sticky = "s")
-add_button = tk.Button(hint_frame, width = 4, height = 1, text = "Add", bg = "lightgray", bd = 2, relief = "raised")
-add_button.grid(row = 2, column = 1, sticky = "s")
+        self.create_text_area()
+        self.create_hint_area()    
 
-window.mainloop()
+    def create_text_area(self):
+        self.text_frame = tk.Frame(self.bottom_frame, bg = "white")
+        self.text_frame.pack(side = "left", fill = "both", expand = True)
+        
+        self.text_label = tk.Label(self.text_frame, text = "This is the text area", bg = "gray", relief = "sunken")
+        self.text_label.pack(side = "top", fill = "both", ecpand = True, padx = 20, pady = 20)
+        self.reselect_button = tk.Button(self.text_frame, width = 16, height = 1, text = "Reselect folders", bg = "lightgray", bd = 2, relief = "raised", command = self.on_bt_click_reselect)
+        self.reselect_button.pack(side = "bottom") 
+        
+    def create_hint_area(self):  
+        self.hint_frame = tk.Frame(self.bottom_frame, bg = "gray")
+        self.hint_frame.pack(side = "right", fill = "both", expand = True)            
+
+        hint_text = (
+            "← 上一張\n"
+            "→ 下一張\n"
+            "滑鼠左鍵：選取box\n"
+            "滑鼠右鍵：刪除box\n"
+            "Ctrl + 滑鼠左鍵：繪製box"
+            )
+        self.hint_label = tk.Label(self.hint_frame, text = hint_text, justify = "left") #hint的顯示區
+        self.hint_label.grid(row = 0, column = 0, columnspan = 2, sticky = "s",  padx = 20, pady = 20)
+        self.crop_button = tk.Button(self.hint_frame, width = 4, height = 1, text = "Crop", bg = "lightgray", bd = 2, relief = "raised", command = self.on_bt_click_crop)
+        self.crop_button.grid(row = 2, column = 0, sticky = "s")
+        self.add_button = tk.Button(self.hint_frame, width = 4, height = 1, text = "Add", bg = "lightgray", bd = 2, relief = "raised", command = self.on_bt_click_add)
+        self.add_button.grid(row = 2, column = 1, sticky = "s")
+
+    # Button events
+    def on_bt_click_reselect(self):
+        print("on_bt_click_reselect")
+
+    def on_bt_click_crop(self):
+        print("on_bt_click_crop")
+    
+    def on_bt_click_add(self):
+        print("on_bt_click_add")
+
+    # Mouse events
+    def on_mouse_click_right(self, event):
+        print("on_mouse_click_right")
+
+    def on_mouse_click_left(self, event):
+        print("on_mouse_click_left")
+
+    # Key events 
+    def on_lc_press_switch_pen(self, event):
+        self.ctrl_pressed = not self.ctrl_pressed
+        print("Left crtl is pressed.)")
+    
+    def on_rc_press(self, event):
+        self.ctrl_pressed = Truee
+        print("Right crtl is being pressed.")
+
+    def on_rc_release(self, event):
+        self.ctrl_pressed = False
+        print("Ringht ctrl is released.")
+
+    def next_image(self, event):
+        print("Next image")
+    
+    def previous_image(self, event):
+        print("Previous image")
+    
+    # Bind key and mouse with events
+    def setup_events(self):
+        self.window.bind("<Left>", self.previous_image)
+        self.window.bind("<Right>", self.next_image)
+        self.window.bind("<Control_L>", self.on_lc_press_switch_pen)
+        self.window.bind("<Control_R>", self.on_rc_press)
+        self.window.bind("<KeyRelease-Control_R>", self.on_rc_release)
+
+        self.canvas.bind("<Button--1>", self.on_mouse_click_left)
+        self.canvas.bind("<Button-3>", self.on_mouse_click_right)
