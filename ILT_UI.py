@@ -60,15 +60,20 @@ class Initial:
         self.add_button = tk.Button(self.hint_frame, width = 4, height = 1, text = "Add", bg = "lightgray", bd = 2, relief = "raised", command = self.on_bt_click_add)
         self.add_button.grid(row = 2, column = 1, sticky = "s")
 
+    def update_text_label(self, text):
+        self.text_label.config(text = text)
+
     # Button events
     def on_bt_click_reselect(self):
         print("on_bt_click_reselect")
-
+        self.dispatch(UIEvent.RESELECT_BT_CLICK)
     def on_bt_click_crop(self):
         print("on_bt_click_crop")
+        self.dispatch(UIEvent.CROP_BT_CLICK)
     
     def on_bt_click_add(self):
         print("on_bt_click_add")
+        self.dispatch(UIEvent.ADD_BT_CLICK)
 
     # Mouse events
     def on_mouse_click_right(self, event):
