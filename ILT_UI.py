@@ -1,13 +1,16 @@
 import tkinter as tk
+from tkinter import filedialog
+from UI_event import UIEvent
 
-class Initial:
-    def __init__(self):
+class UI:
+    def __init__(self, event_dispatcher):
+        self.dispatch = event_dispatcher
         self.window_width = 1920
         self.window_height = 1080
 
         # Create the main window
         self.window = tk.Tk()
-        self.window.title("ILT UI")
+        self.window.title("Image Labelling Tool")
         self.window.geometry(f"{self.window_width}x{self.window_height}")
 
         self.setup_ui()
@@ -38,7 +41,7 @@ class Initial:
         self.text_frame.pack(side = "left", fill = "both", expand = True)
         
         self.text_label = tk.Label(self.text_frame, text = "This is the text area", bg = "gray", relief = "sunken")
-        self.text_label.pack(side = "top", fill = "both", ecpand = True, padx = 20, pady = 20)
+        self.text_label.pack(side = "top", fill = "both", expand = True, padx = 20, pady = 20)
         self.reselect_button = tk.Button(self.text_frame, width = 16, height = 1, text = "Reselect folders", bg = "lightgray", bd = 2, relief = "raised", command = self.on_bt_click_reselect)
         self.reselect_button.pack(side = "bottom") 
         
@@ -66,14 +69,15 @@ class Initial:
     # Button events
     def on_bt_click_reselect(self):
         print("on_bt_click_reselect")
-        self.dispatch(UIEvent.RESELECT_BT_CLICK)
+        self.dispatch(UIEvent.RESELECT_BT_CLICK, None)
+
     def on_bt_click_crop(self):
         print("on_bt_click_crop")
-        self.dispatch(UIEvent.CROP_BT_CLICK)
+        self.dispatch(UIEvent.CROP_BT_CLICK, None)
     
     def on_bt_click_add(self):
         print("on_bt_click_add")
-        self.dispatch(UIEvent.ADD_BT_CLICK)
+        self.dispatch(UIEvent.ADD_BT_CLICK, None)
 
     # Mouse events
     def on_mouse_click_right(self, event):
@@ -85,15 +89,15 @@ class Initial:
     # Key events 
     def on_lc_press_switch_pen(self, event):
         self.ctrl_pressed = not self.ctrl_pressed
-        print("Left crtl is pressed.)")
-    
+        print("Left ctrl is pressed.")
+
     def on_rc_press(self, event):
-        self.ctrl_pressed = Truee
-        print("Right crtl is being pressed.")
+        self.ctrl_pressed = True
+        print("Right ctrl is being pressed.")
 
     def on_rc_release(self, event):
         self.ctrl_pressed = False
-        print("Ringht ctrl is released.")
+        print("Right ctrl is released.")
 
     def next_image(self, event):
         print("Next image")
@@ -111,3 +115,10 @@ class Initial:
 
         self.canvas.bind("<Button--1>", self.on_mouse_click_left)
         self.canvas.bind("<Button-3>", self.on_mouse_click_right)
+
+    def select_folder(self, title):
+        folder_path = filedialog.askdirectory(parent = self.window, title = title)
+        return folder_path
+    
+    def run(self):
+        self.window.mainloop()

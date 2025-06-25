@@ -1,9 +1,10 @@
 from UI_event import UIEvent
+import os
 
-class Controller():
+class Controller:
     def __init__(self, view):
         self.view = view
-    
+
     def handle_event(self, event_type, event_data):
         if event_type == UIEvent.LEFT_CTRL_PRESS:
             print("Controller: Left Ctrl pressed.")
@@ -64,3 +65,33 @@ class Controller():
             print("entry_value:", event_data.get("value"))
             print("do ADD EVENT")
             self.view.update_text_label("Add button clicked.")
+
+'''
+    def load_image_folder(self):
+        self.image_folder_path = self.view.select_folder("Select Image Folder")
+        if self.image_folder_path:
+            self.images = [
+                f for f in os.listdir(self.image_folder_path)
+                if f.lower().endswith(('.jpg', '.jpeg', '.png'))
+            ]
+            self.images_path = [
+                os.path.join(self.image_folder_path, f)
+                for f in self.images
+            ]
+        else:
+            print("No image folder selected.")
+
+    def load_label_folder(self):
+        self.label_folder_path = self.view.select_folder("Select Label Folder")
+        if self.label_folder_path:
+            self.labels = [
+                f for f in os.listdir(self.label_folder_path)
+                if f.lower().endswith(('.txt'))
+            ]
+            self.labels_path = [
+                os.path.join(self.label_folder_path, f)
+                for f in self.labels
+            ]
+        else:
+            print("No label folder selected.")
+'''
