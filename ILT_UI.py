@@ -3,8 +3,8 @@ from tkinter import filedialog
 from UI_event import UIEvent
 
 class UI:
-    def __init__(self, event_dispatcher):
-        self.dispatch = event_dispatcher
+    def __init__(self):
+        self.dispatch = None
         self.window_width = 1920
         self.window_height = 1080
 
@@ -17,8 +17,9 @@ class UI:
         self.setup_events()
         self.ctrl_pressed = False
 
-        self.window.mainloop()
-    
+    def set_dispatcher(self, event_dispatcher):
+        self.dispatch = event_dispatcher
+
     def setup_ui(self):
         self.create_top_area()
         self.create_bottom_area()
@@ -26,7 +27,7 @@ class UI:
     def create_top_area(self):
         self.image_frame = tk.Frame(self.window, bg = "black")
         self.image_frame.pack(side = "top", fill = "both", expand = True)
-        self.canvas = tk.Canvas(self.image_frame, bg = "black")
+        self.canvas = tk.Canvas(self.image_frame, height = 640, bg = "black")
         self.canvas.pack(fill = "both", expand = True)
 
     def create_bottom_area(self): 
@@ -40,10 +41,10 @@ class UI:
         self.text_frame = tk.Frame(self.bottom_frame, bg = "white")
         self.text_frame.pack(side = "left", fill = "both", expand = True)
         
-        self.text_label = tk.Label(self.text_frame, text = "This is the text area", bg = "gray", relief = "sunken")
-        self.text_label.pack(side = "top", fill = "both", expand = True, padx = 20, pady = 20)
+        self.text_label = tk.Label(self.text_frame, height = 15, text = "This is the text area", bg = "gray", relief = "sunken")
+        self.text_label.pack(side = "top", fill = "x", padx = 20, pady = 20)
         self.reselect_button = tk.Button(self.text_frame, width = 16, height = 1, text = "Reselect folders", bg = "lightgray", bd = 2, relief = "raised", command = self.on_bt_click_reselect)
-        self.reselect_button.pack(side = "bottom") 
+        self.reselect_button.pack(side = "top") 
         
     def create_hint_area(self):  
         self.hint_frame = tk.Frame(self.bottom_frame, bg = "gray")
@@ -56,7 +57,7 @@ class UI:
             "滑鼠右鍵：刪除box\n"
             "Ctrl + 滑鼠左鍵：繪製box"
             )
-        self.hint_label = tk.Label(self.hint_frame, text = hint_text, justify = "left") #hint的顯示區
+        self.hint_label = tk.Label(self.hint_frame, width = 50, height = 15, text = hint_text, justify = "left", anchor = "w", bg = "gray", fg = "black", font = ("", 12)) 
         self.hint_label.grid(row = 0, column = 0, columnspan = 2, sticky = "s",  padx = 20, pady = 20)
         self.crop_button = tk.Button(self.hint_frame, width = 4, height = 1, text = "Crop", bg = "lightgray", bd = 2, relief = "raised", command = self.on_bt_click_crop)
         self.crop_button.grid(row = 2, column = 0, sticky = "s")
@@ -82,29 +83,37 @@ class UI:
     # Mouse events
     def on_mouse_click_right(self, event):
         print("on_mouse_click_right")
+        self.dispatch(UIEvent.MOUSE_RIGHT_CLICK, {"value": event})
 
     def on_mouse_click_left(self, event):
         print("on_mouse_click_left")
+        self.dispatch(UIEvent.MOUSE_LEFT_CLICK, {"value": event})
 
     # Key events 
     def on_lc_press_switch_pen(self, event):
         self.ctrl_pressed = not self.ctrl_pressed
         print("Left ctrl is pressed.")
+        self.dispatch(UIEvent.LEFT_CTRL_PRESS, {"value": event})
 
     def on_rc_press(self, event):
         self.ctrl_pressed = True
         print("Right ctrl is being pressed.")
+        self.dispatch(UIEvent.RIGHT_CTRL_PRESS, {"value": event})
 
     def on_rc_release(self, event):
         self.ctrl_pressed = False
         print("Right ctrl is released.")
+        self.dispatch(UIEvent.RIGHT_CTRL_RELEASE, {"value": event})
+
 
     def next_image(self, event):
         print("Next image")
+        self.dispatch(UIEvent.RIGHT_PRESS, {"value": event})
     
     def previous_image(self, event):
         print("Previous image")
-    
+        self.dispatch(UIEvent.LEFT_PRESS, {"value": event})
+
     # Bind key and mouse with events
     def setup_events(self):
         self.window.bind("<Left>", self.previous_image)
