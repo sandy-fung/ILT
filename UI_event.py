@@ -13,3 +13,5 @@ class UIEvent(Enum):
     RESELECT_BT_CLICK = auto()
     CROP_BT_CLICK = auto()
     ADD_BT_CLICK = auto()
+
+    WINDOW_READY = auto()
