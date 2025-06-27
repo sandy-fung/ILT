@@ -14,6 +14,12 @@ def get_label_folder_path():
         return config.get("Path", "label_folder_path")
     except:
         return None
+try:
+    with open("config.ini", "r") as f:
+        f.write("test")
+    print("success")
+except Exception as e:
+    print("failed")
     
 def save_paths(image_folder_path, label_folder_path):
     if not config.has_section("Path"):

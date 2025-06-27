@@ -68,7 +68,7 @@ class UI:
         self.text_label.config(text = text)
 
     def get_canvas_size(self):
-        print("4")
+        #print("4")
         self.canvas_height = self.canvas.winfo_height()
         self.canvas_width = self.canvas.winfo_width()
         if self.canvas_height == 0 or self.canvas_width == 0:
@@ -77,10 +77,10 @@ class UI:
         return self.canvas_height, self.canvas_width
 
     def update_image_canvas(self, image):
-        print("6")
+        #print("6")
         self.canvas.delete("all")
-        self.canvas.create_image(self.canvas_width//2, self.canvas_height//2, anchor = "center", image = image)
         self.canvas.image = image
+        self.canvas.create_image(self.canvas_width//2, self.canvas_height//2, anchor = "center", image = image)
 
     # Button events
     def on_bt_click_reselect(self):

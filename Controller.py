@@ -35,7 +35,9 @@ class Controller:
         self.label_folder_path = self.view.select_folder("Select Label Folder")
         if not self.label_folder_path:
             print("No label folder selected.")
+
         self.load_folder()
+        print(f"save_path:{self.image_folder_path}, {self.label_folder_path}")
         
 
     def load_folder(self):
@@ -57,6 +59,7 @@ class Controller:
             os.path.join(self.label_folder_path, f)
             for f in self.labels
         ]
+
         # Save paths to config
         config_utils.save_paths(self.image_folder_path, self.label_folder_path)
 
@@ -72,18 +75,9 @@ class Controller:
         config_utils.save_image_index(self.image_index)
         return self.image_index
         
-    def load_image(self, images_path):
+    def load_image(self, path):
         self.image_index = config_utils.get_image_index()
-        '''
-        if not self.images_path:
-            print("No images_path.")
-        else:
-            print(f"Images_path: {self.images_path}, Image Index: {self.image_index}")
-        image = cv2.imread(images_path[self.image_index])
-        if image is None:
-            print(f"Error: Could not read image at {images_path[self.image_index]}")
-            return
-        '''
+        image = cv2.imread(path[self.image_index])
         self.image_height, self.image_width = image.shape[:2]
         #print("3")
         canvas_height, canvas_width = self.view.get_canvas_size()
