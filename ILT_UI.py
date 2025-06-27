@@ -67,18 +67,33 @@ class UI:
     def update_text_label(self, text):
         self.text_label.config(text = text)
 
+    def get_canvas_size(self):
+        print("4")
+        self.canvas_height = self.canvas.winfo_height()
+        self.canvas_width = self.canvas.winfo_width()
+        if self.canvas_height == 0 or self.canvas_width == 0:
+            self.canvas_height = 1920
+            self.canvas_width = 640
+        return self.canvas_height, self.canvas_width
+
+    def update_image_canvas(self, image):
+        print("6")
+        self.canvas.delete("all")
+        self.canvas.create_image(self.canvas_width//2, self.canvas_height//2, anchor = "center", image = image)
+        self.canvas.image = image
+
     # Button events
     def on_bt_click_reselect(self):
         print("on_bt_click_reselect")
-        self.dispatch(UIEvent.RESELECT_BT_CLICK, None)
+        self.dispatch(UIEvent.RESELECT_BT_CLICK, {})
 
     def on_bt_click_crop(self):
         print("on_bt_click_crop")
-        self.dispatch(UIEvent.CROP_BT_CLICK, None)
+        self.dispatch(UIEvent.CROP_BT_CLICK, {})
     
     def on_bt_click_add(self):
         print("on_bt_click_add")
-        self.dispatch(UIEvent.ADD_BT_CLICK, None)
+        self.dispatch(UIEvent.ADD_BT_CLICK, {})
 
     # Mouse events
     def on_mouse_click_right(self, event):
@@ -130,4 +145,5 @@ class UI:
         return folder_path
     
     def run(self):
+        self.window.after_idle(lambda: self.dispatch(UIEvent.WINDOW_READY, {}))
         self.window.mainloop()
