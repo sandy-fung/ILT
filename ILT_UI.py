@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import filedialog
 from UI_event import UIEvent
 from log_levels import DEBUG, INFO, ERROR
+from tkinter import messagebox
 
 class UI:
     def __init__(self):
@@ -33,25 +34,25 @@ class UI:
         self.canvas = tk.Canvas(self.image_frame, width = self.canvas_width, height = self.canvas_height, bd = 0)
         self.canvas.pack(fill = "both", expand = True)
 
-    def create_bottom_area(self): 
+    def create_bottom_area(self):
         self.bottom_frame = tk.Frame(self.window, bg = "gray")
         self.bottom_frame.pack(side = "bottom", fill = "both", expand = True)
 
         self.create_text_area()
-        self.create_hint_area()    
+        self.create_hint_area()
 
     def create_text_area(self):
         self.text_frame = tk.Frame(self.bottom_frame)
         self.text_frame.pack(side = "left", fill = "both", expand = True)
-        
+
         self.text_label = tk.Label(self.text_frame, height = 15, text = "This is the text area", bg = "white", relief = "sunken")
         self.text_label.pack(side = "top", fill = "x", padx = 20, pady = 20)
         self.reselect_button = tk.Button(self.text_frame, width = 16, height = 1, text = "Reselect folders", bg = "lightgray", bd = 2, relief = "raised", command = self.on_bt_click_reselect)
-        self.reselect_button.pack(side = "top") 
-        
-    def create_hint_area(self):  
+        self.reselect_button.pack(side = "top")
+
+    def create_hint_area(self):
         self.hint_frame = tk.Frame(self.bottom_frame)
-        self.hint_frame.pack(side = "right", fill = "both", expand = True)            
+        self.hint_frame.pack(side = "right", fill = "both", expand = True)
 
         hint_text = (
             "← 上一張\n"
@@ -60,7 +61,7 @@ class UI:
             "滑鼠右鍵：刪除box\n"
             "Ctrl + 滑鼠左鍵：繪製box"
             )
-        self.hint_label = tk.Label(self.hint_frame, width = 50, height = 15, text = hint_text, justify = "left", anchor = "w", fg = "black", font = ("", 12)) 
+        self.hint_label = tk.Label(self.hint_frame, width = 50, height = 15, text = hint_text, justify = "left", anchor = "w", fg = "black", font = ("", 12))
         self.hint_label.grid(row = 0, column = 0, columnspan = 2, sticky = "s",  padx = 20, pady = 20)
         self.crop_button = tk.Button(self.hint_frame, width = 4, height = 1, text = "Crop", bg = "lightgray", bd = 2, relief = "raised", command = self.on_bt_click_crop)
         self.crop_button.grid(row = 2, column = 0, sticky = "s")
@@ -86,7 +87,7 @@ class UI:
     def on_bt_click_crop(self):
         print("on_bt_click_crop")
         self.dispatch(UIEvent.CROP_BT_CLICK, {})
-    
+
     def on_bt_click_add(self):
         print("on_bt_click_add")
         self.dispatch(UIEvent.ADD_BT_CLICK, {})
@@ -100,7 +101,7 @@ class UI:
         print("on_mouse_click_left")
         self.dispatch(UIEvent.MOUSE_LEFT_CLICK, {"value": event})
 
-    # Key events 
+    # Key events
     def on_lc_press_switch_pen(self, event):
         self.ctrl_pressed = not self.ctrl_pressed
         print("Left ctrl is pressed.")
@@ -120,7 +121,7 @@ class UI:
     def next_image(self, event):
         print("Next image")
         self.dispatch(UIEvent.RIGHT_PRESS, {"value": event})
-    
+
     def previous_image(self, event):
         print("Previous image")
         self.dispatch(UIEvent.LEFT_PRESS, {"value": event})
@@ -139,7 +140,11 @@ class UI:
     def select_folder(self, title):
         folder_path = filedialog.askdirectory(parent = self.window, title = title)
         return folder_path
-    
+
+    def show_error(self, msg):
+        messagebox.showerror("Error", str(msg))
+
+
     def run(self):
         self.window.after_idle(lambda: self.dispatch(UIEvent.WINDOW_READY, {}))
         self.window.mainloop()
