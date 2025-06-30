@@ -60,8 +60,10 @@ class UI:
             "滑鼠右鍵：刪除box\n"
             "Ctrl + 滑鼠左鍵：繪製box"
             )
-        self.hint_label = tk.Label(self.hint_frame, width = 50, height = 15, text = hint_text, justify = "left", anchor = "w", fg = "black", font = ("", 12)) 
-        self.hint_label.grid(row = 0, column = 0, columnspan = 2, sticky = "s",  padx = 20, pady = 20)
+        self.hint_label = tk.Label(self.hint_frame, width = 50, height = 10, text = hint_text, justify = "left", anchor = "w", fg = "black", font = ("", 12)) 
+        self.hint_label.grid(row = 1, column = 0, columnspan = 2, sticky = "s", padx = 20)
+        self.index_label = tk.Label(self.hint_frame, text = " : ", font = ("", 12))
+        self.index_label.grid(row = 0, column = 2, sticky = "nwse")
         self.crop_button = tk.Button(self.hint_frame, width = 4, height = 1, text = "Crop", bg = "lightgray", bd = 2, relief = "raised", command = self.on_bt_click_crop)
         self.crop_button.grid(row = 2, column = 0, sticky = "s")
         self.add_button = tk.Button(self.hint_frame, width = 4, height = 1, text = "Add", bg = "lightgray", bd = 2, relief = "raised", command = self.on_bt_click_add)
@@ -76,6 +78,11 @@ class UI:
         self.canvas.image = image
         self.canvas.create_image(self.canvas_width//2, self.canvas_height//2, anchor = "center", image = image)
         DEBUG("Image updated on canvas with height: {}, width: {}", self.canvas_height, self.canvas_width)
+
+    def update_index_label(self, index, path):
+        DEBUG("update_index_label")
+        self.index_label.config(text = f"{index + 1} : {len(path)}")
+        DEBUG("Index label updated with index: {}", index)
 
 
     # Button events

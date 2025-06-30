@@ -32,14 +32,20 @@ class Controller:
     def select_folders(self):
         self.image_folder_path = self.view.select_folder("Select Image Folder")
         if not self.image_folder_path:
-            print("No image folder selected.")
+            INFO("No image folder selected.")
         self.label_folder_path = self.view.select_folder("Select Label Folder")
         if not self.label_folder_path:
-            print("No label folder selected.")
+            INFO("No label folder selected.")
 
         self.load_folder()
-        print(f"save_path:{self.image_folder_path}, {self.label_folder_path}")
-        
+        DEBUG("save_path:{}, {}", self.image_folder_path, self.label_folder_path)
+
+        # Save paths to config
+        config_utils.save_paths(self.image_folder_path, self.label_folder_path)
+
+        # Reset image index
+        self.image_index = 0
+        config_utils.save_image_index(self.image_index)
 
     def load_folder(self):
         # load image folder
@@ -61,20 +67,21 @@ class Controller:
             for f in self.labels
         ]
 
-        # Save paths to config
-        config_utils.save_paths(self.image_folder_path, self.label_folder_path)
-
     def next_image(self):
+        DEBUG("Current image index:", self.image_index)
         if self.image_index < len(self.images) - 1:
             self.image_index += 1
         config_utils.save_image_index(self.image_index)
-        return self.image_index
+
+        self.load_image(self.images_path)
 
     def previous_image(self):
-        if self.image_index < len(self.images) - 1:
+        DEBUG("Current image index:", self.image_index)
+        if self.image_index > 0:
             self.image_index -= 1
         config_utils.save_image_index(self.image_index)
-        return self.image_index
+
+        self.load_image(self.images_path)
         
     def load_image(self, path):
         self.image_index = config_utils.get_image_index()
@@ -98,6 +105,7 @@ class Controller:
         DEBUG("Image converted to PhotoImage")
         self.view.update_image_canvas(self.image)
         DEBUG("Controller.load_image() completed")
+        self.view.update_index_label(self.image_index, self.images_path)
 
     def handle_event(self, event_type, event_data):
         if event_type == UIEvent.WINDOW_READY:
@@ -126,12 +134,14 @@ class Controller:
             print("Controller: Right pressed.")
             print("entry_value:", event_data.get("value"))
             print("do R-Press EVENT")
+            self.next_image()
             self.view.update_text_label("Right pressed.")
 
         elif event_type == UIEvent.LEFT_PRESS:
             print("Controller: Left pressed.")
             print("entry_value:", event_data.get("value"))
             print("do L-Press EVENT")
+            self.previous_image()
             self.view.update_text_label("Left pressed.")
 
         elif event_type == UIEvent.MOUSE_LEFT_CLICK:

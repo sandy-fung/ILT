@@ -35,7 +35,8 @@ def get_image_index():
 def save_image_index(index):
     if not config.has_section("Path"):
         config.add_section("Path")
-    config.set("Path", "image_index", index)
+    config.set("Path", "image_index", str(index))
+
     with open(DEAFULT_CONFI_PATH, "w") as f:
         config.write(f)
 
