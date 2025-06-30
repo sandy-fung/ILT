@@ -3,6 +3,7 @@ import config_utils
 import os
 from PIL import Image, ImageTk
 import cv2
+from log_levels import DEBUG, INFO, ERROR
 
 class Controller:
     def __init__(self, view):
@@ -77,23 +78,33 @@ class Controller:
         
     def load_image(self, path):
         self.image_index = config_utils.get_image_index()
+        DEBUG(f"Get image index: {self.image_index}")
         image = cv2.imread(path[self.image_index])
+        if image is None:
+            ERROR("Failed to load image at index:", self.image_index)
+            return
+        DEBUG(f"Image loaded from path: {path[self.image_index]}")
         self.image_height, self.image_width = image.shape[:2]
-        #print("3")
-        canvas_height, canvas_width = self.view.get_canvas_size()
-        config_utils.save_image_info(self.image_width, self.image_height)
+        DEBUG("Image loaded with height: {}, width: {}", self.image_height, self.image_width)
+        config_utils.save_image_info(self.image_height, self.image_width)
+        INFO("save_image_info to config")
+        canvas_height, canvas_width = self.view.canvas_height, self.view.canvas_width
+        DEBUG("Canvas size: height: {}, width: {}", canvas_height, canvas_width)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        DEBUG("Image converted to RGB format")
         image = Image.fromarray(image).resize((canvas_width, canvas_height))
-        self.tk_image = ImageTk.PhotoImage(image)
-        #print("5")
-        self.view.update_image_canvas(self.tk_image)
+        DEBUG("Image resized to canvas size: height: {}, width: {}", canvas_height, canvas_width)
+        self.image = ImageTk.PhotoImage(image)
+        DEBUG("Image converted to PhotoImage")
+        self.view.update_image_canvas(self.image)
+        DEBUG("Controller.load_image() completed")
 
     def handle_event(self, event_type, event_data):
         if event_type == UIEvent.WINDOW_READY:
-            print("1")
+            print("Controller: Window is ready.")
             self.load_image(self.images_path)
         
-        if event_type == UIEvent.LEFT_CTRL_PRESS:
+        elif event_type == UIEvent.LEFT_CTRL_PRESS:
             print("Controller: Left Ctrl pressed.")
             print("entry_value:", event_data.get("value"))
             print("do L-CTRL EVENT")

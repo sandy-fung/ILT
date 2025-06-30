@@ -1,7 +1,9 @@
 from configparser import ConfigParser
 
+DEAFULT_CONFI_PATH = "config.ini"
+
 config = ConfigParser()
-config.read("config.ini")
+config.read(DEAFULT_CONFI_PATH)
 
 def get_image_folder_path():
     try:
@@ -14,20 +16,14 @@ def get_label_folder_path():
         return config.get("Path", "label_folder_path")
     except:
         return None
-try:
-    with open("config.ini", "r") as f:
-        f.write("test")
-    print("success")
-except Exception as e:
-    print("failed")
-    
+
 def save_paths(image_folder_path, label_folder_path):
     if not config.has_section("Path"):
         config.add_section("Path")
     config.set("Path", "image_folder_path", image_folder_path)
     config.set("Path", "label_folder_path", label_folder_path)
-    
-    with open("config.ini", "w") as f:
+
+    with open(DEAFULT_CONFI_PATH, "w") as f:
         config.write(f)
 
 def get_image_index():
@@ -40,14 +36,15 @@ def save_image_index(index):
     if not config.has_section("Path"):
         config.add_section("Path")
     config.set("Path", "image_index", index)
-    with open("config.ini", "w") as f:
+    with open(DEAFULT_CONFI_PATH, "w") as f:
         config.write(f)
 
 
-def save_image_info(width, height):
+def save_image_info(height, width):
     if not config.has_section("ImageInfo"):
         config.add_section("ImageInfo")
-    config.set("ImageInfo", "image_width", str(width))
     config.set("ImageInfo", "image_height", str(height))
-    with open("config.ini", "w") as f:
+    config.set("ImageInfo", "image_width", str(width))
+    
+    with open(DEAFULT_CONFI_PATH, "w") as f:
         config.write(f)
