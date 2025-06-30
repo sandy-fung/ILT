@@ -1,12 +1,15 @@
 import tkinter as tk
 from tkinter import filedialog
 from UI_event import UIEvent
+from log_levels import DEBUG, INFO, ERROR
 
 class UI:
     def __init__(self):
         self.dispatch = None
         self.window_width = 1920
         self.window_height = 1080
+        self.canvas_width = 1920
+        self.canvas_height = 720
 
         # Create the main window
         self.window = tk.Tk()
@@ -25,9 +28,9 @@ class UI:
         self.create_bottom_area()
 
     def create_top_area(self):
-        self.image_frame = tk.Frame(self.window, bg = "black")
-        self.image_frame.pack(side = "top", fill = "both", expand = True)
-        self.canvas = tk.Canvas(self.image_frame, height = 640, bg = "black")
+        self.image_frame = tk.Frame(self.window, width = self.canvas_width, height = self.canvas_height, bg = "black")
+        self.image_frame.pack(side = "top")
+        self.canvas = tk.Canvas(self.image_frame, width = self.canvas_width, height = self.canvas_height, bd = 0)
         self.canvas.pack(fill = "both", expand = True)
 
     def create_bottom_area(self): 
@@ -38,16 +41,16 @@ class UI:
         self.create_hint_area()    
 
     def create_text_area(self):
-        self.text_frame = tk.Frame(self.bottom_frame, bg = "white")
+        self.text_frame = tk.Frame(self.bottom_frame)
         self.text_frame.pack(side = "left", fill = "both", expand = True)
         
-        self.text_label = tk.Label(self.text_frame, height = 15, text = "This is the text area", bg = "gray", relief = "sunken")
+        self.text_label = tk.Label(self.text_frame, height = 15, text = "This is the text area", bg = "white", relief = "sunken")
         self.text_label.pack(side = "top", fill = "x", padx = 20, pady = 20)
         self.reselect_button = tk.Button(self.text_frame, width = 16, height = 1, text = "Reselect folders", bg = "lightgray", bd = 2, relief = "raised", command = self.on_bt_click_reselect)
         self.reselect_button.pack(side = "top") 
         
     def create_hint_area(self):  
-        self.hint_frame = tk.Frame(self.bottom_frame, bg = "gray")
+        self.hint_frame = tk.Frame(self.bottom_frame)
         self.hint_frame.pack(side = "right", fill = "both", expand = True)            
 
         hint_text = (
@@ -57,7 +60,7 @@ class UI:
             "滑鼠右鍵：刪除box\n"
             "Ctrl + 滑鼠左鍵：繪製box"
             )
-        self.hint_label = tk.Label(self.hint_frame, width = 50, height = 15, text = hint_text, justify = "left", anchor = "w", bg = "gray", fg = "black", font = ("", 12)) 
+        self.hint_label = tk.Label(self.hint_frame, width = 50, height = 15, text = hint_text, justify = "left", anchor = "w", fg = "black", font = ("", 12)) 
         self.hint_label.grid(row = 0, column = 0, columnspan = 2, sticky = "s",  padx = 20, pady = 20)
         self.crop_button = tk.Button(self.hint_frame, width = 4, height = 1, text = "Crop", bg = "lightgray", bd = 2, relief = "raised", command = self.on_bt_click_crop)
         self.crop_button.grid(row = 2, column = 0, sticky = "s")
@@ -67,18 +70,26 @@ class UI:
     def update_text_label(self, text):
         self.text_label.config(text = text)
 
+    def update_image_canvas(self, image):
+        DEBUG("update_image_canvas")
+        self.canvas.delete("all")
+        self.canvas.image = image
+        self.canvas.create_image(self.canvas_width//2, self.canvas_height//2, anchor = "center", image = image)
+        DEBUG("Image updated on canvas with height: {}, width: {}", self.canvas_height, self.canvas_width)
+
+
     # Button events
     def on_bt_click_reselect(self):
         print("on_bt_click_reselect")
-        self.dispatch(UIEvent.RESELECT_BT_CLICK, None)
+        self.dispatch(UIEvent.RESELECT_BT_CLICK, {})
 
     def on_bt_click_crop(self):
         print("on_bt_click_crop")
-        self.dispatch(UIEvent.CROP_BT_CLICK, None)
+        self.dispatch(UIEvent.CROP_BT_CLICK, {})
     
     def on_bt_click_add(self):
         print("on_bt_click_add")
-        self.dispatch(UIEvent.ADD_BT_CLICK, None)
+        self.dispatch(UIEvent.ADD_BT_CLICK, {})
 
     # Mouse events
     def on_mouse_click_right(self, event):
@@ -130,4 +141,5 @@ class UI:
         return folder_path
     
     def run(self):
+        self.window.after_idle(lambda: self.dispatch(UIEvent.WINDOW_READY, {}))
         self.window.mainloop()
