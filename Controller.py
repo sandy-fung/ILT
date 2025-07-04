@@ -86,7 +86,8 @@ class Controller:
         if self.image_index > 0:
             self.image_index -= 1
         config_utils.save_image_index(self.image_index)
-        return self.image_index
+        
+        self.load_image(self.images_path)
 
     def load_image(self, path):
         self.image_index = config_utils.get_image_index()
@@ -103,16 +104,28 @@ class Controller:
         config_utils.save_image_info(self.image_height, self.image_width)
         INFO("save_image_info to config")
 
-        canvas_height, canvas_width = self.view.canvas_height, self.view.canvas_width
-        DEBUG("Canvas size: height: {}, width: {}", canvas_height, canvas_width)
-
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         DEBUG("Image converted to RGB format")
 
-        image = Image.fromarray(image).resize((canvas_width, canvas_height))
-        DEBUG("Image resized to canvas size: height: {}, width: {}", canvas_height, canvas_width)
+        self.original_image = Image.fromarray(image_rgb)
+        DEBUG("Image converted to PIL Image")
 
-        self.image = ImageTk.PhotoImage(image)
+        self.update_resized_image()
+
+    def update_resized_image(self):
+        if self.original_image is None:
+            ERROR("No original image to resize.")
+            return
+        DEBUG("Controller.update_resized_image() called")
+
+        canvas_height, canvas_width = self.view.get_canvas_size()
+        if canvas_height == 0 or canvas_width == 0:
+            ERROR("Failed to get canvas size.")
+            return
+        DEBUG("Canvasanvas size is zero, using default values size: height: {}, width: {}", canvas_height, canvas_width)
+
+        rs_image = self.original_image.resize((canvas_width, canvas_height), Image.Resampling.LANCZOS)
+        self.image = ImageTk.PhotoImage(rs_image)
         DEBUG("Image converted to PhotoImage")
 
         self.view.update_image_canvas(self.image)
@@ -123,6 +136,10 @@ class Controller:
         if event_type == UIEvent.WINDOW_READY:
             INFO("Controller: Window is ready.")
             self.load_image(self.images_path)
+
+        elif event_type == UIEvent.CANVAS_RESIZE:
+            DEBUG("Controller: Canvas resized.")
+            self.update_resized_image()
 
         elif event_type == UIEvent.LEFT_CTRL_PRESS:
             print("Controller: Left Ctrl pressed.")

@@ -9,8 +9,6 @@ class UI:
         self.dispatch = None
         self.window_width = 1920
         self.window_height = 1080
-        self.canvas_width = 1920
-        self.canvas_height = 720
 
         # Create the main window
         self.window = tk.Tk()
@@ -24,19 +22,20 @@ class UI:
     def set_dispatcher(self, event_dispatcher):
         self.dispatch = event_dispatcher
 
+# Define UI components
     def setup_ui(self):
         self.create_top_area()
         self.create_bottom_area()
 
     def create_top_area(self):
-        self.image_frame = tk.Frame(self.window, width = self.canvas_width, height = self.canvas_height, bg = "black")
-        self.image_frame.pack(side = "top")
-        self.canvas = tk.Canvas(self.image_frame, width = self.canvas_width, height = self.canvas_height, bd = 0)
+        self.image_frame = tk.Frame(self.window, bg = "black")
+        self.image_frame.pack(side = "top", fill = "both", expand = True)
+        self.canvas = tk.Canvas(self.image_frame, bd = 0)
         self.canvas.pack(fill = "both", expand = True)
 
     def create_bottom_area(self):
         self.bottom_frame = tk.Frame(self.window, bg = "gray")
-        self.bottom_frame.pack(side = "bottom", fill = "both", expand = True)
+        self.bottom_frame.pack(side = "bottom", fill = "x")
 
         self.create_text_area()
         self.create_hint_area()
@@ -73,6 +72,19 @@ class UI:
     def update_text_label(self, text):
         self.text_label.config(text = text)
 
+# About canvas
+    def get_canvas_size(self):
+        self.canvas_height = self.canvas.winfo_height()
+        self.canvas_width = self.canvas.winfo_width()
+        DEBUG("Canvas size: height: {}, width: {}", self.canvas_height, self.canvas_width)
+        if self.canvas_height == 0 or self.canvas_width == 0:
+            self.canvas_height = 720
+            self.canvas_width = 1920
+        return self.canvas_height, self.canvas_width
+    
+    def on_canvas_resize(self, event):
+        self.dispatch(UIEvent.CANVAS_RESIZE, {})
+
     def update_image_canvas(self, image):
         DEBUG("update_image_canvas")
         self.canvas.delete("all")
@@ -86,7 +98,7 @@ class UI:
         DEBUG("Index label updated with index: {}", index)
 
 
-    # Button events
+# Button events
     def on_bt_click_reselect(self):
         print("on_bt_click_reselect")
         self.dispatch(UIEvent.RESELECT_BT_CLICK, {})
@@ -143,6 +155,7 @@ class UI:
 
         self.canvas.bind("<Button--1>", self.on_mouse_click_left)
         self.canvas.bind("<Button-3>", self.on_mouse_click_right)
+        self.canvas.bind("<Configure>", self.on_canvas_resize)
 
     def select_folder(self, title):
         folder_path = filedialog.askdirectory(parent = self.window, title = title)

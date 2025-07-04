@@ -15,3 +15,4 @@ class UIEvent(Enum):
     ADD_BT_CLICK = auto()
 
     WINDOW_READY = auto()
+    CANVAS_RESIZE = auto()

@@ -1,1 +1,8 @@
+# ignore Python cache files
 __pycache__/
+
+# ignore config.ini file
+config.ini
+
+# ignore log files
+log_levels.py
