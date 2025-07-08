@@ -53,6 +53,8 @@ class Controller:
         self.image_index = 0
         config_utils.save_image_index(self.image_index)
 
+        self.load_image(self.images_path)
+
     def load_folder(self):
         # load image folder
         self.images = [
