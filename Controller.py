@@ -104,7 +104,7 @@ class Controller:
         DEBUG("Image loaded with height: {}, width: {}", self.image_height, self.image_width)
 
         config_utils.save_image_info(self.image_height, self.image_width)
-        INFO("save_image_info to config")
+        DEBUG("save_image_info to config")
 
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         DEBUG("Image converted to RGB format")

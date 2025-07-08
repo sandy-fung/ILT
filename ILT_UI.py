@@ -25,32 +25,44 @@ class UI:
 # Define UI components
     def setup_ui(self):
         self.create_top_area()
+        self.create_middle_area()
         self.create_bottom_area()
 
     def create_top_area(self):
-        self.image_frame = tk.Frame(self.window, bg = "black")
+        self.toolbar =  tk.Frame(self.window)
+        self.toolbar.pack(side = "top", fill = "x")
+
+        self.reselect_button = tk.Button(self.toolbar, width = 16, height = 1, text = "Reselect Folders", fg = "#008378", relief = "flat", bd = 2, command = self.on_bt_click_reselect)
+        self.reselect_button.pack(side = "left", padx = 5)
+        
+        self.crop_button = tk.Button(self.toolbar, width = 4, height = 1, text = "Crop", fg = "#008378", relief = "flat", bd = 2,  command = self.on_bt_click_crop)
+        self.crop_button.pack(side = "left")
+        
+        self.add_button = tk.Button(self.toolbar, width = 4, height = 1, text = "Add", fg = "#008378", relief = "flat", bd = 2,  command = self.on_bt_click_add)
+        self.add_button.pack(side = "left", padx = 5)
+
+    def create_middle_area(self):
+        self.image_frame = tk.Frame(self.window)
         self.image_frame.pack(side = "top", fill = "both", expand = True)
-        self.canvas = tk.Canvas(self.image_frame, bd = 0)
+        self.canvas = tk.Canvas(self.image_frame, highlightthickness = 0)
         self.canvas.pack(fill = "both", expand = True)
 
     def create_bottom_area(self):
-        self.bottom_frame = tk.Frame(self.window, bg = "gray")
+        self.bottom_frame = tk.Frame(self.window, relief = "ridge", bd = 2)
         self.bottom_frame.pack(side = "bottom", fill = "x")
 
         self.create_text_area()
         self.create_hint_area()
 
     def create_text_area(self):
-        self.text_frame = tk.Frame(self.bottom_frame)
+        self.text_frame = tk.Frame(self.bottom_frame, bg = "#f8f8f8")
         self.text_frame.pack(side = "left", fill = "both", expand = True)
 
-        self.text_label = tk.Label(self.text_frame, height = 15, text = "This is the text area", bg = "white", relief = "sunken")
+        self.text_label = tk.Label(self.text_frame, height = 15, text = "This is the text area", font = ("Segoe UI", 11), fg = "#424242", bg = "white", relief = "sunken")
         self.text_label.pack(side = "top", fill = "x", padx = 20, pady = 20)
-        self.reselect_button = tk.Button(self.text_frame, width = 16, height = 1, text = "Reselect folders", bg = "lightgray", bd = 2, relief = "raised", command = self.on_bt_click_reselect)
-        self.reselect_button.pack(side = "top")
 
     def create_hint_area(self):
-        self.hint_frame = tk.Frame(self.bottom_frame)
+        self.hint_frame = tk.Frame(self.bottom_frame, bg = "#f8f8f8")
         self.hint_frame.pack(side = "right", fill = "both", expand = True)
 
         hint_text = (
@@ -60,14 +72,10 @@ class UI:
             "滑鼠右鍵：刪除box\n"
             "Ctrl + 滑鼠左鍵：繪製box"
             )
-        self.hint_label = tk.Label(self.hint_frame, width = 50, height = 10, text = hint_text, justify = "left", anchor = "w", fg = "black", font = ("", 12)) 
+        self.hint_label = tk.Label(self.hint_frame, width = 50, height = 10, bg = "#f8f8f8", text = hint_text, justify = "left", anchor = "w", fg = "#424242", font = ("Segoe UI", 11)) 
         self.hint_label.grid(row = 1, column = 0, columnspan = 2, sticky = "s", padx = 20)
-        self.index_label = tk.Label(self.hint_frame, text = " : ", font = ("", 12))
+        self.index_label = tk.Label(self.hint_frame, bg = "#f8f8f8", text = " : ", fg = "#829901", font = ("Segoe UI", 11))
         self.index_label.grid(row = 0, column = 2, sticky = "nwse")
-        self.crop_button = tk.Button(self.hint_frame, width = 4, height = 1, text = "Crop", bg = "lightgray", bd = 2, relief = "raised", command = self.on_bt_click_crop)
-        self.crop_button.grid(row = 2, column = 0, sticky = "s")
-        self.add_button = tk.Button(self.hint_frame, width = 4, height = 1, text = "Add", bg = "lightgray", bd = 2, relief = "raised", command = self.on_bt_click_add)
-        self.add_button.grid(row = 2, column = 1, sticky = "s")
 
     def update_text_label(self, text):
         self.text_label.config(text = text)
