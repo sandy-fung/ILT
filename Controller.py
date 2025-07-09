@@ -65,31 +65,20 @@ class Controller:
             os.path.join(self.image_folder_path, f)
             for f in self.images
         ]
+
         # load label folder
-        self.labels = [
-            f for f in os.listdir(self.label_folder_path)
-            if f.lower().endswith(('.txt'))
-        ]
-        self.labels_path = [
-            os.path.join(self.label_folder_path, f)
-            for f in self.labels
-        ]
+        self.labels = []
+        self.labels_path = []
 
-    def next_image(self):
-        DEBUG("Current image index:", self.image_index)
-        if self.image_index < len(self.images) - 1:
-            self.image_index += 1
-        config_utils.save_image_index(self.image_index)
+        for f in self.images:
+            label = os.path.splitext(f)[0] + ".txt"
+            label_path = os.path.join(self.label_folder_path, label)
 
-        self.load_image(self.images_path)
+            if not os.path.exists(label_path):
+                open(label_path, 'w').close() #Create empth txt
 
-    def previous_image(self):
-        DEBUG("Current image index:", self.image_index)
-        if self.image_index > 0:
-            self.image_index -= 1
-        config_utils.save_image_index(self.image_index)
-        
-        self.load_image(self.images_path)
+            self.labels.append(label)
+            self.labels_path.append(label_path)
 
     def load_image(self, path):
         self.image_index = config_utils.get_image_index()
@@ -134,63 +123,89 @@ class Controller:
         DEBUG("Controller.load_image() completed")
         self.view.update_index_label(self.image_index, self.images_path)
 
+    def load_label(self, path):
+        try:
+            with open(path[self.image_index], 'r', encoding = 'utf-8') as f:
+                content = f.read()
+            DEBUG("Label loaded from path:", path[self.image_index])
+        except FileNotFoundError:
+            ERROR("Label file not found at path:", path[self.image_index])
+            content = "(Label file not found)"
+        except Exception as e:
+            ERROR("Error loading label file:", e)
+            content = "(Error loading label file)"
+
+        self.view.update_text_box(content)
+
+    def next_image(self):
+        DEBUG("Current image index:", self.image_index)
+        if self.image_index < len(self.images) - 1:
+            self.image_index += 1
+        config_utils.save_image_index(self.image_index)
+
+        self.load_image(self.images_path)
+        self.load_label(self.labels_path)
+
+    def previous_image(self):
+        DEBUG("Current image index:", self.image_index)
+        if self.image_index > 0:
+            self.image_index -= 1
+        config_utils.save_image_index(self.image_index)
+        
+        self.load_image(self.images_path)
+        self.load_label(self.labels_path)
+
     def handle_event(self, event_type, event_data):
         if event_type == UIEvent.WINDOW_READY:
             INFO("Controller: Window is ready.")
             self.load_image(self.images_path)
+            self.load_label(self.labels_path)
 
         elif event_type == UIEvent.CANVAS_RESIZE:
             DEBUG("Controller: Canvas resized.")
             self.update_resized_image()
 
         elif event_type == UIEvent.LEFT_CTRL_PRESS:
-            print("Controller: Left Ctrl pressed.")
-            print("entry_value:", event_data.get("value"))
-            print("do L-CTRL EVENT")
-            self.view.update_text_label("Left Ctrl pressed.")
+            DEBUG("Controller: Left Ctrl pressed.")
+            DEBUG("entry_value:", event_data.get("value"))
+            DEBUG("do L-CTRL EVENT")  
 
         elif event_type == UIEvent.RIGHT_CTRL_PRESS:
-            print("Controller: Right Ctrl pressed.")
-            print("entry_value:", event_data.get("value"))
-            print("do R-CTRL EVENT")
-            self.view.update_text_label("Right Ctrl pressed.")
+            DEBUG("Controller: Right Ctrl pressed.")
+            DEBUG("entry_value:", event_data.get("value"))
+            DEBUG("do R-CTRL EVENT")
 
         elif event_type == UIEvent.RIGHT_CTRL_RELEASE:
-            print("Controller: Right Ctrl released.")
-            print("entry_value:", event_data.get("value"))
-            print("do R-CTRL RELEASE EVENT")
-            self.view.update_text_label("Right Ctrl released.")
+            DEBUG("Controller: Right Ctrl released.")
+            DEBUG("entry_value:", event_data.get("value"))
+            DEBUG("do R-CTRL RELEASE EVENT")
 
         elif event_type == UIEvent.RIGHT_PRESS:
-            print("Controller: Right pressed.")
-            print("entry_value:", event_data.get("value"))
-            print("do R-Press EVENT")
+            DEBUG("Controller: Right pressed.")
+            DEBUG("entry_value:", event_data.get("value"))
+            DEBUG("do R-Press EVENT")
             self.next_image()
-            self.view.update_text_label("Right pressed.")
 
         elif event_type == UIEvent.LEFT_PRESS:
-            print("Controller: Left pressed.")
-            print("entry_value:", event_data.get("value"))
-            print("do L-Press EVENT")
+            DEBUG("Controller: Left pressed.")
+            DEBUG("entry_value:", event_data.get("value"))
+            DEBUG("do L-Press EVENT")
             self.previous_image()
-            self.view.update_text_label("Left pressed.")
 
         elif event_type == UIEvent.MOUSE_LEFT_CLICK:
-            print("Controller: Mouse Left clicked.")
-            print("entry_value", event_data.get("value"))
-            print("do MOUSE-L EVENT")
-            self.view.update_text_label("Mouse Left clicked.")
+            DEBUG("Controller: Mouse Left clicked.")
+            DEBUG("entry_value", event_data.get("value"))
+            DEBUG("do MOUSE-L EVENT")
 
         elif event_type == UIEvent.MOUSE_RIGHT_CLICK:
-            print("Controller: Mouse Right clicked.")
-            print("entry_value:", event_data.get("value"))
-            print("do MOUSE-R EVENT")
-            self.view.update_text_label("Mouse Right clicked.")
+            DEBUG("Controller: Mouse Right clicked.")
+            DEBUG("entry_value:", event_data.get("value"))
+            DEBUG("do MOUSE-R EVENT")
 
         elif event_type == UIEvent.RESELECT_BT_CLICK:
-            print("Controller: Reselect button clicked.")
-            print("entry_value:", event_data.get("value"))
-            print("do RESELECT EVENT")
+            DEBUG("Controller: Reselect button clicked.")
+            DEBUG("entry_value:", event_data.get("value"))
+            DEBUG("do RESELECT EVENT")
 
             try :
                 self.select_folders()
@@ -198,18 +213,14 @@ class Controller:
                 ERROR("Error selecting folders:", e)
                 self.view.show_error(e)
 
-            self.view.update_text_label("Reselect button clicked.")
-
         elif event_type == UIEvent.CROP_BT_CLICK:
-            print("Controller: Crop button clicked.")
-            print("entry_value:", event_data.get("value"))
-            print("do CROP EVENT")
-            self.view.update_text_label("Crop button clicked.")
+            DEBUG("Controller: Crop button clicked.")
+            DEBUG("entry_value:", event_data.get("value"))
+            DEBUG("do CROP EVENT")
 
         elif event_type == UIEvent.ADD_BT_CLICK:
-            print("Controller: Add button clicked.")
-            print("entry_value:", event_data.get("value"))
-            print("do ADD EVENT")
-            self.view.update_text_label("Add button clicked.")
+            DEBUG("Controller: Add button clicked.")
+            DEBUG("entry_value:", event_data.get("value"))
+            DEBUG("do ADD EVENT")
 
 

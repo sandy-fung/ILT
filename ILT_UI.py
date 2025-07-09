@@ -32,13 +32,31 @@ class UI:
         self.toolbar =  tk.Frame(self.window)
         self.toolbar.pack(side = "top", fill = "x")
 
-        self.reselect_button = tk.Button(self.toolbar, width = 16, height = 1, text = "Reselect Folders", fg = "#008378", relief = "flat", bd = 2, command = self.on_bt_click_reselect)
+        self.reselect_button = tk.Button(
+            self.toolbar,
+            width = 16, height = 1,
+            text = "Reselect Folders", fg = "#008378",
+            relief = "flat", bd = 2,
+            command = self.on_bt_click_reselect
+        )
         self.reselect_button.pack(side = "left", padx = 5)
         
-        self.crop_button = tk.Button(self.toolbar, width = 4, height = 1, text = "Crop", fg = "#008378", relief = "flat", bd = 2,  command = self.on_bt_click_crop)
+        self.crop_button = tk.Button(
+            self.toolbar,
+            width = 4, height = 1,
+            text = "Crop", fg = "#008378",
+            relief = "flat", bd = 2,
+            command = self.on_bt_click_crop
+        )
         self.crop_button.pack(side = "left")
         
-        self.add_button = tk.Button(self.toolbar, width = 4, height = 1, text = "Add", fg = "#008378", relief = "flat", bd = 2,  command = self.on_bt_click_add)
+        self.add_button = tk.Button(
+            self.toolbar,
+            width = 4, height = 1,
+            text = "Add", fg = "#008378", 
+            relief = "flat", bd = 2,
+            command = self.on_bt_click_add
+        )
         self.add_button.pack(side = "left", padx = 5)
 
     def create_middle_area(self):
@@ -58,8 +76,15 @@ class UI:
         self.text_frame = tk.Frame(self.bottom_frame, bg = "#f8f8f8")
         self.text_frame.pack(side = "left", fill = "both", expand = True)
 
-        self.text_label = tk.Label(self.text_frame, height = 15, text = "This is the text area", font = ("Segoe UI", 11), fg = "#424242", bg = "white", relief = "sunken")
-        self.text_label.pack(side = "top", fill = "x", padx = 20, pady = 20)
+        self.text_box = tk.Text(
+            self.text_frame,
+            height = 15, bg = "white",
+            font = ("Segoe UI", 11), fg = "#424242",
+            relief = "sunken",
+            wrap = "word"
+        )
+        self.text_box.tag_configure("left", justify = "left")
+        self.text_box.pack(side = "top", fill = "x", padx = 20, pady = 20)
 
     def create_hint_area(self):
         self.hint_frame = tk.Frame(self.bottom_frame, bg = "#f8f8f8")
@@ -72,13 +97,14 @@ class UI:
             "滑鼠右鍵：刪除box\n"
             "Ctrl + 滑鼠左鍵：繪製box"
             )
-        self.hint_label = tk.Label(self.hint_frame, width = 50, height = 10, bg = "#f8f8f8", text = hint_text, justify = "left", anchor = "w", fg = "#424242", font = ("Segoe UI", 11)) 
+        self.hint_label = tk.Label(
+            self.hint_frame,
+            width = 50, height = 10, bg = "#f8f8f8",
+            text = hint_text, justify = "left", anchor = "w", fg = "#424242", font = ("Segoe UI", 11)
+        ) 
         self.hint_label.grid(row = 1, column = 0, columnspan = 2, sticky = "s", padx = 20)
         self.index_label = tk.Label(self.hint_frame, bg = "#f8f8f8", text = " : ", fg = "#829901", font = ("Segoe UI", 11))
         self.index_label.grid(row = 0, column = 2, sticky = "nwse")
-
-    def update_text_label(self, text):
-        self.text_label.config(text = text)
 
 # About canvas
     def get_canvas_size(self):
@@ -100,6 +126,12 @@ class UI:
         self.canvas.create_image(self.canvas_width//2, self.canvas_height//2, anchor = "center", image = image)
         DEBUG("Image updated on canvas with height: {}, width: {}", self.canvas_height, self.canvas_width)
 
+# Update text and index labels
+    def update_text_box(self, content):
+        self.text_box.config(state = "normal")
+        self.text_box.delete("1.0", tk.END) # Clear the text box
+        self.text_box.insert(tk.END, content)
+
     def update_index_label(self, index, path):
         DEBUG("update_index_label")
         self.index_label.config(text = f"{index + 1} : {len(path)}")
@@ -108,49 +140,49 @@ class UI:
 
 # Button events
     def on_bt_click_reselect(self):
-        print("on_bt_click_reselect")
+        DEBUG("on_bt_click_reselect")
         self.dispatch(UIEvent.RESELECT_BT_CLICK, {})
 
     def on_bt_click_crop(self):
-        print("on_bt_click_crop")
+        DEBUG("on_bt_click_crop")
         self.dispatch(UIEvent.CROP_BT_CLICK, {})
 
     def on_bt_click_add(self):
-        print("on_bt_click_add")
+        DEBUG("on_bt_click_add")
         self.dispatch(UIEvent.ADD_BT_CLICK, {})
 
     # Mouse events
     def on_mouse_click_right(self, event):
-        print("on_mouse_click_right")
+        DEBUG("on_mouse_click_right")
         self.dispatch(UIEvent.MOUSE_RIGHT_CLICK, {"value": event})
 
     def on_mouse_click_left(self, event):
-        print("on_mouse_click_left")
+        DEBUG("on_mouse_click_left")
         self.dispatch(UIEvent.MOUSE_LEFT_CLICK, {"value": event})
 
     # Key events
     def on_lc_press_switch_pen(self, event):
         self.ctrl_pressed = not self.ctrl_pressed
-        print("Left ctrl is pressed.")
+        DEBUG("on_lc_press_switch_pen")
         self.dispatch(UIEvent.LEFT_CTRL_PRESS, {"value": event})
 
     def on_rc_press(self, event):
         self.ctrl_pressed = True
-        print("Right ctrl is being pressed.")
+        DEBUG("Ron_rc_press")
         self.dispatch(UIEvent.RIGHT_CTRL_PRESS, {"value": event})
 
     def on_rc_release(self, event):
         self.ctrl_pressed = False
-        print("Right ctrl is released.")
+        DEBUG("on_rc_release")
         self.dispatch(UIEvent.RIGHT_CTRL_RELEASE, {"value": event})
 
 
     def next_image(self, event):
-        print("Next image")
+        DEBUG("next_image")
         self.dispatch(UIEvent.RIGHT_PRESS, {"value": event})
 
     def previous_image(self, event):
-        print("Previous image")
+        DEBUG("previous_image")
         self.dispatch(UIEvent.LEFT_PRESS, {"value": event})
 
     # Bind key and mouse with events
