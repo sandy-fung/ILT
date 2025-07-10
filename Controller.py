@@ -1,9 +1,8 @@
 from UI_event import UIEvent
 import config_utils
+import image_utils
+import folder_utils
 import os
-from PIL import Image, ImageTk
-import cv2
-
 from log_levels import DEBUG, INFO, ERROR
 
 class Controller:
@@ -57,49 +56,17 @@ class Controller:
 
     def load_folder(self):
         # load image folder
-        self.images = [
-            f for f in os.listdir(self.image_folder_path)
-            if f.lower().endswith(('.jpg', '.jpeg', '.png'))
-        ]
-        self.images_path = [
-            os.path.join(self.image_folder_path, f)
-            for f in self.images
-        ]
+        self.images, self.images_path = folder_utils.scan_image_folder(self.image_folder_path)
 
         # load label folder
-        self.labels = []
-        self.labels_path = []
+        self.labels, self.labels_path = folder_utils.scan_label_folder(self.images, self.label_folder_path)
+        folder_utils.ensure_labels_exist(self.labels_path)
 
-        for f in self.images:
-            label = os.path.splitext(f)[0] + ".txt"
-            label_path = os.path.join(self.label_folder_path, label)
+    def load_image(self, imgs_path):
+        index = config_utils.get_image_index()
+        image_path = imgs_path[index]
 
-            if not os.path.exists(label_path):
-                open(label_path, 'w').close() #Create empth txt
-
-            self.labels.append(label)
-            self.labels_path.append(label_path)
-
-    def load_image(self, path):
-        self.image_index = config_utils.get_image_index()
-        DEBUG(f"Get image index: {self.image_index}")
-        image = cv2.imread(path[self.image_index])
-        if image is None:
-            ERROR("Failed to load image at index:", self.image_index)
-            return
-        DEBUG(f"Image loaded from path: {path[self.image_index]}")
-
-        self.image_height, self.image_width = image.shape[:2]
-        DEBUG("Image loaded with height: {}, width: {}", self.image_height, self.image_width)
-
-        config_utils.save_image_info(self.image_height, self.image_width)
-        DEBUG("save_image_info to config")
-
-        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        DEBUG("Image converted to RGB format")
-
-        self.original_image = Image.fromarray(image_rgb)
-        DEBUG("Image converted to PIL Image")
+        self.original_image = image_utils.load_image(image_path)
 
         self.update_resized_image()
 
@@ -113,11 +80,9 @@ class Controller:
         if canvas_height == 0 or canvas_width == 0:
             ERROR("Failed to get canvas size.")
             return
-        DEBUG("Canvasanvas size is zero, using default values size: height: {}, width: {}", canvas_height, canvas_width)
 
-        rs_image = self.original_image.resize((canvas_width, canvas_height), Image.Resampling.LANCZOS)
-        self.image = ImageTk.PhotoImage(rs_image)
-        DEBUG("Image converted to PhotoImage")
+        resized = image_utils.resize_image(self.original_image, (canvas_width, canvas_height))
+        self.image = image_utils.convert_to_tk(resized)
 
         self.view.update_image_canvas(self.image)
         DEBUG("Controller.load_image() completed")
@@ -125,9 +90,7 @@ class Controller:
 
     def load_label(self, path):
         try:
-            with open(path[self.image_index], 'r', encoding = 'utf-8') as f:
-                content = f.read()
-            DEBUG("Label loaded from path:", path[self.image_index])
+            content = folder_utils.load_label(self.labels_path[self.image_index])
         except FileNotFoundError:
             ERROR("Label file not found at path:", path[self.image_index])
             content = "(Label file not found)"
