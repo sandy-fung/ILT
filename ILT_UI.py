@@ -60,10 +60,21 @@ class UI:
         self.add_button.pack(side = "left", padx = 5)
 
     def create_middle_area(self):
-        self.image_frame = tk.Frame(self.window)
-        self.image_frame.pack(side = "top", fill = "both", expand = True)
-        self.canvas = tk.Canvas(self.image_frame, highlightthickness = 0)
+        self.middle_frame = tk.Frame(self.window)
+        self.middle_frame.pack(side = "top", fill = "both", expand = True)
+
+        self.create_canvas()
+        self.create_class_id_area()
+
+    def create_canvas(self):
+        self.canvas_frame = tk.Frame(self.middle_frame)
+        self.canvas_frame.pack(side = "left", fill = "both", expand = True)
+        self.canvas = tk.Canvas(self.canvas_frame, highlightthickness = 0)
         self.canvas.pack(fill = "both", expand = True)
+
+    def create_class_id_area(self):
+        self.class_id_frame = tk.Frame(self.middle_frame)
+        self.class_id_frame.pack(side = "right", fill = "y")
 
     def create_bottom_area(self):
         self.bottom_frame = tk.Frame(self.window, relief = "ridge", bd = 2)
@@ -105,6 +116,15 @@ class UI:
         self.hint_label.grid(row = 1, column = 0, columnspan = 2, sticky = "s", padx = 20)
         self.index_label = tk.Label(self.hint_frame, bg = "#f8f8f8", text = " : ", fg = "#829901", font = ("Segoe UI", 11))
         self.index_label.grid(row = 0, column = 2, sticky = "nwse")
+
+# Draw class id buttons
+    def draw_class_id_buttons(self, var, labels):
+        self.class_id_vars = tk.StringVar(value = var)
+        for i, label in enumerate(labels):
+            column = i // 13
+            row = i % 13
+            button = tk.Radiobutton(self.class_id_frame, text = label, variable = self.class_id_vars, value = label, command = lambda l = label: self.dispatch(UIEvent.CLASS_ID_CHANGE, {"label": l}))
+            button.grid(row = row, column = column, sticky = "e", padx = 5, pady = 5)
 
 # About canvas
     def get_canvas_size(self):
@@ -149,7 +169,7 @@ class UI:
 
     def on_bt_click_add(self):
         DEBUG("on_bt_click_add")
-        self.dispatch(UIEvent.ADD_BT_CLICK, {})
+        self.dispatch(UIEvent.ADD_BT_CLICK, {})        
 
     # Mouse events
     def on_mouse_click_right(self, event):

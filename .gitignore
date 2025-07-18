@@ -1,4 +1,4 @@
-# ignore Python cache files
+# ignore Python cache folder
 __pycache__/
 
 # ignore config.ini file
@@ -6,3 +6,9 @@ config.ini
 
 # ignore log files
 log_levels.py
+
+# ignore virtual environment folder
+venv/
+
+# ignore .vscode folder
+.vscode/
