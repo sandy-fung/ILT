@@ -4,6 +4,7 @@ from UI_event import UIEvent
 from log_levels import DEBUG, INFO, ERROR
 from tkinter import messagebox
 import label_display_utils
+import bbox_controller
 
 class UI:
     def __init__(self):
@@ -15,10 +16,18 @@ class UI:
         self.window = tk.Tk()
         self.window.title("Image Labelling Tool")
         self.window.geometry(f"{self.window_width}x{self.window_height}")
+        
+        # Ensure window can receive keyboard focus
+        self.window.focus_set()
+        self.window.focus_force()
+
+        # Initialize drawing-related states
+        self.ctrl_pressed = False
+        self.drawing_mode = False
+        self.bbox_controller = None
 
         self.setup_ui()
         self.setup_events()
-        self.ctrl_pressed = False
 
     def set_dispatcher(self, event_dispatcher):
         self.dispatch = event_dispatcher
@@ -65,6 +74,9 @@ class UI:
         self.image_frame.pack(side = "top", fill = "both", expand = True)
         self.canvas = tk.Canvas(self.image_frame, highlightthickness = 0)
         self.canvas.pack(fill = "both", expand = True)
+        
+        # Initialize drawing controller
+        self.bbox_controller = bbox_controller.BBoxController(self.canvas)
 
     def create_bottom_area(self):
         self.bottom_frame = tk.Frame(self.window, relief = "ridge", bd = 2)
@@ -96,7 +108,8 @@ class UI:
             "→ 下一張\n"
             "滑鼠左鍵：選取box\n"
             "滑鼠右鍵：刪除box\n"
-            "Ctrl + 滑鼠左鍵：繪製box"
+            "Ctrl：切換繪框模式\n"
+            "繪框模式下拖拽：繪製新box"
             )
         self.hint_label = tk.Label(
             self.hint_frame,
@@ -106,6 +119,13 @@ class UI:
         self.hint_label.grid(row = 1, column = 0, columnspan = 2, sticky = "s", padx = 20)
         self.index_label = tk.Label(self.hint_frame, bg = "#f8f8f8", text = " : ", fg = "#829901", font = ("Segoe UI", 11))
         self.index_label.grid(row = 0, column = 2, sticky = "nwse")
+        
+        # Add drawing mode status display
+        self.drawing_mode_label = tk.Label(
+            self.hint_frame, bg = "#f8f8f8", text = "普通模式", 
+            fg = "#424242", font = ("Segoe UI", 11, "bold")
+        )
+        self.drawing_mode_label.grid(row = 0, column = 0, sticky = "nw", padx = 20)
 
 # About canvas
     def get_canvas_size(self):
@@ -217,17 +237,57 @@ class UI:
         if self.dispatch:
             self.dispatch(UIEvent.MOUSE_RIGHT_CLICK, {"value": event})
 
-    def on_mouse_click_left(self, event):
-        DEBUG("on_mouse_click_left")
+    def on_mouse_press(self, event):
+        """Handle mouse press event - support drawing mode"""
+        DEBUG("on_mouse_press at ({}, {})", event.x, event.y)
+        
+        if self.bbox_controller and self.bbox_controller.is_in_drawing_mode():
+            # Drawing mode: start drawing
+            if self.bbox_controller.start_drawing(event.x, event.y):
+                if self.dispatch:
+                    self.dispatch(UIEvent.MOUSE_LEFT_PRESS, {"value": event})
+                return
+        
+        # Normal mode: original click handling
         if self.dispatch:
             self.dispatch(UIEvent.MOUSE_LEFT_CLICK, {"value": event})
+    
+    def on_mouse_release(self, event):
+        """Handle mouse release event - support drawing mode"""
+        DEBUG("on_mouse_release at ({}, {})", event.x, event.y)
+        
+        if self.bbox_controller and self.bbox_controller.is_in_drawing_mode():
+            # Drawing mode: complete drawing
+            drawing_result = self.bbox_controller.finish_drawing(event.x, event.y)
+            if drawing_result and self.dispatch:
+                self.dispatch(UIEvent.MOUSE_LEFT_RELEASE, {"value": event, "drawing_result": drawing_result})
+        
+    def on_mouse_drag(self, event):
+        """Handle mouse drag event - drawing preview"""
+        if self.bbox_controller and self.bbox_controller.is_in_drawing_mode():
+            self.bbox_controller.update_preview(event.x, event.y)
+            if self.dispatch:
+                self.dispatch(UIEvent.MOUSE_DRAG, {"value": event})
 
     # Key events
     def on_lc_press_switch_pen(self, event):
+        """Left Ctrl key toggle drawing mode"""
+        DEBUG("on_lc_press_switch_pen triggered")
+        
         self.ctrl_pressed = not self.ctrl_pressed
-        DEBUG("on_lc_press_switch_pen")
+        
+        # Toggle drawing mode
+        if self.bbox_controller:
+            self.drawing_mode = self.bbox_controller.toggle_drawing_mode()
+            DEBUG("Drawing mode toggled to: {}", self.drawing_mode)
+            
+            # Update status display
+            self.update_drawing_mode_display()
+        else:
+            ERROR("bbox_controller is None!")
+        
         if self.dispatch:
-            self.dispatch(UIEvent.LEFT_CTRL_PRESS, {"value": event})
+            self.dispatch(UIEvent.DRAWING_MODE_TOGGLE, {"value": event, "drawing_mode": self.drawing_mode})
 
     def on_rc_press(self, event):
         self.ctrl_pressed = True
@@ -256,11 +316,17 @@ class UI:
     def setup_events(self):
         self.window.bind("<Left>", self.previous_image)
         self.window.bind("<Right>", self.next_image)
+        
+        # Ctrl key event binding
         self.window.bind("<Control_L>", self.on_lc_press_switch_pen)
+        
         self.window.bind("<Control_R>", self.on_rc_press)
         self.window.bind("<KeyRelease-Control_R>", self.on_rc_release)
 
-        self.canvas.bind("<Button--1>", self.on_mouse_click_left)
+        # Mouse event binding (support drawing functionality)
+        self.canvas.bind("<Button-1>", self.on_mouse_press)
+        self.canvas.bind("<ButtonRelease-1>", self.on_mouse_release)
+        self.canvas.bind("<B1-Motion>", self.on_mouse_drag)
         self.canvas.bind("<Button-3>", self.on_mouse_click_right)
         self.canvas.bind("<Configure>", self.on_canvas_resize)
 
@@ -271,6 +337,30 @@ class UI:
     def show_error(self, msg):
         messagebox.showerror("Error", str(msg))
 
+    # Drawing mode related methods
+    def get_drawing_mode(self):
+        """Get current drawing mode status"""
+        return self.drawing_mode
+    
+    def set_drawing_mode(self, mode):
+        """Set drawing mode"""
+        if self.bbox_controller:
+            self.bbox_controller.set_drawing_mode(mode)
+            self.drawing_mode = mode
+            self.update_drawing_mode_display()
+            DEBUG("Drawing mode set to: {}", mode)
+    
+    def cancel_current_drawing(self):
+        """Cancel current drawing"""
+        if self.bbox_controller:
+            self.bbox_controller.cancel_drawing()
+    
+    def update_drawing_mode_display(self):
+        """Update drawing mode status display"""
+        if self.drawing_mode:
+            self.drawing_mode_label.config(text="繪框模式", fg="#FF6B35")
+        else:
+            self.drawing_mode_label.config(text="普通模式", fg="#424242")
 
     def run(self):
         if self.dispatch:

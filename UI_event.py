@@ -9,6 +9,11 @@ class UIEvent(Enum):
 
     MOUSE_LEFT_CLICK = auto()
     MOUSE_RIGHT_CLICK = auto()
+    MOUSE_LEFT_PRESS = auto()
+    MOUSE_LEFT_RELEASE = auto()
+    MOUSE_DRAG = auto()
+
+    DRAWING_MODE_TOGGLE = auto()
 
     RESELECT_BT_CLICK = auto()
     CROP_BT_CLICK = auto()

@@ -20,6 +20,10 @@ class Controller:
         self.image_index = 0
         self.image_width = 0
         self.image_height = 0
+        
+        # Drawing mode state
+        self.drawing_mode = False
+        
         self.check_config()
 
 
@@ -156,7 +160,12 @@ class Controller:
         elif event_type == UIEvent.LEFT_CTRL_PRESS:
             DEBUG("Controller: Left Ctrl pressed.")
             DEBUG("entry_value:", event_data.get("value"))
-            DEBUG("do L-CTRL EVENT")  
+            DEBUG("do L-CTRL EVENT")
+            
+        elif event_type == UIEvent.DRAWING_MODE_TOGGLE:
+            DEBUG("Controller: Drawing mode toggle.")
+            self.drawing_mode = event_data.get("drawing_mode", False)
+            DEBUG("Drawing mode set to: {}", self.drawing_mode)  
 
         elif event_type == UIEvent.RIGHT_CTRL_PRESS:
             DEBUG("Controller: Right Ctrl pressed.")
@@ -210,5 +219,66 @@ class Controller:
             DEBUG("Controller: Add button clicked.")
             DEBUG("entry_value:", event_data.get("value"))
             DEBUG("do ADD EVENT")
+            
+        elif event_type == UIEvent.MOUSE_LEFT_PRESS:
+            DEBUG("Controller: Mouse left press in drawing mode.")
+            
+        elif event_type == UIEvent.MOUSE_LEFT_RELEASE:
+            DEBUG("Controller: Mouse left release in drawing mode.")
+            drawing_result = event_data.get("drawing_result")
+            if drawing_result:
+                self.handle_new_bbox(drawing_result)
+                
+        elif event_type == UIEvent.MOUSE_DRAG:
+            DEBUG("Controller: Mouse drag in drawing mode.")
+
+    def handle_new_bbox(self, drawing_result):
+        """Handle newly drawn bounding box"""
+        try:
+            yolo_coords = drawing_result['yolo_coords']
+            canvas_coords = drawing_result['canvas_coords']
+            size = drawing_result['size']
+            
+            # Create new LabelObject (default class_id=0)
+            cx, cy, w_ratio, h_ratio = yolo_coords
+            new_label = label_display_utils.LabelObject(0, cx, cy, w_ratio, h_ratio)
+            
+            # Add to current labels list
+            self.current_labels.append(new_label)
+            DEBUG("Added new bbox: cx={:.6f}, cy={:.6f}, w={:.6f}, h={:.6f}", cx, cy, w_ratio, h_ratio)
+            
+            # Save to label file
+            self.save_current_labels()
+            
+            # Update UI display
+            self.update_label_display()
+            
+        except Exception as e:
+            ERROR("Error handling new bbox: {}", e)
+    
+    def save_current_labels(self):
+        """Save current labels list to file"""
+        if self.image_index < len(self.labels_path):
+            label_file_path = self.labels_path[self.image_index]
+            
+            try:
+                with open(label_file_path, 'w', encoding='utf-8') as f:
+                    for label in self.current_labels:
+                        yolo_line = f"{label.class_id} {label.cx_ratio:.17f} {label.cy_ratio:.17f} {label.w_ratio:.17f} {label.h_ratio:.17f}\n"
+                        f.write(yolo_line)
+                        
+                DEBUG("Saved {} labels to {}", len(self.current_labels), label_file_path)
+                
+            except Exception as e:
+                ERROR("Error saving labels to file: {}", e)
+    
+    def update_label_display(self):
+        """Update label display"""
+        # Update label boxes display on canvas
+        if self.current_labels:
+            self.view.draw_labels_on_canvas(self.current_labels)
+        
+        # Update text box display
+        self.load_label(self.labels_path)
 
 
