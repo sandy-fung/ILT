@@ -6,3 +6,6 @@ config.ini
 
 # ignore log files
 log_levels.py
+venv/*
+.vscode/*
+todo.md

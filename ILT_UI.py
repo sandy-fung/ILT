@@ -3,6 +3,7 @@ from tkinter import filedialog
 from UI_event import UIEvent
 from log_levels import DEBUG, INFO, ERROR
 from tkinter import messagebox
+import label_display_utils
 
 class UI:
     def __init__(self):
@@ -117,7 +118,8 @@ class UI:
         return self.canvas_height, self.canvas_width
     
     def on_canvas_resize(self, event):
-        self.dispatch(UIEvent.CANVAS_RESIZE, {})
+        if self.dispatch:
+            self.dispatch(UIEvent.CANVAS_RESIZE, {})
 
     def update_image_canvas(self, image):
         DEBUG("update_image_canvas")
@@ -125,6 +127,61 @@ class UI:
         self.canvas.image = image
         self.canvas.create_image(self.canvas_width//2, self.canvas_height//2, anchor = "center", image = image)
         DEBUG("Image updated on canvas with height: {}, width: {}", self.canvas_height, self.canvas_width)
+
+    def draw_labels_on_canvas(self, labels):
+        """Draw label bounding boxes on canvas"""
+        if not labels:
+            DEBUG("No labels to draw")
+            return
+        
+        # Update canvas size before drawing
+        self.get_canvas_size()
+        DEBUG("Drawing {} labels on canvas with size {}x{}", len(labels), self.canvas_width, self.canvas_height)
+        
+        # Define colors for different classes
+        colors = [
+            "#FF0000",  # Red
+            "#00FF00",  # Green  
+            "#0000FF",  # Blue
+            "#FFFF00",  # Yellow
+            "#FF00FF",  # Magenta
+            "#00FFFF",  # Cyan
+            "#FFA500",  # Orange
+            "#800080",  # Purple
+        ]
+        
+        for label in labels:
+            # Convert label coordinates to canvas pixel coordinates
+            x1, y1, x2, y2 = label_display_utils.convert_label_to_canvas_coords(
+                label, self.canvas_width, self.canvas_height
+            )
+            
+            # Select color based on class_id
+            color = colors[label.class_id % len(colors)]
+            
+            # Draw bounding box
+            self.canvas.create_rectangle(
+                x1, y1, x2, y2,
+                outline=color,
+                width=2,
+                tags="label_box"
+            )
+            
+            # Draw class ID text
+            text_x = x1
+            text_y = y1 - 5 if y1 > 15 else y2 + 5
+            
+            self.canvas.create_text(
+                text_x, text_y,
+                text=str(label.class_id),
+                fill=color,
+                anchor="nw",
+                font=("Arial", 10, "bold"),
+                tags="label_text"
+            )
+            
+            DEBUG("Drew label: class_id={}, coords=({:.1f},{:.1f},{:.1f},{:.1f})", 
+                  label.class_id, x1, y1, x2, y2)
 
 # Update text and index labels
     def update_text_box(self, content):
@@ -141,49 +198,59 @@ class UI:
 # Button events
     def on_bt_click_reselect(self):
         DEBUG("on_bt_click_reselect")
-        self.dispatch(UIEvent.RESELECT_BT_CLICK, {})
+        if self.dispatch:
+            self.dispatch(UIEvent.RESELECT_BT_CLICK, {})
 
     def on_bt_click_crop(self):
         DEBUG("on_bt_click_crop")
-        self.dispatch(UIEvent.CROP_BT_CLICK, {})
+        if self.dispatch:
+            self.dispatch(UIEvent.CROP_BT_CLICK, {})
 
     def on_bt_click_add(self):
         DEBUG("on_bt_click_add")
-        self.dispatch(UIEvent.ADD_BT_CLICK, {})
+        if self.dispatch:
+            self.dispatch(UIEvent.ADD_BT_CLICK, {})
 
     # Mouse events
     def on_mouse_click_right(self, event):
         DEBUG("on_mouse_click_right")
-        self.dispatch(UIEvent.MOUSE_RIGHT_CLICK, {"value": event})
+        if self.dispatch:
+            self.dispatch(UIEvent.MOUSE_RIGHT_CLICK, {"value": event})
 
     def on_mouse_click_left(self, event):
         DEBUG("on_mouse_click_left")
-        self.dispatch(UIEvent.MOUSE_LEFT_CLICK, {"value": event})
+        if self.dispatch:
+            self.dispatch(UIEvent.MOUSE_LEFT_CLICK, {"value": event})
 
     # Key events
     def on_lc_press_switch_pen(self, event):
         self.ctrl_pressed = not self.ctrl_pressed
         DEBUG("on_lc_press_switch_pen")
-        self.dispatch(UIEvent.LEFT_CTRL_PRESS, {"value": event})
+        if self.dispatch:
+            self.dispatch(UIEvent.LEFT_CTRL_PRESS, {"value": event})
 
     def on_rc_press(self, event):
         self.ctrl_pressed = True
         DEBUG("Ron_rc_press")
-        self.dispatch(UIEvent.RIGHT_CTRL_PRESS, {"value": event})
+        if self.dispatch:
+            self.dispatch(UIEvent.RIGHT_CTRL_PRESS, {"value": event})
 
     def on_rc_release(self, event):
         self.ctrl_pressed = False
         DEBUG("on_rc_release")
-        self.dispatch(UIEvent.RIGHT_CTRL_RELEASE, {"value": event})
+        if self.dispatch:
+            self.dispatch(UIEvent.RIGHT_CTRL_RELEASE, {"value": event})
 
 
     def next_image(self, event):
         DEBUG("next_image")
-        self.dispatch(UIEvent.RIGHT_PRESS, {"value": event})
+        if self.dispatch:
+            self.dispatch(UIEvent.RIGHT_PRESS, {"value": event})
 
     def previous_image(self, event):
         DEBUG("previous_image")
-        self.dispatch(UIEvent.LEFT_PRESS, {"value": event})
+        if self.dispatch:
+            self.dispatch(UIEvent.LEFT_PRESS, {"value": event})
 
     # Bind key and mouse with events
     def setup_events(self):
@@ -206,5 +273,6 @@ class UI:
 
 
     def run(self):
-        self.window.after_idle(lambda: self.dispatch(UIEvent.WINDOW_READY, {}))
+        if self.dispatch:
+            self.window.after_idle(lambda: self.dispatch(UIEvent.WINDOW_READY, {}))
         self.window.mainloop()

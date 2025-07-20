@@ -2,6 +2,7 @@ from UI_event import UIEvent
 import config_utils
 import image_utils
 import folder_utils
+import label_display_utils
 import os
 from log_levels import DEBUG, INFO, ERROR
 
@@ -15,6 +16,7 @@ class Controller:
         self.labels = []
         self.images_path = []
         self.labels_path = []
+        self.current_labels = []  # List of LabelObject instances for current image
         self.image_index = 0
         self.image_width = 0
         self.image_height = 0
@@ -61,6 +63,11 @@ class Controller:
         # load label folder
         self.labels, self.labels_path = folder_utils.scan_label_folder(self.images, self.label_folder_path)
         folder_utils.ensure_labels_exist(self.labels_path)
+        
+        # Load the current image and labels
+        self.image_index = config_utils.get_image_index()
+        if self.images_path:
+            self.load_image(self.images_path)
 
     def load_image(self, imgs_path):
         index = config_utils.get_image_index()
@@ -87,6 +94,12 @@ class Controller:
         self.view.update_image_canvas(self.image)
         DEBUG("Controller.load_image() completed")
         self.view.update_index_label(self.image_index, self.images_path)
+        
+        # Parse and draw labels for current image
+        self.parse_current_labels()
+        if self.current_labels:
+            DEBUG("Drawing {} labels on canvas", len(self.current_labels))
+            self.view.draw_labels_on_canvas(self.current_labels)
 
     def load_label(self, path):
         try:
@@ -99,6 +112,18 @@ class Controller:
             content = "(Error loading label file)"
 
         self.view.update_text_box(content)
+        
+        # Labels are already parsed and drawn in update_resized_image()
+
+    def parse_current_labels(self):
+        """Parse current image's label file and store LabelObject instances"""
+        if self.image_index < len(self.labels_path):
+            current_label_path = self.labels_path[self.image_index]
+            self.current_labels = label_display_utils.parse_label_file(current_label_path)
+            DEBUG("Parsed {} labels for current image", len(self.current_labels))
+        else:
+            self.current_labels = []
+            ERROR("Invalid image index for label parsing: {}", self.image_index)
 
     def next_image(self):
         DEBUG("Current image index:", self.image_index)
