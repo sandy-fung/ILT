@@ -565,6 +565,20 @@ class UI:
         else:
             # 恢復選擇狀態顯示
             self.update_selection_status_display(self.bbox_controller.get_selected_label() if self.bbox_controller else None)
+    
+    def update_sorting_status(self, label_count=0, plate_count=0):
+        """
+        更新狀態以顯示標籤已排序
+        
+        Args:
+            label_count (int): 排序的標籤數量
+            plate_count (int): 偵測到的車牌數量
+        """
+        if label_count > 0:
+            status_text = f"標籤已自動排序：{label_count} 個標籤，{plate_count} 個車牌"
+            self.selection_status_label.config(text=status_text, fg="#008800")
+            # 3秒後恢復正常狀態顯示
+            self.window.after(3000, lambda: self.update_selection_status_display())
 
     def run(self):
         if self.dispatch:

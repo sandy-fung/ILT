@@ -128,6 +128,19 @@ class Controller:
             current_label_path = self.labels_path[self.image_index]
             self.current_labels = label_display_utils.parse_label_file(current_label_path)
             DEBUG("Parsed {} labels for current image", len(self.current_labels))
+            
+            # 自動排序標籤
+            if self.current_labels:
+                original_count = len(self.current_labels)
+                self.current_labels, plate_count = label_display_utils.sort_labels_by_position(self.current_labels)
+                DEBUG("Auto-sorted {} labels by position in {} plates", original_count, plate_count)
+                # 保存排序後的標籤
+                self.save_current_labels()
+                # 更新文字框顯示排序後的標籤
+                self.load_label(self.labels_path)
+                # 更新狀態顯示
+                if hasattr(self.view, 'update_sorting_status'):
+                    self.view.update_sorting_status(original_count, plate_count)
         else:
             self.current_labels = []
             ERROR("Invalid image index for label parsing: {}", self.image_index)
