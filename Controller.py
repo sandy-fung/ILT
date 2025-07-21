@@ -196,8 +196,22 @@ class Controller:
 
         elif event_type == UIEvent.MOUSE_RIGHT_CLICK:
             DEBUG("Controller: Mouse Right clicked.")
-            DEBUG("entry_value:", event_data.get("value"))
-            DEBUG("do MOUSE-R EVENT")
+            event = event_data.get("value")
+            DEBUG("Right click at ({}, {})", event.x, event.y)
+            
+            # 取得 bbox_controller 從 view
+            bbox_controller = getattr(self.view, 'bbox_controller', None)
+            if bbox_controller and bbox_controller.get_selected_label():
+                # 如果有選中的標籤，檢查右鍵是否點擊在選中的標籤上
+                selected_label = bbox_controller.get_selected_label()
+                canvas_width = self.view.get_canvas_size()[1]
+                canvas_height = self.view.get_canvas_size()[0]
+                if selected_label.contains(event.x, event.y, canvas_width, canvas_height):
+                    # 顯示右鍵菜單 (複用 image_label_tool 的方式)
+                    if hasattr(self.view, 'show_context_menu'):
+                        self.view.show_context_menu(event)
+                    else:
+                        DEBUG("Context menu not implemented in view")
 
         elif event_type == UIEvent.RESELECT_BT_CLICK:
             DEBUG("Controller: Reselect button clicked.")
@@ -221,7 +235,36 @@ class Controller:
             DEBUG("do ADD EVENT")
             
         elif event_type == UIEvent.MOUSE_LEFT_PRESS:
-            DEBUG("Controller: Mouse left press in drawing mode.")
+            x = event_data.get("x", 0)
+            y = event_data.get("y", 0)
+            DEBUG("Controller: Mouse left press at ({}, {})", x, y)
+            
+            # 取得 bbox_controller 從 view
+            bbox_controller = getattr(self.view, 'bbox_controller', None)
+            if not bbox_controller:
+                DEBUG("No bbox_controller found in view")
+                return
+                
+            # 檢查是否在繪製模式
+            if bbox_controller.is_in_drawing_mode():
+                DEBUG("In drawing mode - start drawing")
+                # 繪製模式的原有邏輯保持不變
+            else:
+                DEBUG("In normal mode - handle selection")
+                # 普通模式：處理 bounding box 選擇
+                selected_label = bbox_controller.handle_selection(x, y, self.current_labels)
+                if selected_label:
+                    DEBUG("Selected label with class_id: {}", selected_label.class_id)
+                    # 觸發視覺更新
+                    self.view.draw_labels_on_canvas(self.current_labels)
+                    # 更新狀態顯示
+                    if hasattr(self.view, 'update_selection_status_display'):
+                        self.view.update_selection_status_display(selected_label)
+                else:
+                    DEBUG("No label selected")
+                    # 更新狀態顯示
+                    if hasattr(self.view, 'update_selection_status_display'):
+                        self.view.update_selection_status_display(None)
             
         elif event_type == UIEvent.MOUSE_LEFT_RELEASE:
             DEBUG("Controller: Mouse left release in drawing mode.")
@@ -231,6 +274,10 @@ class Controller:
                 
         elif event_type == UIEvent.MOUSE_DRAG:
             DEBUG("Controller: Mouse drag in drawing mode.")
+            
+        elif event_type == UIEvent.DELETE_KEY:
+            DEBUG("Controller: Delete key pressed.")
+            self.delete_selected_label()
 
     def handle_new_bbox(self, drawing_result):
         """Handle newly drawn bounding box"""
@@ -280,5 +327,48 @@ class Controller:
         
         # Update text box display
         self.load_label(self.labels_path)
+        
+    def delete_selected_label(self):
+        """刪除選中的標籤"""
+        # 取得 bbox_controller 從 view
+        bbox_controller = getattr(self.view, 'bbox_controller', None)
+        if not bbox_controller:
+            DEBUG("No bbox_controller found in view")
+            return False
+            
+        # 獲取選中的標籤
+        selected_label = bbox_controller.get_selected_label()
+        if not selected_label:
+            DEBUG("No label selected for deletion")
+            return False
+            
+        try:
+            # 從當前標籤列表中移除
+            if selected_label in self.current_labels:
+                self.current_labels.remove(selected_label)
+                DEBUG("Removed label with class_id: {}", selected_label.class_id)
+                
+                # 清除選擇狀態
+                bbox_controller.clear_selection(self.current_labels)
+                
+                # 保存更新後的標籤文件
+                self.save_current_labels()
+                
+                # 刷新畫布顯示
+                self.update_label_display()
+                
+                # 更新狀態顯示
+                if hasattr(self.view, 'update_selection_status_display'):
+                    self.view.update_selection_status_display(None)
+                
+                INFO("Successfully deleted selected label")
+                return True
+            else:
+                ERROR("Selected label not found in current labels list")
+                return False
+                
+        except Exception as e:
+            ERROR("Error deleting selected label: {}", e)
+            return False
 
 

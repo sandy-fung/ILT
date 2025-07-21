@@ -9,6 +9,7 @@ class LabelObject:
         self.cy_ratio = cy_ratio
         self.w_ratio = w_ratio
         self.h_ratio = h_ratio
+        self.selected = False  # 選中狀態標記
 
     def update(self, cx: float, cy: float, width: float, height: float, canvas_size):
         canv_x, canv_y = canvas_size
@@ -21,6 +22,34 @@ class LabelObject:
         ret = f"{self.class_id} {self.cx_ratio:.17f} {self.cy_ratio:.17f} {self.w_ratio:.17f} {self.h_ratio:.17f}"
         DEBUG("Converted to YOLO format: {}", ret)
         return ret
+
+    def contains(self, x, y, canvas_width, canvas_height):
+        """
+        判斷點擊位置是否在此 bounding box 內
+        
+        Args:
+            x (float): 點擊的 x 座標 (canvas 像素)
+            y (float): 點擊的 y 座標 (canvas 像素)
+            canvas_width (int): Canvas 寬度
+            canvas_height (int): Canvas 高度
+            
+        Returns:
+            bool: 如果點擊在框內則返回 True
+        """
+        # 轉換為 canvas 座標的邊界框
+        x1, y1, x2, y2 = convert_label_to_canvas_coords(self, canvas_width, canvas_height)
+        
+        # 檢查點擊是否在矩形內
+        return x1 <= x <= x2 and y1 <= y <= y2
+
+    def set_selected(self, selected):
+        """
+        設定選中狀態
+        
+        Args:
+            selected (bool): 是否選中
+        """
+        self.selected = selected
 
 
 def label_to_pixel_position(label, canvas_width, canvas_height):

@@ -18,6 +18,9 @@ class BBoxController:
         self.draw_start_y = 0
         self.current_preview_id = None
         
+        # Selection state variables
+        self.selected_label = None
+        
         # Minimum box size constraints
         self.min_box_width = 5
         self.min_box_height = 5
@@ -145,6 +148,61 @@ class BBoxController:
         """Create LabelObject instance from YOLO coordinates"""
         cx, cy, w_ratio, h_ratio = yolo_coords
         return label_display_utils.LabelObject(class_id, cx, cy, w_ratio, h_ratio)
+
+    def handle_selection(self, x, y, labels):
+        """
+        處理點擊選擇邏輯，按照 z-index 順序 (最上層優先)
+        
+        Args:
+            x (float): 點擊的 x 座標
+            y (float): 點擊的 y 座標
+            labels (list): LabelObject 列表
+            
+        Returns:
+            LabelObject or None: 選中的標籤對象，如果沒有選中則返回 None
+        """
+        canvas_width = self.canvas.winfo_width()
+        canvas_height = self.canvas.winfo_height()
+        
+        # 從最後一個開始檢查 (最上層的 bounding box)
+        for label in reversed(labels):
+            if label.contains(x, y, canvas_width, canvas_height):
+                # 清除所有標籤的選中狀態
+                self.clear_selection(labels)
+                
+                # 設定當前標籤為選中
+                label.set_selected(True)
+                self.selected_label = label
+                
+                DEBUG("Selected label: class_id={}, coords=({:.3f}, {:.3f}, {:.3f}, {:.3f})", 
+                      label.class_id, label.cx_ratio, label.cy_ratio, label.w_ratio, label.h_ratio)
+                return label
+        
+        # 如果沒有點擊在任何標籤上，清除選擇
+        self.clear_selection(labels)
+        return None
+
+    def clear_selection(self, labels):
+        """
+        清除所有標籤的選中狀態
+        
+        Args:
+            labels (list): LabelObject 列表
+        """
+        for label in labels:
+            label.set_selected(False)
+        
+        self.selected_label = None
+        DEBUG("Cleared all selections")
+
+    def get_selected_label(self):
+        """
+        獲取當前選中的標籤
+        
+        Returns:
+            LabelObject or None: 當前選中的標籤
+        """
+        return self.selected_label
 
 class DrawingState:
     """Drawing state enumeration"""

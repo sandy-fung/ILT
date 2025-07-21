@@ -77,6 +77,9 @@ class UI:
         
         # Initialize drawing controller
         self.bbox_controller = bbox_controller.BBoxController(self.canvas)
+        
+        # Create context menu (reuse approach from image_label_tool)
+        self.create_context_menu()
 
     def create_bottom_area(self):
         self.bottom_frame = tk.Frame(self.window, relief = "ridge", bd = 2)
@@ -107,7 +110,8 @@ class UI:
             "← 上一張\n"
             "→ 下一張\n"
             "滑鼠左鍵：選取box\n"
-            "滑鼠右鍵：刪除box\n"
+            "滑鼠右鍵：刪除選中的box\n"
+            "Delete鍵：刪除選中的box\n"
             "Ctrl：切換繪框模式\n"
             "繪框模式下拖拽：繪製新box"
             )
@@ -126,6 +130,13 @@ class UI:
             fg = "#424242", font = ("Segoe UI", 11, "bold")
         )
         self.drawing_mode_label.grid(row = 0, column = 0, sticky = "nw", padx = 20)
+        
+        # Add selection status display
+        self.selection_status_label = tk.Label(
+            self.hint_frame, bg = "#f8f8f8", text = "未選中任何框", 
+            fg = "#666666", font = ("Segoe UI", 10)
+        )
+        self.selection_status_label.grid(row = 0, column = 1, sticky = "nw", padx = (20, 0))
 
 # About canvas
     def get_canvas_size(self):
@@ -150,6 +161,11 @@ class UI:
 
     def draw_labels_on_canvas(self, labels):
         """Draw label bounding boxes on canvas"""
+        # Clear previous labels first
+        self.canvas.delete("label_box")
+        self.canvas.delete("label_box_selected") 
+        self.canvas.delete("label_text")
+        
         if not labels:
             DEBUG("No labels to draw")
             return
@@ -176,15 +192,24 @@ class UI:
                 label, self.canvas_width, self.canvas_height
             )
             
-            # Select color based on class_id
-            color = colors[label.class_id % len(colors)]
+            # Determine color and style based on selection state
+            if hasattr(label, 'selected') and label.selected:
+                # Selected: red color with thicker border
+                color = "#FF0000"  # Red
+                width = 3
+                tags = "label_box_selected"
+            else:
+                # Not selected: original color based on class_id
+                color = colors[label.class_id % len(colors)]
+                width = 2
+                tags = "label_box"
             
             # Draw bounding box
             self.canvas.create_rectangle(
                 x1, y1, x2, y2,
                 outline=color,
-                width=2,
-                tags="label_box"
+                width=width,
+                tags=tags
             )
             
             # Draw class ID text
@@ -233,7 +258,7 @@ class UI:
 
     # Mouse events
     def on_mouse_click_right(self, event):
-        DEBUG("on_mouse_click_right")
+        DEBUG("on_mouse_click_right at ({}, {})", event.x, event.y)
         if self.dispatch:
             self.dispatch(UIEvent.MOUSE_RIGHT_CLICK, {"value": event})
 
@@ -248,9 +273,9 @@ class UI:
                     self.dispatch(UIEvent.MOUSE_LEFT_PRESS, {"value": event})
                 return
         
-        # Normal mode: original click handling
+        # Normal mode: handle selection
         if self.dispatch:
-            self.dispatch(UIEvent.MOUSE_LEFT_CLICK, {"value": event})
+            self.dispatch(UIEvent.MOUSE_LEFT_PRESS, {"value": event, "x": event.x, "y": event.y})
     
     def on_mouse_release(self, event):
         """Handle mouse release event - support drawing mode"""
@@ -301,6 +326,10 @@ class UI:
         if self.dispatch:
             self.dispatch(UIEvent.RIGHT_CTRL_RELEASE, {"value": event})
 
+    def on_delete_key(self, event):
+        DEBUG("on_delete_key")
+        if self.dispatch:
+            self.dispatch(UIEvent.DELETE_KEY, {"value": event})
 
     def next_image(self, event):
         DEBUG("next_image")
@@ -322,6 +351,9 @@ class UI:
         
         self.window.bind("<Control_R>", self.on_rc_press)
         self.window.bind("<KeyRelease-Control_R>", self.on_rc_release)
+        
+        # Delete key event binding
+        self.window.bind("<Delete>", self.on_delete_key)
 
         # Mouse event binding (support drawing functionality)
         self.canvas.bind("<Button-1>", self.on_mouse_press)
@@ -336,6 +368,26 @@ class UI:
 
     def show_error(self, msg):
         messagebox.showerror("Error", str(msg))
+
+    def create_context_menu(self):
+        """創建右鍵選單 (複用 image_label_tool 的方法)"""
+        self.context_menu = tk.Menu(self.window, tearoff=0)
+        self.context_menu.add_command(label="刪除", command=self.delete_from_context_menu)
+    
+    def show_context_menu(self, event):
+        """顯示右鍵菜單 (複用 image_label_tool 的座標方式)"""
+        try:
+            # 使用參考專案的座標轉換方式
+            self.context_menu.post(event.x_root, event.y_root)
+        finally:
+            self.context_menu.grab_release()
+    
+    def delete_from_context_menu(self):
+        """從右鍵菜單觸發刪除 (複用 image_label_tool 的確認邏輯)"""
+        # 顯示確認對話框 (參考 plate_box_3.py 的實現)
+        result = messagebox.askyesno("Delete", "Delete selected box?")
+        if result and self.dispatch:
+            self.dispatch(UIEvent.DELETE_KEY, {"value": None})
 
     # Drawing mode related methods
     def get_drawing_mode(self):
@@ -361,6 +413,14 @@ class UI:
             self.drawing_mode_label.config(text="繪框模式", fg="#FF6B35")
         else:
             self.drawing_mode_label.config(text="普通模式", fg="#424242")
+    
+    def update_selection_status_display(self, selected_label=None):
+        """Update selection status display"""
+        if selected_label:
+            status_text = f"已選中：class_id={selected_label.class_id}"
+            self.selection_status_label.config(text=status_text, fg="#FF0000")
+        else:
+            self.selection_status_label.config(text="未選中任何框", fg="#666666")
 
     def run(self):
         if self.dispatch:
