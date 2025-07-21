@@ -22,8 +22,6 @@ class UI:
         self.window.focus_force()
 
         # Initialize drawing-related states
-        self.ctrl_pressed = False
-        self.drawing_mode = False
         self.bbox_controller = None
 
         self.setup_ui()
@@ -274,8 +272,6 @@ class UI:
         """Left Ctrl key toggle drawing mode"""
         DEBUG("on_lc_press_switch_pen triggered")
         
-        self.ctrl_pressed = not self.ctrl_pressed
-        
         # Toggle drawing mode
         if self.bbox_controller:
             self.drawing_mode = self.bbox_controller.toggle_drawing_mode()
@@ -290,16 +286,28 @@ class UI:
             self.dispatch(UIEvent.DRAWING_MODE_TOGGLE, {"value": event, "drawing_mode": self.drawing_mode})
 
     def on_rc_press(self, event):
-        self.ctrl_pressed = True
-        DEBUG("Ron_rc_press")
+        DEBUG("on_rc_press")
+
+        if self.bbox_controller:
+            self.bbox_controller.set_drawing_mode(True)
+            self.update_drawing_mode_display()
+        else:
+            ERROR("bbox_controller is None!")
+
         if self.dispatch:
-            self.dispatch(UIEvent.RIGHT_CTRL_PRESS, {"value": event})
+            self.dispatch(UIEvent.RIGHT_CTRL_PRESS, {"value": event}, drawing_mode = True)
 
     def on_rc_release(self, event):
-        self.ctrl_pressed = False
         DEBUG("on_rc_release")
+
+        if self.bbox_controller:
+            self.bbox_controller.set_drawing_mode(False)
+            self.update_drawing_mode_display()
+        else:
+            ERROR("bbox_controller is None!")
+
         if self.dispatch:
-            self.dispatch(UIEvent.RIGHT_CTRL_RELEASE, {"value": event})
+            self.dispatch(UIEvent.RIGHT_CTRL_RELEASE, {"value": event}, drawing_mode = False)
 
 
     def next_image(self, event):
@@ -336,19 +344,6 @@ class UI:
 
     def show_error(self, msg):
         messagebox.showerror("Error", str(msg))
-
-    # Drawing mode related methods
-    def get_drawing_mode(self):
-        """Get current drawing mode status"""
-        return self.drawing_mode
-    
-    def set_drawing_mode(self, mode):
-        """Set drawing mode"""
-        if self.bbox_controller:
-            self.bbox_controller.set_drawing_mode(mode)
-            self.drawing_mode = mode
-            self.update_drawing_mode_display()
-            DEBUG("Drawing mode set to: {}", mode)
     
     def cancel_current_drawing(self):
         """Cancel current drawing"""
@@ -357,7 +352,7 @@ class UI:
     
     def update_drawing_mode_display(self):
         """Update drawing mode status display"""
-        if self.drawing_mode:
+        if self.drawing_mode and self.bbox_controller.is_in_drawing_mode():
             self.drawing_mode_label.config(text="繪框模式", fg="#FF6B35")
         else:
             self.drawing_mode_label.config(text="普通模式", fg="#424242")
