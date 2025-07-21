@@ -168,7 +168,7 @@ class Controller:
             INFO("Controller: Window is ready.")
             self.load_image(self.images_path)
             self.load_label(self.labels_path)
-            self.view.draw_class_id_buttons(config_utils.get_class_id_vars(), wlm.get_labels())
+            self.view.show_class_id_buttons(config_utils.get_class_id_vars(), wlm.get_labels())
 
         elif event_type == UIEvent.CANVAS_RESIZE:
             DEBUG("Controller: Canvas resized.")
