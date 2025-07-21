@@ -3,6 +3,7 @@ import config_utils
 import image_utils
 import folder_utils
 import label_display_utils
+import Words_Label_mapping as wlm
 import os
 from log_levels import DEBUG, INFO, ERROR
 
@@ -154,6 +155,7 @@ class Controller:
             INFO("Controller: Window is ready.")
             self.load_image(self.images_path)
             self.load_label(self.labels_path)
+            self.view.draw_class_id_buttons(config_utils.get_class_id_vars(), wlm.get_labels())
 
         elif event_type == UIEvent.CANVAS_RESIZE:
             DEBUG("Controller: Canvas resized.")
@@ -236,6 +238,12 @@ class Controller:
             DEBUG("entry_value:", event_data.get("value"))
             DEBUG("do ADD EVENT")
             
+        elif event_type == UIEvent.CLASS_ID_CHANGE:
+            DEBUG("Controller: Class ID changed.")
+            DEBUG("entry_label:{}", event_data.get("label"))
+            DEBUG("do CLASS ID CHANGE EVENT")
+
+            config_utils.save_class_id_vars(event_data.get("label"))
         elif event_type == UIEvent.MOUSE_LEFT_PRESS:
             x = event_data.get("x", 0)
             y = event_data.get("y", 0)
