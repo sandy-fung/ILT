@@ -371,3 +371,116 @@ def validate_yolo_bounds(cx_ratio, cy_ratio, w_ratio, h_ratio):
         return False
         
     return True
+
+
+def calculate_vertical_overlap(label1, label2):
+    """
+    計算兩個標籤的垂直重疊率
+    
+    Args:
+        label1 (LabelObject): 第一個標籤
+        label2 (LabelObject): 第二個標籤
+        
+    Returns:
+        float: 垂直重疊率 (0-1)
+    """
+    # 獲取兩個標籤的垂直範圍
+    y1_top = label1.cy_ratio - label1.h_ratio / 2
+    y1_bottom = label1.cy_ratio + label1.h_ratio / 2
+    y2_top = label2.cy_ratio - label2.h_ratio / 2
+    y2_bottom = label2.cy_ratio + label2.h_ratio / 2
+    
+    # 計算重疊區域
+    overlap_top = max(y1_top, y2_top)
+    overlap_bottom = min(y1_bottom, y2_bottom)
+    
+    if overlap_top >= overlap_bottom:
+        return 0.0  # 無重疊
+    
+    # 計算重疊率（相對於較小的高度）
+    overlap_height = overlap_bottom - overlap_top
+    min_height = min(label1.h_ratio, label2.h_ratio)
+    
+    return overlap_height / min_height if min_height > 0 else 0.0
+
+
+def is_same_plate(label, group, overlap_threshold=0.5):
+    """
+    判斷標籤是否屬於同一車牌
+    
+    Args:
+        label (LabelObject): 要檢查的標籤
+        group (list): 車牌分組中的標籤列表
+        overlap_threshold (float): 垂直重疊率閾值
+        
+    Returns:
+        bool: 是否屬於同一車牌
+    """
+    if not group:
+        return False
+    
+    # 檢查與組內任一標籤的垂直重疊率
+    for group_label in group:
+        if calculate_vertical_overlap(label, group_label) >= overlap_threshold:
+            return True
+    
+    return False
+
+
+def group_labels_by_plate(labels):
+    """
+    將標籤按車牌分組
+    
+    Args:
+        labels (list): LabelObject 列表
+        
+    Returns:
+        list: 分組後的標籤列表，每個元素是一個車牌的標籤列表
+    """
+    if not labels:
+        return []
+    
+    # 先按 Y 座標排序，方便分組
+    sorted_labels = sorted(labels, key=lambda l: l.cy_ratio)
+    
+    groups = []
+    for label in sorted_labels:
+        assigned = False
+        for group in groups:
+            if is_same_plate(label, group):
+                group.append(label)
+                assigned = True
+                break
+        
+        if not assigned:
+            groups.append([label])
+    
+    DEBUG("Grouped {} labels into {} plates", len(labels), len(groups))
+    return groups
+
+
+def sort_labels_by_position(labels):
+    """
+    對標籤進行分組並排序
+    
+    Args:
+        labels (list): LabelObject 列表
+        
+    Returns:
+        tuple: (排序後的 LabelObject 列表, 車牌數量)
+    """
+    if not labels:
+        return [], 0
+    
+    # 分組
+    groups = group_labels_by_plate(labels)
+    
+    # 對每組內的標籤按 X 座標排序
+    sorted_labels = []
+    for group_idx, group in enumerate(groups):
+        sorted_group = sorted(group, key=lambda l: l.cx_ratio)
+        sorted_labels.extend(sorted_group)
+        DEBUG("Plate {}: {} labels sorted by X position", group_idx + 1, len(sorted_group))
+    
+    INFO("Sorted {} labels in {} plates", len(sorted_labels), len(groups))
+    return sorted_labels, len(groups)
