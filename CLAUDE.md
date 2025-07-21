@@ -60,15 +60,22 @@ python main.py
 ### UI Components
 - Top toolbar: "Reselect Folders", "Crop", "Add" buttons
 - Main canvas with image display and bounding box visualization
-- Right panel: Class ID selection buttons (0-9, A-Z) for character annotation
-- Text box showing label content in YOLO format
+- Right panel: Class ID selection buttons (0-9, A-Z) for character annotation (optional)
+- Text box showing label content in YOLO format (optional)
 - Hint area with keyboard shortcuts (in Chinese)
+- Status display: Shows drawing mode, selection status, and sorting feedback
+
+**UI Configuration Options:**
+- `SHOW_CLASS_ID_BUTTONS`: Toggle class ID button panel visibility
+- `SHOW_TEXT_BOX`: Toggle text box visibility for streamlined interface
 
 ### Bounding Box Features
 - **Visualization**: Display YOLO format labels as colored bounding boxes with class ID
 - **Selection**: Click to select boxes (red highlight)
 - **Class ID Assignment**: Select character button (0-9, A-Z) to set box class
-- **Drawing**: Ctrl key toggles drawing mode for creating new boxes (default class: 0)
+- **Drawing**: Two drawing modes available:
+  - Left Ctrl: Toggle drawing mode on/off
+  - Right Ctrl: Hold to enter drawing mode, release to exit
 - **Deletion**: Delete key or right-click to remove selected box
 - **Dragging**: Drag selected boxes to new positions
 - **Resizing**: Drag gray corner handles to resize boxes
@@ -79,11 +86,11 @@ python main.py
 
 ### Event System
 Events are defined in `UI_event.py` and handled through the Controller:
-- Keyboard events: LEFT/RIGHT navigation, Ctrl modifiers, Delete key
+- Keyboard events: LEFT/RIGHT navigation, Left/Right Ctrl modifiers, Delete key
 - Mouse events: Left/right clicks, drag operations, bounding box interactions
 - Button events: Toolbar button clicks, class ID selection
 - System events: Window ready, canvas resize
-- Bounding box events: Drawing mode toggle, selection, deletion
+- Bounding box events: Drawing mode toggle, selection, deletion, dragging, resizing
 
 ## Development Notes
 
@@ -115,3 +122,4 @@ Events are defined in `UI_event.py` and handled through the Controller:
 - Uses Python's configparser for config.ini
 - Graceful error handling for missing/corrupt config files
 - Automatic config creation with sensible defaults
+- Improved error messages for Windows-specific issues (e.g., file path access errors)
