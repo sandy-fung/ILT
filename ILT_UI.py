@@ -126,6 +126,7 @@ class UI:
             "→ 下一張\n"
             "滑鼠左鍵：選取box\n"
             "拖曳選中的box：移動box位置\n"
+            "拖曳右下角灰色方塊：調整box大小\n"
             "滑鼠右鍵：刪除選中的box\n"
             "Delete鍵：刪除選中的box\n"
             "Ctrl：切換繪框模式\n"
@@ -186,13 +187,15 @@ class UI:
         DEBUG("Image updated on canvas with height: {}, width: {}", self.canvas_height, self.canvas_width)
 
     def draw_labels_on_canvas(self, labels):
-        """Draw label bounding boxes on canvas (完全複用 image_label_tool 的清除機制避免殘影)"""
+        """Draw label bounding boxes on canvas with resize handles (複用 image_label_tool 的清除機制 + resize handles)"""
         # Clear ALL previous label-related items to avoid 殘影 (複用 image_label_tool 的完整清除策略)
         # 使用更廣泛的標籤清除，確保不會有任何殘影
         self.canvas.delete("label_box")
         self.canvas.delete("label_box_selected")
         self.canvas.delete("label_box_dragging") 
+        self.canvas.delete("label_box_resizing")  # 添加 resizing 標籤清除
         self.canvas.delete("label_text")
+        self.canvas.delete("resize_handle")  # 添加 resize handle 清除
         
         # 額外清除任何可能的殘留項目 (加強版清除機制)
         for item in self.canvas.find_withtag("label_box"):
@@ -200,6 +203,10 @@ class UI:
         for item in self.canvas.find_withtag("label_box_selected"):
             self.canvas.delete(item)
         for item in self.canvas.find_withtag("label_box_dragging"):
+            self.canvas.delete(item)
+        for item in self.canvas.find_withtag("label_box_resizing"):
+            self.canvas.delete(item)
+        for item in self.canvas.find_withtag("resize_handle"):
             self.canvas.delete(item)
         
         if not labels:
@@ -228,8 +235,14 @@ class UI:
                 label, self.canvas_width, self.canvas_height
             )
             
-            # Determine color and style based on state (複用 image_label_tool 的視覺回饋邏輯)
-            if self.bbox_controller and self.bbox_controller.is_dragging and label == self.bbox_controller.dragging_label:
+            # Determine color and style based on state (複用 image_label_tool 的視覺回饋邏輯 + resizing)
+            if self.bbox_controller and self.bbox_controller.is_resizing and label == self.bbox_controller.resizing_label:
+                # Resizing: special style with dotted line and bright color
+                color = "#FF6B35"  # Orange for resizing
+                width = 4
+                tags = "label_box_resizing"
+                dash = (3, 3)  # Dotted line pattern for resizing
+            elif self.bbox_controller and self.bbox_controller.is_dragging and label == self.bbox_controller.dragging_label:
                 # Dragging: special style with dashed line and bright color
                 color = "#00FFFF"  # Cyan for dragging
                 width = 4
@@ -242,8 +255,8 @@ class UI:
                 tags = "label_box_selected"
                 dash = None
             else:
-                # Not selected: original color based on class_id
-                color = colors[label.class_id % len(colors)]
+                # Not selected: green color (完全複用 plate_box_3.py 第 32 行)
+                color = "green"  # 原始實作使用 "green"
                 width = 2
                 tags = "label_box"
                 dash = None
@@ -262,6 +275,10 @@ class UI:
                 **rect_kwargs
             )
             
+            # Draw resize handles for selected labels (複用 plate_box_3.py 的 resize handle 繪製邏輯)
+            if hasattr(label, 'selected') and label.selected and self.bbox_controller:
+                self.draw_resize_handles(label, x1, y1, x2, y2, color)
+            
             # Draw class ID text
             text_x = x1
             text_y = y1 - 5 if y1 > 15 else y2 + 5
@@ -277,6 +294,36 @@ class UI:
             
             DEBUG("Drew label: class_id={}, coords=({:.1f},{:.1f},{:.1f},{:.1f})", 
                   label.class_id, x1, y1, x2, y2)
+
+    def draw_resize_handles(self, label, x1, y1, x2, y2, color):
+        """
+        繪製 resize handle (完全複用 plate_box_3.py 第 36-43 行的邏輯 - 只有右下角)
+        
+        Args:
+            label (LabelObject): 標籤對象
+            x1, y1, x2, y2 (float): bounding box 的 canvas 座標
+            color (str): 邊框顏色（未使用，保持與原始實作一致）
+        """
+        handle_size = self.bbox_controller.handle_size if self.bbox_controller else 10
+        
+        # 只繪製右下角 handle (完全複用 plate_box_3.py 第 37-43 行)
+        # self.handle_id = self.canvas.create_rectangle(
+        #     self.x2 - self.handle_size,
+        #     self.y2 - self.handle_size,
+        #     self.x2,
+        #     self.y2,
+        #     fill="gray"
+        # )
+        self.canvas.create_rectangle(
+            x2 - handle_size,
+            y2 - handle_size,
+            x2,
+            y2,
+            fill="gray",
+            tags="resize_handle"
+        )
+        
+        DEBUG("Drew resize handle for label: class_id={}", label.class_id)
 
 # Update text and index labels
     def update_text_box(self, content):
@@ -313,7 +360,7 @@ class UI:
             self.dispatch(UIEvent.MOUSE_RIGHT_CLICK, {"value": event})
 
     def on_mouse_press(self, event):
-        """Handle mouse press event - support drawing and dragging modes (複用 image_label_tool 的模式)"""
+        """Handle mouse press event - support drawing, dragging, and resizing modes (複用 image_label_tool 的模式 + resize)"""
         DEBUG("on_mouse_press at ({}, {})", event.x, event.y)
         
         if self.bbox_controller and self.bbox_controller.is_in_drawing_mode():
@@ -323,12 +370,18 @@ class UI:
                     self.dispatch(UIEvent.MOUSE_LEFT_PRESS, {"value": event})
                 return
         
-        # Normal mode: handle selection and dragging
+        # Normal mode: handle selection, dragging, and resizing (按照 plate_box_3.py 的優先序)
         if self.dispatch:
-            self.dispatch(UIEvent.MOUSE_LEFT_PRESS, {"value": event, "x": event.x, "y": event.y})
+            # 添加操作類型信息，讓 Controller 知道發生了什麼操作
+            self.dispatch(UIEvent.MOUSE_LEFT_PRESS, {
+                "value": event, 
+                "x": event.x, 
+                "y": event.y,
+                "supports_resize": True  # 標記支援 resize 功能
+            })
     
     def on_mouse_release(self, event):
-        """Handle mouse release event - support drawing and dragging modes (複用 image_label_tool 的模式)"""
+        """Handle mouse release event - support drawing, dragging, and resizing modes (複用 image_label_tool 的模式 + resize)"""
         DEBUG("on_mouse_release at ({}, {})", event.x, event.y)
         
         if self.bbox_controller and self.bbox_controller.is_in_drawing_mode():
@@ -336,6 +389,11 @@ class UI:
             drawing_result = self.bbox_controller.finish_drawing(event.x, event.y)
             if drawing_result and self.dispatch:
                 self.dispatch(UIEvent.MOUSE_LEFT_RELEASE, {"value": event, "drawing_result": drawing_result})
+        elif self.bbox_controller and self.bbox_controller.is_resizing:
+            # Resizing mode: complete resizing (複用 plate_box_3.py 的 resize 完成邏輯)
+            resized_label = self.bbox_controller.finish_resize()
+            if resized_label and self.dispatch:
+                self.dispatch(UIEvent.MOUSE_LEFT_RELEASE, {"value": event, "resized_label": resized_label})
         elif self.bbox_controller and self.bbox_controller.is_dragging:
             # Dragging mode: complete dragging
             dragged_label = self.bbox_controller.finish_drag()
@@ -343,17 +401,22 @@ class UI:
                 self.dispatch(UIEvent.MOUSE_LEFT_RELEASE, {"value": event, "dragged_label": dragged_label})
         
     def on_mouse_drag(self, event):
-        """Handle mouse drag event - drawing preview and dragging (複用 image_label_tool 的模式)"""
+        """Handle mouse drag event - drawing preview, dragging, and resizing (複用 image_label_tool 的模式 + resize)"""
         if self.bbox_controller and self.bbox_controller.is_in_drawing_mode():
             # Drawing mode: update preview
             self.bbox_controller.update_preview(event.x, event.y)
             if self.dispatch:
                 self.dispatch(UIEvent.MOUSE_DRAG, {"value": event})
+        elif self.bbox_controller and self.bbox_controller.is_resizing:
+            # Resizing mode: update resize position (複用 plate_box_3.py 的 resize 拖拽邏輯)
+            self.bbox_controller.update_resize(event.x, event.y)
+            if self.dispatch:
+                self.dispatch(UIEvent.MOUSE_DRAG, {"value": event, "x": event.x, "y": event.y, "operation": "resize"})
         elif self.bbox_controller and self.bbox_controller.is_dragging:
             # Dragging mode: update drag position
             self.bbox_controller.update_drag(event.x, event.y)
             if self.dispatch:
-                self.dispatch(UIEvent.MOUSE_DRAG, {"value": event, "x": event.x, "y": event.y})
+                self.dispatch(UIEvent.MOUSE_DRAG, {"value": event, "x": event.x, "y": event.y, "operation": "drag"})
 
     # Key events
     def on_lc_press_switch_pen(self, event):

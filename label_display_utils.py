@@ -131,6 +131,76 @@ class LabelObject:
         # 應用邊界約束
         self.apply_boundary_constraints(canvas_width, canvas_height)
 
+    def is_on_resize_handle(self, x, y, canvas_width, canvas_height, handle_size=10):
+        """
+        檢測點擊是否在 resize handle 上 (完全複用 plate_box_3.py 的邏輯 - 只有右下角)
+        
+        Args:
+            x (float): 點擊的 X 座標 (canvas 像素)
+            y (float): 點擊的 Y 座標 (canvas 像素)
+            canvas_width (int): Canvas 寬度
+            canvas_height (int): Canvas 高度
+            handle_size (int): Handle 尺寸 (預設 10 像素)
+            
+        Returns:
+            bool: 如果在 resize handle 上返回 True，否則返回 False
+        """
+        # 轉換為 canvas 座標的邊界框
+        x1, y1, x2, y2 = convert_label_to_canvas_coords(self, canvas_width, canvas_height)
+        
+        # 只檢查右下角 handle (完全複用 plate_box_3.py 第 73-75 行的邏輯)
+        return (x2 - handle_size <= x <= x2 and y2 - handle_size <= y <= y2)
+
+    def resize(self, new_width_pixels, new_height_pixels, canvas_width, canvas_height):
+        """
+        調整 bounding box 大小，保持中心點不變 (複用 plate_box_3.py 的 resize 邏輯)
+        
+        Args:
+            new_width_pixels (float): 新的寬度 (canvas 像素)
+            new_height_pixels (float): 新的高度 (canvas 像素) 
+            canvas_width (int): Canvas 寬度
+            canvas_height (int): Canvas 高度
+        """
+        # 設定最小尺寸限制
+        min_width_pixels = max(10, new_width_pixels)
+        min_height_pixels = max(10, new_height_pixels)
+        
+        # 轉換為 YOLO 比例
+        new_w_ratio = min_width_pixels / canvas_width
+        new_h_ratio = min_height_pixels / canvas_height
+        
+        # 更新尺寸
+        self.w_ratio = new_w_ratio
+        self.h_ratio = new_h_ratio
+        
+        # 應用邊界約束 (確保調整後的 box 不超出邊界)
+        self.apply_boundary_constraints(canvas_width, canvas_height)
+        
+        DEBUG("Resized label: new size=({:.3f}, {:.3f}), canvas_size=({}, {})", 
+              self.w_ratio, self.h_ratio, canvas_width, canvas_height)
+
+    def resize_by_delta(self, dx, dy, canvas_width, canvas_height):
+        """
+        根據滑鼠拖拽增量調整大小 (完全複用 plate_box_3.py 第 167 行的邏輯)
+        保持中心點不變，只調整寬度和高度
+        
+        Args:
+            dx (float): X 方向增量 (canvas 像素)
+            dy (float): Y 方向增量 (canvas 像素)
+            canvas_width (int): Canvas 寬度
+            canvas_height (int): Canvas 高度
+        """
+        # 獲取當前像素尺寸
+        _, _, current_width, current_height = label_to_pixel_position(self, canvas_width, canvas_height)
+        
+        # 根據增量計算新的寬度和高度 (複用 plate_box_3.py 第 167 行)
+        # self.resizing_box.resize(self.resizing_box.width + dx, self.resizing_box.height + dy)
+        new_width = current_width + dx
+        new_height = current_height + dy
+        
+        # 應用新的尺寸（resize 方法會保持中心點不變）
+        self.resize(new_width, new_height, canvas_width, canvas_height)
+
 
 def label_to_pixel_position(label, canvas_width, canvas_height):
     """Convert a label object to bounding box coordinates in pixel format"""

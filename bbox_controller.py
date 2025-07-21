@@ -27,9 +27,18 @@ class BBoxController:
         self.drag_start_y = 0           # Drag start Y coordinate (canvas)
         self.is_dragging = False        # Dragging in progress flag
         
+        # Resizing state variables (複用 plate_box_3.py 的 resizing 邏輯)
+        self.resizing_label = None      # Currently resizing LabelObject  
+        self.resize_start_x = 0         # Resize start X coordinate (canvas)
+        self.resize_start_y = 0         # Resize start Y coordinate (canvas)
+        self.is_resizing = False        # Resizing in progress flag
+        
         # Minimum box size constraints
         self.min_box_width = 5
         self.min_box_height = 5
+        
+        # Handle size for resize handles
+        self.handle_size = 10
 
     def toggle_drawing_mode(self):
         """Toggle drawing mode"""
@@ -304,8 +313,153 @@ class BBoxController:
             
         return dragged_label
 
+    def check_resize_handle_click(self, x, y, labels):
+        """
+        檢查點擊是否在 resize handle 上 (完全複用 plate_box_3.py 第 141-143 行的邏輯)
+        
+        Args:
+            x (float): 點擊的 X 座標 (canvas 像素)
+            y (float): 點擊的 Y 座標 (canvas 像素)
+            labels (list): LabelObject 列表
+            
+        Returns:
+            LabelObject or None: 如果點擊在 handle 上返回標籤對象，否則返回 None
+        """
+        canvas_width = self.canvas.winfo_width()
+        canvas_height = self.canvas.winfo_height()
+        
+        # 從最上層開始檢查 (z-index: top first，複用 plate_box_3.py 第 140 行)
+        for label in reversed(labels):
+            if label.is_on_resize_handle(x, y, canvas_width, canvas_height, self.handle_size):
+                DEBUG("Resize handle clicked: label class_id={}", label.class_id)
+                return label
+        
+        return None
+
+    def start_resize(self, x, y, labels):
+        """
+        開始 resize 操作 (完全複用 plate_box_3.py 第 141-143 行的邏輯)
+        
+        Args:
+            x (float): 點擊起始 X 座標 (canvas 像素)
+            y (float): 點擊起始 Y 座標 (canvas 像素)
+            labels (list): LabelObject 列表
+            
+        Returns:
+            bool: 是否成功開始 resize
+        """
+        # 檢查是否點擊在 resize handle 上
+        label = self.check_resize_handle_click(x, y, labels)
+        
+        if label:
+            self.is_resizing = True
+            self.resizing_label = label
+            self.resize_start_x = x
+            self.resize_start_y = y
+            
+            # 設定該 label 為選中狀態 (複用 plate_box_3.py 第 149-152 行)
+            self.clear_selection(labels)
+            label.set_selected(True)
+            self.selected_label = label
+            
+            # 更改光標樣式（原始實作沒有特別設定光標，但我們可以保留）
+            self.canvas.config(cursor="sizing")
+            
+            DEBUG("Started resizing label: class_id={}, start_pos=({}, {})", 
+                  label.class_id, x, y)
+            return True
+        
+        return False
+
+    def update_resize(self, x, y):
+        """
+        處理 resize 移動 (完全複用 plate_box_3.py 第 162-168 行的邏輯)
+        
+        Args:
+            x (float): 當前 X 座標 (canvas 像素)
+            y (float): 當前 Y 座標 (canvas 像素)
+        """
+        if not self.is_resizing or not self.resizing_label:
+            return
+            
+        # 計算位移量 (複用 plate_box_3.py 第 162-164 行)
+        dx = x - self.resize_start_x
+        dy = y - self.resize_start_y
+        
+        # 更新起始位置 (複用 plate_box_3.py 第 164 行)
+        self.resize_start_x, self.resize_start_y = x, y
+        
+        # 獲取 canvas 尺寸
+        canvas_width = self.canvas.winfo_width()
+        canvas_height = self.canvas.winfo_height()
+        
+        # 使用 resize_by_delta 方法調整大小 (對應 plate_box_3.py 第 167 行)
+        # self.resizing_box.resize(self.resizing_box.width + dx, self.resizing_box.height + dy)
+        self.resizing_label.resize_by_delta(dx, dy, canvas_width, canvas_height)
+        
+        DEBUG("Resizing label moved by delta ({}, {}), new size=({:.3f}, {:.3f})", 
+              dx, dy, self.resizing_label.w_ratio, self.resizing_label.h_ratio)
+
+    def finish_resize(self):
+        """
+        完成 resize 操作 (複用 plate_box_3.py 的清理邏輯)
+        
+        Returns:
+            LabelObject or None: 被 resize 的標籤對象，如果有的話
+        """
+        if not self.is_resizing:
+            return None
+            
+        resized_label = self.resizing_label
+        
+        # 清除 resizing 狀態 (複用 plate_box_3.py 第 174 行)
+        self.is_resizing = False
+        self.resizing_label = None
+        self.resize_start_x = 0
+        self.resize_start_y = 0
+        
+        # 恢復光標樣式
+        if self.drawing_mode:
+            self.canvas.config(cursor="pencil")
+        else:
+            self.canvas.config(cursor="arrow")
+            
+        if resized_label:
+            DEBUG("Finished resizing label: class_id={}, final size=({:.3f}, {:.3f})", 
+                  resized_label.class_id, resized_label.w_ratio, resized_label.h_ratio)
+            
+        return resized_label
+
+    def handle_mouse_press_with_resize(self, x, y, labels):
+        """
+        處理滑鼠按下事件，支援 resize handles (複用 plate_box_3.py 的優先序邏輯)
+        
+        Args:
+            x (float): 點擊的 X 座標 (canvas 像素)
+            y (float): 點擊的 Y 座標 (canvas 像素)
+            labels (list): LabelObject 列表
+            
+        Returns:
+            str: 操作類型 ("resize", "drag", "select", "none")
+        """
+        # 優先檢查 resize handle (複用 plate_box_3.py 的優先序)
+        if self.start_resize(x, y, labels):
+            return "resize"
+        
+        # 其次檢查拖拽
+        if self.start_drag(x, y, labels):
+            return "drag"
+        
+        # 最後檢查選擇
+        selected_label = self.handle_selection(x, y, labels)
+        if selected_label:
+            return "select"
+        
+        return "none"
+
 class DrawingState:
     """Drawing state enumeration"""
     IDLE = "idle"
     DRAWING = "drawing"
     PREVIEW = "preview"
+    RESIZING = "resizing"  # 添加 resizing 狀態
