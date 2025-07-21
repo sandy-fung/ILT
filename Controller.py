@@ -377,11 +377,18 @@ class Controller:
             self.current_labels.append(new_label)
             DEBUG("Added new bbox: cx={:.6f}, cy={:.6f}, w={:.6f}, h={:.6f}", cx, cy, w_ratio, h_ratio)
             
+            # 重新排序標籤
+            if len(self.current_labels) > 1:
+                original_count = len(self.current_labels)
+                self.current_labels, plate_count = label_display_utils.sort_labels_by_position(self.current_labels)
+                DEBUG("Re-sorted {} labels after adding new bbox", original_count)
+            
             # Save to label file
             self.save_current_labels()
             
             # Update UI display
             self.update_label_display()
+            self.load_label(self.labels_path)  # 更新文字框顯示
             
         except Exception as e:
             ERROR("Error handling new bbox: {}", e)
@@ -398,11 +405,18 @@ class Controller:
                   dragged_label.class_id, dragged_label.cx_ratio, 
                   dragged_label.cy_ratio, dragged_label.w_ratio, dragged_label.h_ratio)
             
+            # 重新排序標籤（因為位置改變了）
+            if len(self.current_labels) > 1:
+                original_count = len(self.current_labels)
+                self.current_labels, plate_count = label_display_utils.sort_labels_by_position(self.current_labels)
+                DEBUG("Re-sorted {} labels after dragging", original_count)
+            
             # 儲存更新後的標籤文件
             self.save_current_labels()
             
             # 更新 UI 顯示
             self.update_label_display()
+            self.load_label(self.labels_path)  # 更新文字框顯示
             
             DEBUG("Dragged bbox processing completed")
             
@@ -480,11 +494,18 @@ class Controller:
                 # 清除選擇狀態
                 bbox_controller.clear_selection(self.current_labels)
                 
+                # 重新排序剩餘的標籤
+                if self.current_labels:
+                    original_count = len(self.current_labels)
+                    self.current_labels, plate_count = label_display_utils.sort_labels_by_position(self.current_labels)
+                    DEBUG("Re-sorted {} labels after deletion", original_count)
+                
                 # 保存更新後的標籤文件
                 self.save_current_labels()
                 
                 # 刷新畫布顯示
                 self.update_label_display()
+                self.load_label(self.labels_path)  # 更新文字框顯示
                 
                 # 更新狀態顯示
                 if hasattr(self.view, 'update_selection_status_display'):

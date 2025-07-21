@@ -56,14 +56,25 @@ python main.py
 
 ### UI Components
 - Top toolbar: "Reselect Folders", "Crop", "Add" buttons
-- Main canvas with image display
+- Main canvas with image display and bounding box visualization
 - Text box showing label content
 - Hint area with keyboard shortcuts (in Chinese)
 
+### Bounding Box Features
+- **Visualization**: Display YOLO format labels as colored bounding boxes
+- **Selection**: Click to select boxes (red highlight)
+- **Drawing**: Ctrl key toggles drawing mode for creating new boxes
+- **Deletion**: Delete key or right-click to remove selected box
+- **Dragging**: Drag selected boxes to new positions
+- **Resizing**: Drag corner handles to resize boxes
+- **Auto-sorting**: Labels automatically sorted left-to-right on load
+  - Supports multiple license plates with intelligent grouping
+  - Uses 50% vertical overlap threshold for plate detection
+
 ### Event System
 Events are defined in `UI_event.py` and handled through the Controller:
-- Keyboard events: LEFT/RIGHT navigation, Ctrl modifiers
-- Mouse events: Left/right clicks
+- Keyboard events: LEFT/RIGHT navigation, Ctrl modifiers, Delete key
+- Mouse events: Left/right clicks, drag operations
 - Button events: Toolbar button clicks
 - System events: Window ready, canvas resize
 
@@ -79,6 +90,14 @@ Events are defined in `UI_event.py` and handled through the Controller:
 2. `image_utils.py` loads with OpenCV and converts to PIL
 3. `ILT_UI.py` displays on Tkinter canvas with auto-resize
 4. Labels are read/written as text files alongside images
+
+### Label Processing Flow
+1. `label_display_utils.py` parses YOLO format labels into LabelObject instances
+2. Auto-sorting on load:
+   - Groups labels by vertical overlap (same license plate detection)
+   - Sorts each group by X coordinate (left-to-right)
+   - Saves sorted results back to label files
+3. Visual feedback shows number of labels and detected plates
 
 ### Configuration Management
 - Uses Python's configparser for config.ini

@@ -130,7 +130,8 @@ class UI:
             "滑鼠右鍵：刪除選中的box\n"
             "Delete鍵：刪除選中的box\n"
             "Ctrl：切換繪框模式\n"
-            "繪框模式下拖拽：繪製新box"
+            "繪框模式下拖拽：繪製新box\n"
+            "※ 標籤會自動依位置排序"
             )
         self.hint_label = tk.Label(
             self.hint_frame,
