@@ -21,6 +21,12 @@ class BBoxController:
         # Selection state variables
         self.selected_label = None
         
+        # Dragging state variables (reuse pattern from image_label_tool)
+        self.dragging_label = None      # Currently dragging LabelObject
+        self.drag_start_x = 0           # Drag start X coordinate (canvas)
+        self.drag_start_y = 0           # Drag start Y coordinate (canvas)
+        self.is_dragging = False        # Dragging in progress flag
+        
         # Minimum box size constraints
         self.min_box_width = 5
         self.min_box_height = 5
@@ -203,6 +209,100 @@ class BBoxController:
             LabelObject or None: 當前選中的標籤
         """
         return self.selected_label
+
+    def start_drag(self, x, y, labels):
+        """
+        初始化拖曳操作 (複用 image_label_tool 的模式)
+        
+        Args:
+            x (float): 拖曳起始 X 座標 (canvas 像素)
+            y (float): 拖曳起始 Y 座標 (canvas 像素)  
+            labels (list): LabelObject 列表
+            
+        Returns:
+            bool: 是否成功開始拖曳
+        """
+        # 檢查是否有選中的標籤且點擊在其內部
+        if self.selected_label and self.selected_label.contains(x, y, 
+                                                               self.canvas.winfo_width(), 
+                                                               self.canvas.winfo_height()):
+            self.is_dragging = True
+            self.dragging_label = self.selected_label
+            self.drag_start_x = x
+            self.drag_start_y = y
+            
+            # 更改光標樣式
+            self.canvas.config(cursor="fleur")
+            
+            DEBUG("Started dragging label: class_id={}, coords=({:.3f}, {:.3f}, {:.3f}, {:.3f})", 
+                  self.dragging_label.class_id, self.dragging_label.cx_ratio, 
+                  self.dragging_label.cy_ratio, self.dragging_label.w_ratio, self.dragging_label.h_ratio)
+            return True
+        
+        return False
+
+    def update_drag(self, x, y):
+        """
+        處理拖曳移動 (複用 image_label_tool 的增量計算模式)
+        
+        Args:
+            x (float): 當前 X 座標 (canvas 像素)
+            y (float): 當前 Y 座標 (canvas 像素)
+        """
+        if not self.is_dragging or not self.dragging_label:
+            return
+            
+        # 計算位移量 (複用參考實現的 delta 方式)
+        dx = x - self.drag_start_x
+        dy = y - self.drag_start_y
+        
+        if dx == 0 and dy == 0:
+            return
+            
+        # 獲取 canvas 尺寸
+        canvas_width = self.canvas.winfo_width()
+        canvas_height = self.canvas.winfo_height()
+        
+        # 移動標籤 (使用 canvas 像素增量)
+        self.dragging_label.move_by_canvas_delta(dx, dy, canvas_width, canvas_height)
+        
+        # 更新拖曳起始位置
+        self.drag_start_x = x
+        self.drag_start_y = y
+        
+        DEBUG("Dragging label moved by delta ({}, {}), new coords=({:.3f}, {:.3f})", 
+              dx, dy, self.dragging_label.cx_ratio, self.dragging_label.cy_ratio)
+
+    def finish_drag(self):
+        """
+        完成拖曳操作 (複用 image_label_tool 的清理模式)
+        
+        Returns:
+            LabelObject or None: 被拖曳的標籤對象，如果有的話
+        """
+        if not self.is_dragging:
+            return None
+            
+        dragged_label = self.dragging_label
+        
+        # 清除拖曳狀態
+        self.is_dragging = False
+        self.dragging_label = None
+        self.drag_start_x = 0
+        self.drag_start_y = 0
+        
+        # 恢復光標樣式
+        if self.drawing_mode:
+            self.canvas.config(cursor="pencil")
+        else:
+            self.canvas.config(cursor="arrow")
+            
+        if dragged_label:
+            DEBUG("Finished dragging label: class_id={}, final coords=({:.3f}, {:.3f}, {:.3f}, {:.3f})", 
+                  dragged_label.class_id, dragged_label.cx_ratio, 
+                  dragged_label.cy_ratio, dragged_label.w_ratio, dragged_label.h_ratio)
+            
+        return dragged_label
 
 class DrawingState:
     """Drawing state enumeration"""

@@ -110,6 +110,7 @@ class UI:
             "← 上一張\n"
             "→ 下一張\n"
             "滑鼠左鍵：選取box\n"
+            "拖曳選中的box：移動box位置\n"
             "滑鼠右鍵：刪除選中的box\n"
             "Delete鍵：刪除選中的box\n"
             "Ctrl：切換繪框模式\n"
@@ -160,11 +161,21 @@ class UI:
         DEBUG("Image updated on canvas with height: {}, width: {}", self.canvas_height, self.canvas_width)
 
     def draw_labels_on_canvas(self, labels):
-        """Draw label bounding boxes on canvas"""
-        # Clear previous labels first
+        """Draw label bounding boxes on canvas (完全複用 image_label_tool 的清除機制避免殘影)"""
+        # Clear ALL previous label-related items to avoid 殘影 (複用 image_label_tool 的完整清除策略)
+        # 使用更廣泛的標籤清除，確保不會有任何殘影
         self.canvas.delete("label_box")
-        self.canvas.delete("label_box_selected") 
+        self.canvas.delete("label_box_selected")
+        self.canvas.delete("label_box_dragging") 
         self.canvas.delete("label_text")
+        
+        # 額外清除任何可能的殘留項目 (加強版清除機制)
+        for item in self.canvas.find_withtag("label_box"):
+            self.canvas.delete(item)
+        for item in self.canvas.find_withtag("label_box_selected"):
+            self.canvas.delete(item)
+        for item in self.canvas.find_withtag("label_box_dragging"):
+            self.canvas.delete(item)
         
         if not labels:
             DEBUG("No labels to draw")
@@ -192,24 +203,38 @@ class UI:
                 label, self.canvas_width, self.canvas_height
             )
             
-            # Determine color and style based on selection state
-            if hasattr(label, 'selected') and label.selected:
+            # Determine color and style based on state (複用 image_label_tool 的視覺回饋邏輯)
+            if self.bbox_controller and self.bbox_controller.is_dragging and label == self.bbox_controller.dragging_label:
+                # Dragging: special style with dashed line and bright color
+                color = "#00FFFF"  # Cyan for dragging
+                width = 4
+                tags = "label_box_dragging"
+                dash = (5, 5)  # Dashed line pattern
+            elif hasattr(label, 'selected') and label.selected:
                 # Selected: red color with thicker border
                 color = "#FF0000"  # Red
                 width = 3
                 tags = "label_box_selected"
+                dash = None
             else:
                 # Not selected: original color based on class_id
                 color = colors[label.class_id % len(colors)]
                 width = 2
                 tags = "label_box"
+                dash = None
             
-            # Draw bounding box
+            # Draw bounding box (複用 image_label_tool 的樣式設定)
+            rect_kwargs = {
+                "outline": color,
+                "width": width,
+                "tags": tags
+            }
+            if dash:
+                rect_kwargs["dash"] = dash
+                
             self.canvas.create_rectangle(
                 x1, y1, x2, y2,
-                outline=color,
-                width=width,
-                tags=tags
+                **rect_kwargs
             )
             
             # Draw class ID text
@@ -263,7 +288,7 @@ class UI:
             self.dispatch(UIEvent.MOUSE_RIGHT_CLICK, {"value": event})
 
     def on_mouse_press(self, event):
-        """Handle mouse press event - support drawing mode"""
+        """Handle mouse press event - support drawing and dragging modes (複用 image_label_tool 的模式)"""
         DEBUG("on_mouse_press at ({}, {})", event.x, event.y)
         
         if self.bbox_controller and self.bbox_controller.is_in_drawing_mode():
@@ -273,12 +298,12 @@ class UI:
                     self.dispatch(UIEvent.MOUSE_LEFT_PRESS, {"value": event})
                 return
         
-        # Normal mode: handle selection
+        # Normal mode: handle selection and dragging
         if self.dispatch:
             self.dispatch(UIEvent.MOUSE_LEFT_PRESS, {"value": event, "x": event.x, "y": event.y})
     
     def on_mouse_release(self, event):
-        """Handle mouse release event - support drawing mode"""
+        """Handle mouse release event - support drawing and dragging modes (複用 image_label_tool 的模式)"""
         DEBUG("on_mouse_release at ({}, {})", event.x, event.y)
         
         if self.bbox_controller and self.bbox_controller.is_in_drawing_mode():
@@ -286,13 +311,24 @@ class UI:
             drawing_result = self.bbox_controller.finish_drawing(event.x, event.y)
             if drawing_result and self.dispatch:
                 self.dispatch(UIEvent.MOUSE_LEFT_RELEASE, {"value": event, "drawing_result": drawing_result})
+        elif self.bbox_controller and self.bbox_controller.is_dragging:
+            # Dragging mode: complete dragging
+            dragged_label = self.bbox_controller.finish_drag()
+            if dragged_label and self.dispatch:
+                self.dispatch(UIEvent.MOUSE_LEFT_RELEASE, {"value": event, "dragged_label": dragged_label})
         
     def on_mouse_drag(self, event):
-        """Handle mouse drag event - drawing preview"""
+        """Handle mouse drag event - drawing preview and dragging (複用 image_label_tool 的模式)"""
         if self.bbox_controller and self.bbox_controller.is_in_drawing_mode():
+            # Drawing mode: update preview
             self.bbox_controller.update_preview(event.x, event.y)
             if self.dispatch:
                 self.dispatch(UIEvent.MOUSE_DRAG, {"value": event})
+        elif self.bbox_controller and self.bbox_controller.is_dragging:
+            # Dragging mode: update drag position
+            self.bbox_controller.update_drag(event.x, event.y)
+            if self.dispatch:
+                self.dispatch(UIEvent.MOUSE_DRAG, {"value": event, "x": event.x, "y": event.y})
 
     # Key events
     def on_lc_press_switch_pen(self, event):
@@ -415,12 +451,32 @@ class UI:
             self.drawing_mode_label.config(text="普通模式", fg="#424242")
     
     def update_selection_status_display(self, selected_label=None):
-        """Update selection status display"""
-        if selected_label:
+        """Update selection status display (複用 image_label_tool 的狀態顯示邏輯)"""
+        if self.bbox_controller and self.bbox_controller.is_dragging:
+            # 拖曳模式顯示
+            dragging_label = self.bbox_controller.dragging_label
+            status_text = f"拖曳中：class_id={dragging_label.class_id}"
+            self.selection_status_label.config(text=status_text, fg="#00FFFF")
+        elif selected_label:
             status_text = f"已選中：class_id={selected_label.class_id}"
             self.selection_status_label.config(text=status_text, fg="#FF0000")
         else:
             self.selection_status_label.config(text="未選中任何框", fg="#666666")
+    
+    def update_dragging_status_display(self, is_dragging=False, dragged_label=None):
+        """
+        更新拖曳狀態顯示 (複用 image_label_tool 的狀態回饋邏輯)
+        
+        Args:
+            is_dragging (bool): 是否正在拖曳
+            dragged_label (LabelObject): 被拖曳的標籤對象
+        """
+        if is_dragging and dragged_label:
+            status_text = f"拖曳中：class_id={dragged_label.class_id}, 座標=({dragged_label.cx_ratio:.3f}, {dragged_label.cy_ratio:.3f})"
+            self.selection_status_label.config(text=status_text, fg="#00FFFF")
+        else:
+            # 恢復選擇狀態顯示
+            self.update_selection_status_display(self.bbox_controller.get_selected_label() if self.bbox_controller else None)
 
     def run(self):
         if self.dispatch:

@@ -51,6 +51,86 @@ class LabelObject:
         """
         self.selected = selected
 
+    def move_by_canvas_delta(self, dx, dy, canvas_width, canvas_height):
+        """
+        用 canvas 像素增量移動 bounding box (複用 image_label_tool 的移動邏輯)
+        
+        Args:
+            dx (float): X 方向像素增量
+            dy (float): Y 方向像素增量
+            canvas_width (int): Canvas 寬度
+            canvas_height (int): Canvas 高度
+        """
+        # 轉換像素增量為 YOLO 比例增量
+        dx_ratio = dx / canvas_width
+        dy_ratio = dy / canvas_height
+        
+        # 更新中心點座標
+        self.cx_ratio += dx_ratio
+        self.cy_ratio += dy_ratio
+        
+        # 應用邊界約束 (確保 bounding box 不超出影像邊界)
+        self.apply_boundary_constraints(canvas_width, canvas_height)
+
+    def apply_boundary_constraints(self, canvas_width, canvas_height):
+        """
+        確保 bounding box 不超出影像邊界 (複用 image_label_tool 的約束邏輯，加強邊界檢查)
+        
+        Args:
+            canvas_width (int): Canvas 寬度  
+            canvas_height (int): Canvas 高度
+        """
+        # 計算 bounding box 的邊界
+        half_w = max(0.001, min(0.5, self.w_ratio / 2))  # 防止極端尺寸
+        half_h = max(0.001, min(0.5, self.h_ratio / 2))
+        
+        # 約束中心點，確保 bounding box 完全在 [0,1] 範圍內
+        min_cx = half_w
+        max_cx = 1.0 - half_w
+        min_cy = half_h  
+        max_cy = 1.0 - half_h
+        
+        # 應用約束 (加強邊界檢查)
+        if min_cx < max_cx and min_cy < max_cy:  # 確保約束有效
+            self.cx_ratio = max(min_cx, min(max_cx, self.cx_ratio))
+            self.cy_ratio = max(min_cy, min(max_cy, self.cy_ratio))
+        else:
+            # 處理極端情況：box 太大的情況
+            self.cx_ratio = 0.5
+            self.cy_ratio = 0.5
+            DEBUG("Applied fallback constraints for oversized box")
+
+    def get_canvas_center(self, canvas_width, canvas_height):
+        """
+        取得 canvas 中心點座標
+        
+        Args:
+            canvas_width (int): Canvas 寬度
+            canvas_height (int): Canvas 高度
+            
+        Returns:
+            tuple: (cx_pixels, cy_pixels) Canvas 像素座標
+        """
+        cx_pixels = self.cx_ratio * canvas_width
+        cy_pixels = self.cy_ratio * canvas_height
+        return cx_pixels, cy_pixels
+
+    def set_canvas_position(self, cx, cy, canvas_width, canvas_height):
+        """
+        設定 canvas 位置
+        
+        Args:
+            cx (float): 中心 X 座標 (canvas 像素)
+            cy (float): 中心 Y 座標 (canvas 像素)
+            canvas_width (int): Canvas 寬度
+            canvas_height (int): Canvas 高度
+        """
+        self.cx_ratio = cx / canvas_width
+        self.cy_ratio = cy / canvas_height
+        
+        # 應用邊界約束
+        self.apply_boundary_constraints(canvas_width, canvas_height)
+
 
 def label_to_pixel_position(label, canvas_width, canvas_height):
     """Convert a label object to bounding box coordinates in pixel format"""
@@ -172,3 +252,52 @@ def convert_label_to_canvas_coords(label, canvas_width, canvas_height):
     y2 = center_y + box_height / 2
     
     return x1, y1, x2, y2
+
+
+def delta_canvas_to_yolo(dx, dy, canvas_width, canvas_height):
+    """
+    轉換 canvas 像素增量為 YOLO 比例增量 (複用 image_label_tool 的轉換邏輯)
+    
+    Args:
+        dx (float): X 方向像素增量
+        dy (float): Y 方向像素增量 
+        canvas_width (int): Canvas 寬度
+        canvas_height (int): Canvas 高度
+        
+    Returns:
+        tuple: (dx_ratio, dy_ratio) YOLO 比例增量
+    """
+    dx_ratio = dx / canvas_width
+    dy_ratio = dy / canvas_height
+    return dx_ratio, dy_ratio
+
+
+def validate_yolo_bounds(cx_ratio, cy_ratio, w_ratio, h_ratio):
+    """
+    驗證 YOLO 座標是否在合法範圍 [0,1] (複用 image_label_tool 的驗證邏輯)
+    
+    Args:
+        cx_ratio (float): 中心 X 比例
+        cy_ratio (float): 中心 Y 比例
+        w_ratio (float): 寬度比例
+        h_ratio (float): 高度比例
+        
+    Returns:
+        bool: 是否在合法範圍內
+    """
+    # 檢查所有值是否在 [0,1] 範圍內
+    if not (0 <= cx_ratio <= 1 and 0 <= cy_ratio <= 1):
+        return False
+    if not (0 <= w_ratio <= 1 and 0 <= h_ratio <= 1):
+        return False
+        
+    # 檢查 bounding box 是否完全在影像範圍內
+    half_w = w_ratio / 2
+    half_h = h_ratio / 2
+    
+    if cx_ratio - half_w < 0 or cx_ratio + half_w > 1:
+        return False
+    if cy_ratio - half_h < 0 or cy_ratio + half_h > 1:
+        return False
+        
+    return True

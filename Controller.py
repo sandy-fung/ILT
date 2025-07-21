@@ -24,6 +24,8 @@ class Controller:
         # Drawing mode state
         self.drawing_mode = False
         
+        # Dragging redraw strategy (複用 image_label_tool 的完整重繪策略)
+        
         self.check_config()
 
 
@@ -250,8 +252,14 @@ class Controller:
                 DEBUG("In drawing mode - start drawing")
                 # 繪製模式的原有邏輯保持不變
             else:
-                DEBUG("In normal mode - handle selection")
-                # 普通模式：處理 bounding box 選擇
+                DEBUG("In normal mode - handle selection and dragging")
+                
+                # 首先嘗試開始拖曳 (複用 image_label_tool 的優先序)
+                if bbox_controller.start_drag(x, y, self.current_labels):
+                    DEBUG("Started dragging selected label")
+                    return
+                
+                # 如果沒有開始拖曳，則處理選擇
                 selected_label = bbox_controller.handle_selection(x, y, self.current_labels)
                 if selected_label:
                     DEBUG("Selected label with class_id: {}", selected_label.class_id)
@@ -267,13 +275,29 @@ class Controller:
                         self.view.update_selection_status_display(None)
             
         elif event_type == UIEvent.MOUSE_LEFT_RELEASE:
-            DEBUG("Controller: Mouse left release in drawing mode.")
+            DEBUG("Controller: Mouse left release.")
+            
+            # 處理繪製完成
             drawing_result = event_data.get("drawing_result")
             if drawing_result:
+                DEBUG("Drawing completed")
                 self.handle_new_bbox(drawing_result)
                 
+            # 處理拖曳完成 (複用 image_label_tool 的拖曳完成邏輯)
+            dragged_label = event_data.get("dragged_label")
+            if dragged_label:
+                DEBUG("Dragging completed for label with class_id: {}", dragged_label.class_id)
+                self.handle_dragged_bbox(dragged_label)
+                
         elif event_type == UIEvent.MOUSE_DRAG:
-            DEBUG("Controller: Mouse drag in drawing mode.")
+            DEBUG("Controller: Mouse drag.")
+            
+            # 檢查是否在拖曳模式中需要重繪 (複用 image_label_tool 的完整重繪策略)
+            bbox_controller = getattr(self.view, 'bbox_controller', None)
+            if bbox_controller and bbox_controller.is_dragging:
+                # 使用完整重繪避免殘影 (複用 image_label_tool 的策略)
+                # 立即重繪以避免殘影問題
+                self.view.draw_labels_on_canvas(self.current_labels)
             
         elif event_type == UIEvent.DELETE_KEY:
             DEBUG("Controller: Delete key pressed.")
@@ -302,6 +326,29 @@ class Controller:
             
         except Exception as e:
             ERROR("Error handling new bbox: {}", e)
+    
+    def handle_dragged_bbox(self, dragged_label):
+        """
+        處理拖曳完成的 bounding box (複用 image_label_tool 的儲存邏輯)
+        
+        Args:
+            dragged_label (LabelObject): 被拖曳的標籤對象
+        """
+        try:
+            DEBUG("Processing dragged bbox: class_id={}, coords=({:.6f}, {:.6f}, {:.6f}, {:.6f})", 
+                  dragged_label.class_id, dragged_label.cx_ratio, 
+                  dragged_label.cy_ratio, dragged_label.w_ratio, dragged_label.h_ratio)
+            
+            # 儲存更新後的標籤文件
+            self.save_current_labels()
+            
+            # 更新 UI 顯示
+            self.update_label_display()
+            
+            DEBUG("Dragged bbox processing completed")
+            
+        except Exception as e:
+            ERROR("Error handling dragged bbox: {}", e)
     
     def save_current_labels(self):
         """Save current labels list to file"""
