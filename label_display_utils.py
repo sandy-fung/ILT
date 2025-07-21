@@ -53,7 +53,7 @@ class LabelObject:
 
     def move_by_canvas_delta(self, dx, dy, canvas_width, canvas_height):
         """
-        用 canvas 像素增量移動 bounding box (複用 image_label_tool 的移動邏輯)
+        用 canvas 像素增量移動 bounding box
         
         Args:
             dx (float): X 方向像素增量
@@ -74,14 +74,14 @@ class LabelObject:
 
     def apply_boundary_constraints(self, canvas_width, canvas_height):
         """
-        確保 bounding box 不超出影像邊界 (複用 image_label_tool 的約束邏輯，加強邊界檢查)
+        確保 bounding box 不超出影像邊界
         
         Args:
             canvas_width (int): Canvas 寬度  
             canvas_height (int): Canvas 高度
         """
         # 計算 bounding box 的邊界
-        half_w = max(0.001, min(0.5, self.w_ratio / 2))  # 防止極端尺寸
+        half_w = max(0.001, min(0.5, self.w_ratio / 2))  # Constrain to valid range
         half_h = max(0.001, min(0.5, self.h_ratio / 2))
         
         # 約束中心點，確保 bounding box 完全在 [0,1] 範圍內
@@ -95,7 +95,7 @@ class LabelObject:
             self.cx_ratio = max(min_cx, min(max_cx, self.cx_ratio))
             self.cy_ratio = max(min_cy, min(max_cy, self.cy_ratio))
         else:
-            # 處理極端情況：box 太大的情況
+            # Handle edge case: oversized bounding box
             self.cx_ratio = 0.5
             self.cy_ratio = 0.5
             DEBUG("Applied fallback constraints for oversized box")
@@ -133,14 +133,14 @@ class LabelObject:
 
     def is_on_resize_handle(self, x, y, canvas_width, canvas_height, handle_size=10):
         """
-        檢測點擊是否在 resize handle 上 (完全複用 plate_box_3.py 的邏輯 - 只有右下角)
+        檢測點擊是否在 resize handle 上 (只有右下角)
         
         Args:
             x (float): 點擊的 X 座標 (canvas 像素)
             y (float): 點擊的 Y 座標 (canvas 像素)
             canvas_width (int): Canvas 寬度
             canvas_height (int): Canvas 高度
-            handle_size (int): Handle 尺寸 (預設 10 像素)
+            handle_size (int): Handle 尺寸 (default: 10 pixels)
             
         Returns:
             bool: 如果在 resize handle 上返回 True，否則返回 False
@@ -148,12 +148,12 @@ class LabelObject:
         # 轉換為 canvas 座標的邊界框
         x1, y1, x2, y2 = convert_label_to_canvas_coords(self, canvas_width, canvas_height)
         
-        # 只檢查右下角 handle (完全複用 plate_box_3.py 第 73-75 行的邏輯)
+        # 只檢查右下角 handle
         return (x2 - handle_size <= x <= x2 and y2 - handle_size <= y <= y2)
 
     def resize(self, new_width_pixels, new_height_pixels, canvas_width, canvas_height):
         """
-        調整 bounding box 大小，保持中心點不變 (複用 plate_box_3.py 的 resize 邏輯)
+        調整 bounding box 大小，保持中心點不變
         
         Args:
             new_width_pixels (float): 新的寬度 (canvas 像素)
@@ -181,7 +181,7 @@ class LabelObject:
 
     def resize_by_delta(self, dx, dy, canvas_width, canvas_height):
         """
-        根據滑鼠拖拽增量調整大小 (完全複用 plate_box_3.py 第 167 行的邏輯)
+        根據滑鼠拖拽增量調整大小
         保持中心點不變，只調整寬度和高度
         
         Args:
@@ -193,8 +193,8 @@ class LabelObject:
         # 獲取當前像素尺寸
         _, _, current_width, current_height = label_to_pixel_position(self, canvas_width, canvas_height)
         
-        # 根據增量計算新的寬度和高度 (複用 plate_box_3.py 第 167 行)
-        # self.resizing_box.resize(self.resizing_box.width + dx, self.resizing_box.height + dy)
+        # 根據增量計算新的寬度和高度
+        # Calculate new dimensions based on delta
         new_width = current_width + dx
         new_height = current_height + dy
         
@@ -326,7 +326,7 @@ def convert_label_to_canvas_coords(label, canvas_width, canvas_height):
 
 def delta_canvas_to_yolo(dx, dy, canvas_width, canvas_height):
     """
-    轉換 canvas 像素增量為 YOLO 比例增量 (複用 image_label_tool 的轉換邏輯)
+    轉換 canvas 像素增量為 YOLO 比例增量
     
     Args:
         dx (float): X 方向像素增量
@@ -344,7 +344,7 @@ def delta_canvas_to_yolo(dx, dy, canvas_width, canvas_height):
 
 def validate_yolo_bounds(cx_ratio, cy_ratio, w_ratio, h_ratio):
     """
-    驗證 YOLO 座標是否在合法範圍 [0,1] (複用 image_label_tool 的驗證邏輯)
+    驗證 YOLO 座標是否在合法範圍 [0,1]
     
     Args:
         cx_ratio (float): 中心 X 比例

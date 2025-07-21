@@ -1,6 +1,6 @@
 """
 BBox Controller Module
-Reuse drawing logic from image_label_tool for managing bounding box drawing and operations
+Manages bounding box drawing, selection, dragging, and resizing operations
 """
 
 import tkinter as tk
@@ -21,13 +21,13 @@ class BBoxController:
         # Selection state variables
         self.selected_label = None
         
-        # Dragging state variables (reuse pattern from image_label_tool)
+        # Dragging state variables
         self.dragging_label = None      # Currently dragging LabelObject
         self.drag_start_x = 0           # Drag start X coordinate (canvas)
         self.drag_start_y = 0           # Drag start Y coordinate (canvas)
         self.is_dragging = False        # Dragging in progress flag
         
-        # Resizing state variables (複用 plate_box_3.py 的 resizing 邏輯)
+        # Resizing state variables
         self.resizing_label = None      # Currently resizing LabelObject  
         self.resize_start_x = 0         # Resize start X coordinate (canvas)
         self.resize_start_y = 0         # Resize start Y coordinate (canvas)
@@ -132,7 +132,7 @@ class BBoxController:
     def calculate_yolo_format(self, x1, y1, x2, y2, canvas_w, canvas_h):
         """
         Calculate YOLO format coordinates (center_x, center_y, width_ratio, height_ratio)
-        Reuse conversion logic from image_label_tool
+        Convert YOLO coordinates to canvas pixel coordinates
         """
         cx = (x1 + x2) / 2 / canvas_w
         cy = (y1 + y2) / 2 / canvas_h
@@ -166,7 +166,7 @@ class BBoxController:
 
     def handle_selection(self, x, y, labels):
         """
-        處理點擊選擇邏輯，按照 z-index 順序 (最上層優先)
+        處理點擊選擇邏輯，最上層標籤優先
         
         Args:
             x (float): 點擊的 x 座標
@@ -174,12 +174,12 @@ class BBoxController:
             labels (list): LabelObject 列表
             
         Returns:
-            LabelObject or None: 選中的標籤對象，如果沒有選中則返回 None
+            LabelObject or None: 選中的標籤對象，未選中時返回 None
         """
         canvas_width = self.canvas.winfo_width()
         canvas_height = self.canvas.winfo_height()
         
-        # 從最後一個開始檢查 (最上層的 bounding box)
+        # Check from top layer (last drawn) first
         for label in reversed(labels):
             if label.contains(x, y, canvas_width, canvas_height):
                 # 清除所有標籤的選中狀態
@@ -193,7 +193,7 @@ class BBoxController:
                       label.class_id, label.cx_ratio, label.cy_ratio, label.w_ratio, label.h_ratio)
                 return label
         
-        # 如果沒有點擊在任何標籤上，清除選擇
+        # Clear selection if no label was clicked
         self.clear_selection(labels)
         return None
 
@@ -221,7 +221,7 @@ class BBoxController:
 
     def start_drag(self, x, y, labels):
         """
-        初始化拖曳操作 (複用 image_label_tool 的模式)
+        初始化拖曳操作
         
         Args:
             x (float): 拖曳起始 X 座標 (canvas 像素)
@@ -252,7 +252,7 @@ class BBoxController:
 
     def update_drag(self, x, y):
         """
-        處理拖曳移動 (複用 image_label_tool 的增量計算模式)
+        處理拖曳移動
         
         Args:
             x (float): 當前 X 座標 (canvas 像素)
@@ -261,7 +261,7 @@ class BBoxController:
         if not self.is_dragging or not self.dragging_label:
             return
             
-        # 計算位移量 (複用參考實現的 delta 方式)
+        # 計算位移量
         dx = x - self.drag_start_x
         dy = y - self.drag_start_y
         
@@ -284,7 +284,7 @@ class BBoxController:
 
     def finish_drag(self):
         """
-        完成拖曳操作 (複用 image_label_tool 的清理模式)
+        完成拖曳操作
         
         Returns:
             LabelObject or None: 被拖曳的標籤對象，如果有的話
@@ -315,7 +315,7 @@ class BBoxController:
 
     def check_resize_handle_click(self, x, y, labels):
         """
-        檢查點擊是否在 resize handle 上 (完全複用 plate_box_3.py 第 141-143 行的邏輯)
+        檢查點擊是否在 resize handle 上
         
         Args:
             x (float): 點擊的 X 座標 (canvas 像素)
@@ -328,7 +328,7 @@ class BBoxController:
         canvas_width = self.canvas.winfo_width()
         canvas_height = self.canvas.winfo_height()
         
-        # 從最上層開始檢查 (z-index: top first，複用 plate_box_3.py 第 140 行)
+        # Check from top layer first
         for label in reversed(labels):
             if label.is_on_resize_handle(x, y, canvas_width, canvas_height, self.handle_size):
                 DEBUG("Resize handle clicked: label class_id={}", label.class_id)
@@ -338,7 +338,7 @@ class BBoxController:
 
     def start_resize(self, x, y, labels):
         """
-        開始 resize 操作 (完全複用 plate_box_3.py 第 141-143 行的邏輯)
+        開始 resize 操作
         
         Args:
             x (float): 點擊起始 X 座標 (canvas 像素)
@@ -357,12 +357,12 @@ class BBoxController:
             self.resize_start_x = x
             self.resize_start_y = y
             
-            # 設定該 label 為選中狀態 (複用 plate_box_3.py 第 149-152 行)
+            # 設定該 label 為選中狀態
             self.clear_selection(labels)
             label.set_selected(True)
             self.selected_label = label
             
-            # 更改光標樣式（原始實作沒有特別設定光標，但我們可以保留）
+            # Update cursor style
             self.canvas.config(cursor="sizing")
             
             DEBUG("Started resizing label: class_id={}, start_pos=({}, {})", 
@@ -373,7 +373,7 @@ class BBoxController:
 
     def update_resize(self, x, y):
         """
-        處理 resize 移動 (完全複用 plate_box_3.py 第 162-168 行的邏輯)
+        處理 resize 移動
         
         Args:
             x (float): 當前 X 座標 (canvas 像素)
@@ -382,18 +382,18 @@ class BBoxController:
         if not self.is_resizing or not self.resizing_label:
             return
             
-        # 計算位移量 (複用 plate_box_3.py 第 162-164 行)
+        # 計算位移量
         dx = x - self.resize_start_x
         dy = y - self.resize_start_y
         
-        # 更新起始位置 (複用 plate_box_3.py 第 164 行)
+        # 更新起始位置
         self.resize_start_x, self.resize_start_y = x, y
         
         # 獲取 canvas 尺寸
         canvas_width = self.canvas.winfo_width()
         canvas_height = self.canvas.winfo_height()
         
-        # 使用 resize_by_delta 方法調整大小 (對應 plate_box_3.py 第 167 行)
+        # 使用 resize_by_delta 方法調整大小
         # self.resizing_box.resize(self.resizing_box.width + dx, self.resizing_box.height + dy)
         self.resizing_label.resize_by_delta(dx, dy, canvas_width, canvas_height)
         
@@ -402,7 +402,7 @@ class BBoxController:
 
     def finish_resize(self):
         """
-        完成 resize 操作 (複用 plate_box_3.py 的清理邏輯)
+        完成 resize 操作
         
         Returns:
             LabelObject or None: 被 resize 的標籤對象，如果有的話
@@ -412,7 +412,7 @@ class BBoxController:
             
         resized_label = self.resizing_label
         
-        # 清除 resizing 狀態 (複用 plate_box_3.py 第 174 行)
+        # 清除 resizing 狀態
         self.is_resizing = False
         self.resizing_label = None
         self.resize_start_x = 0
@@ -432,7 +432,7 @@ class BBoxController:
 
     def handle_mouse_press_with_resize(self, x, y, labels):
         """
-        處理滑鼠按下事件，支援 resize handles (複用 plate_box_3.py 的優先序邏輯)
+        處理滑鼠按下事件，支援 resize handles
         
         Args:
             x (float): 點擊的 X 座標 (canvas 像素)
@@ -442,15 +442,15 @@ class BBoxController:
         Returns:
             str: 操作類型 ("resize", "drag", "select", "none")
         """
-        # 優先檢查 resize handle (複用 plate_box_3.py 的優先序)
+        # Check resize handle first
         if self.start_resize(x, y, labels):
             return "resize"
         
-        # 其次檢查拖拽
+        # Check dragging next
         if self.start_drag(x, y, labels):
             return "drag"
         
-        # 最後檢查選擇
+        # Check selection last
         selected_label = self.handle_selection(x, y, labels)
         if selected_label:
             return "select"
