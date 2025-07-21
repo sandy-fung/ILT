@@ -12,8 +12,12 @@ def main():
     try:
         controller = Controller(ui)
     except Exception as e:
-        ERROR("Error checking config:", e)
-        ui.show_error(e)
+        if hasattr(e, 'winerror') and e.winerror == 3:
+            ERROR("Can't find the the path specified.")
+            ui.show_error("找不到檔案路徑，請確認 config.ini 是否存在，或重新設定路徑。")
+        else:
+            ERROR("Error checking config:", e)
+            ui.show_error(e)
 
     ui.set_dispatcher(dispatcher)
 
