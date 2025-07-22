@@ -23,6 +23,7 @@ class UI:
 
         # Initialize drawing-related states
         self.bbox_controller = None
+        self.drawing_mode = False
 
         self.SHOW_CLASS_ID_BUTTONS = False
         self.SHOW_TEXT_BOX = False
@@ -93,8 +94,19 @@ class UI:
         self.bottom_frame = tk.Frame(self.window, relief = "ridge", bd = 2)
         self.bottom_frame.pack(side = "bottom", fill = "x")
 
+
         self.create_text_area()
+        self.create_tool_bt_area()
         self.create_hint_area()
+
+    def create_tool_bt_area(self):
+        self.tool_bt_frame = tk.Frame(self.bottom_frame, bg = "#f8f8f8")
+        self.tool_bt_frame.pack(side = "left", fill = "y")
+
+        # Create buttons
+        # delete  button
+        del_button = tk.Button(self.tool_bt_frame, text="Delete", font=("Helvetica", 16), command=self.on_delete_image_button)
+        del_button.pack(side="left", padx=2)
 
     def create_text_area(self):
         self.text_frame = tk.Frame(self.bottom_frame, bg = "#f8f8f8")
@@ -133,7 +145,7 @@ class UI:
             self.hint_frame,
             width = 50, height = 10, bg = "#f8f8f8",
             text = hint_text, justify = "left", anchor = "w", fg = "#424242", font = ("Segoe UI", 11)
-        ) 
+        )
         self.hint_label.grid(row = 1, column = 0, columnspan = 2, sticky = "s", padx = 20)
         self.index_label = tk.Label(self.hint_frame, bg = "#f8f8f8", text = " : ", fg = "#829901", font = ("Segoe UI", 11))
         self.index_label.grid(row = 0, column = 2, sticky = "nwse")
@@ -470,6 +482,11 @@ class UI:
         if self.dispatch:
             self.dispatch(UIEvent.DELETE_KEY, {"value": event})
 
+    def on_delete_image_button(self):
+        DEBUG("on_delete_image_button")
+        if self.dispatch:
+            self.dispatch(UIEvent.DELETE_IMAGE,  None)
+
     def next_image(self, event):
         DEBUG("next_image")
         if self.dispatch:
@@ -586,3 +603,9 @@ class UI:
         if self.dispatch:
             self.window.after_idle(lambda: self.dispatch(UIEvent.WINDOW_READY, {}))
         self.window.mainloop()
+
+
+# for implementation testing
+if __name__ == "__main__":
+    ui = UI()
+    ui.run()

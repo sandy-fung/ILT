@@ -1,6 +1,8 @@
 import os
 import config_utils
 from log_levels import DEBUG, INFO, ERROR
+import shutil
+
 
 def scan_image_folder(img_folder):
     images = [
@@ -21,7 +23,7 @@ def scan_label_folder(images, label_folder):
     for f in images:
         label = os.path.splitext(f)[0] + ".txt"
         label_path = os.path.join(label_folder, label)
-        
+
         labels.append(label)
         labels_path.append(label_path)
     return labels, labels_path
@@ -36,3 +38,13 @@ def load_label(path):
         content = f.read()
     DEBUG("Label loaded from path: {}", path)
     return content
+
+
+
+def move_file(src, dst):
+    try:
+        shutil.move(src, dst)
+        INFO("Moved file from {} to {}", src, dst)
+    except OSError as e:
+        ERROR("Error moving file from {} to {}: {}", src, dst, e)
+        raise e
