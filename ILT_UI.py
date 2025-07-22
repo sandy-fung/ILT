@@ -76,6 +76,14 @@ class UI:
         )
         self.add_button.pack(side = "left", padx = 5)
 
+        self.del_button = tk.Button(
+            self.toolbar,
+            width = 4, height = 1,
+            text="Delete", fg = "#008378",
+            relief = "flat", bd = 2,
+            command = self.on_delete_image_button)
+        self.del_button.pack(side = "left", padx = 5)
+
     def create_middle_area(self):
         self.middle_frame = tk.Frame(self.window)
         self.middle_frame.pack(side = "top", fill = "both", expand = True)
@@ -101,7 +109,6 @@ class UI:
 
 
         self.create_text_area()
-        self.create_tool_bt_area()
         
         # Create right container for hint and preview areas
         self.right_container = tk.Frame(self.bottom_frame, bg = "#f8f8f8")
@@ -109,15 +116,6 @@ class UI:
         
         self.create_hint_area()
         self.create_preview_area()
-
-    def create_tool_bt_area(self):
-        self.tool_bt_frame = tk.Frame(self.bottom_frame, bg = "#f8f8f8")
-        self.tool_bt_frame.pack(side = "left", fill = "y")
-
-        # Create buttons
-        # delete  button
-        del_button = tk.Button(self.tool_bt_frame, text="Delete", font=("Helvetica", 16), command=self.on_delete_image_button)
-        del_button.pack(side="left", padx=2)
 
     def create_text_area(self):
         self.text_frame = tk.Frame(self.bottom_frame, bg = "#f8f8f8")
