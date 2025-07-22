@@ -4,6 +4,7 @@ import image_utils
 import folder_utils
 import label_display_utils
 import Words_Label_mapping as wlm
+import char_input_handler as char_handler
 import os
 from log_levels import DEBUG, INFO, ERROR
 
@@ -25,7 +26,8 @@ class Controller:
 
         # Drawing mode state
         self.drawing_mode = False
-
+        
+        # Dragging redraw strategy (複用 image_label_tool 的完整重繪策略)
         self.check_config()
 
 
@@ -372,6 +374,11 @@ class Controller:
             DEBUG("Controller: Delete image button pressed.")
             self.delete_selected_image_and_label()
 
+        elif event_type == UIEvent.INPUT_ENTER:
+            DEBUG("Controller: Input enter pressed.")
+            input_text = event_data.get("text", "")
+            DEBUG("Input text:", input_text)
+            self.apply_input_text_to_labels(input_text)
 
     def handle_new_bbox(self, drawing_result):
         """Handle newly drawn bounding box"""
@@ -531,6 +538,28 @@ class Controller:
         except Exception as e:
             ERROR("Error deleting selected label: {}", e)
             return False
+        
+    def apply_input_text_to_labels(self, input_text):
+        DEBUG("Current labels count : {}", len(self.current_labels))
+
+        class_ids = char_handler.convert_text_to_class_ids(input_text)
+        DEBUG("Converted class IDs: {}", class_ids)
+
+        if not char_handler.is_same_length_as_labels(class_ids, len(self.current_labels)):
+            self.view.show_error("輸入長度與標籤數量不符，請重新輸入")
+
+            if hasattr(self.view, "clear_input_box"):
+                self.view.clear_input_box()
+            if hasattr(self.view, "focus_input_box"):
+                self.view.focus_input_box()
+                
+            return
+        
+        for i, cid in enumerate(class_ids):
+            self.current_labels[i].class_id = cid
+
+        self.save_current_labels()
+        self.update_label_display()
 
     def delete_selected_image_and_label(self):
         if self.image_index < len(self.images_path):

@@ -28,9 +28,10 @@ class UI:
         # Store reference to original image for preview
         self.original_image = None
 
-        self.SHOW_CLASS_ID_BUTTONS = True
+        self.SHOW_CLASS_ID_BUTTONS = False
         self.SHOW_TEXT_BOX = True
         self.SHOW_PREVIEW = True
+        self.SHOW_INPUT_BOX = True
 
         self.setup_ui()
         self.setup_events()
@@ -122,18 +123,32 @@ class UI:
         self.text_frame = tk.Frame(self.bottom_frame, bg = "#f8f8f8")
         self.text_frame.pack(side = "left", fill = "both", expand = True)
 
-        if not self.SHOW_TEXT_BOX:
-            DEBUG("Text box is not shown as per configuration.")
+        if self.SHOW_INPUT_BOX:
+            self.input_box = tk.Entry(self.text_frame, font = ("Segoe UI", 11), fg = "#424242")
+            self.input_box.pack(side = "top", fill  = "x", padx = 20, pady = 10)
+
+            self.input_box.focus_set()
+            self.input_box.bind("<Return>", self.input_enter)
+            self.input_box.bind("<KeyRelease>", self.force_uppercase)
+
+        else:
+            DEBUG("Input box is not shown as per configuration.")
             return
-        self.text_box = tk.Text(
-            self.text_frame,
-            height = 15, bg = "white",
-            font = ("Segoe UI", 11), fg = "#424242",
-            relief = "sunken",
-            wrap = "word"
-        )
-        self.text_box.tag_configure("left", justify = "left")
-        self.text_box.pack(side = "top", fill = "x", padx = 20, pady = 20)
+
+        if self.SHOW_TEXT_BOX:
+            self.text_box = tk.Text(
+                self.text_frame,
+                height = 15, bg = "white",
+                font = ("Segoe UI", 11), fg = "#424242",
+                relief = "sunken",
+                wrap = "word"
+            )
+            self.text_box.tag_configure("left", justify = "left")
+            self.text_box.pack(side = "top", fill = "x", padx = 20, pady = 10)
+
+        else:
+            DEBUG("Text box is not shown as per configuration.")
+        
 
     def create_hint_area(self):
         self.hint_frame = tk.Frame(self.right_container, bg = "#f8f8f8")
@@ -1112,6 +1127,39 @@ class UI:
         DEBUG("update_index_label")
         self.index_label.config(text = f"{index + 1} : {len(path)}")
         DEBUG("Index label updated with index: {}", index)
+
+    def force_uppercase(self, event):
+        current = self.input_box.get()
+        upper = current.upper()
+        if current != upper:
+            self.input_box.delete(0, tk.END)
+            self.input_box.insert(0, upper)
+
+    def input_enter(self, event):
+        """Handle Enter key press in input box"""
+        DEBUG("input_enter triggered")
+        if self.dispatch:
+            input_text = self.input_box.get().strip()
+            if input_text:
+                DEBUG("Input text: {}", input_text)
+                self.dispatch(UIEvent.INPUT_ENTER, {"text": input_text})
+            else:
+                ERROR("Input box is empty!")
+        else:
+            ERROR("Dispatch is not set!")
+
+    def clear_input_box(self):
+        """Clear the input box"""
+        if self.input_box:
+            self.input_box.delete(0, tk.END)
+            DEBUG("Input box cleared")
+
+    def focus_input_box(self):
+        """Focus the input box"""
+        if self.input_box:
+            self.input_box.focus_set()
+            DEBUG("Input box focused")
+        
 
 
 # Button events
