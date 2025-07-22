@@ -127,7 +127,10 @@ class UI:
             self.input_box = tk.Entry(self.text_frame, font = ("Segoe UI", 11), fg = "#424242")
             self.input_box.pack(side = "top", fill  = "x", padx = 20, pady = 10)
 
-            self.input_box.focus_set()
+            self.input_box.insert(0, "請輸入車牌號碼")
+            self.input_box.bind("<FocusIn>", self._on_input_focus_in)
+            self.input_box.bind("<FocusOut>", self._on_input_focus_out)
+
             self.input_box.bind("<Return>", self.input_enter)
             self.input_box.bind("<KeyRelease>", self.force_uppercase)
 
@@ -1159,7 +1162,17 @@ class UI:
         if self.input_box:
             self.input_box.focus_set()
             DEBUG("Input box focused")
-        
+
+    def _on_input_focus_in(self, event):
+        if self.input_box.get() == "請輸入車牌號碼":
+            self.input_box.delete(0, tk.END)
+            self.input_box.config(fg = "#000000")
+
+    def _on_input_focus_out(self, event):
+        if not self.input_box.get():
+            self.input_box.insert(0, "請輸入車牌號碼")
+            self.input_box.config(fg = "#777777")
+
 
 
 # Button events
