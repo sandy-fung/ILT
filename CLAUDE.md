@@ -68,6 +68,7 @@ python main.py
 **UI Configuration Options:**
 - `SHOW_CLASS_ID_BUTTONS`: Toggle class ID button panel visibility
 - `SHOW_TEXT_BOX`: Toggle text box visibility for streamlined interface
+- `SHOW_PREVIEW`: Toggle original size preview panel visibility
 
 ### Bounding Box Features
 - **Visualization**: Display YOLO format labels as colored bounding boxes with class ID
@@ -83,6 +84,15 @@ python main.py
   - Supports multiple license plates with intelligent grouping
   - Uses 50% vertical overlap threshold for plate detection
   - Re-sorts after adding, deleting, or moving boxes
+
+### Original Size Preview
+- **Location**: Bottom-right corner of the interface
+- **Features**:
+  - Shows full original image scaled to fit 300x300 preview window
+  - Maintains original aspect ratio with centered display
+  - Displays original image dimensions info
+  - Automatically updates when loading new images
+- **Toggle**: Can be hidden/shown via `SHOW_PREVIEW` configuration or `toggle_preview()` method
 
 ### Event System
 Events are defined in `UI_event.py` and handled through the Controller:

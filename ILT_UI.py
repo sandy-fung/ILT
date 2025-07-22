@@ -24,9 +24,13 @@ class UI:
         # Initialize drawing-related states
         self.bbox_controller = None
         self.drawing_mode = False
+        
+        # Store reference to original image for preview
+        self.original_image = None
 
-        self.SHOW_CLASS_ID_BUTTONS = False
-        self.SHOW_TEXT_BOX = False
+        self.SHOW_CLASS_ID_BUTTONS = True
+        self.SHOW_TEXT_BOX = True
+        self.SHOW_PREVIEW = True
 
         self.setup_ui()
         self.setup_events()
@@ -97,7 +101,13 @@ class UI:
 
         self.create_text_area()
         self.create_tool_bt_area()
+        
+        # Create right container for hint and preview areas
+        self.right_container = tk.Frame(self.bottom_frame, bg = "#f8f8f8")
+        self.right_container.pack(side = "right", fill = "both", expand = True)
+        
         self.create_hint_area()
+        self.create_preview_area()
 
     def create_tool_bt_area(self):
         self.tool_bt_frame = tk.Frame(self.bottom_frame, bg = "#f8f8f8")
@@ -126,8 +136,8 @@ class UI:
         self.text_box.pack(side = "top", fill = "x", padx = 20, pady = 20)
 
     def create_hint_area(self):
-        self.hint_frame = tk.Frame(self.bottom_frame, bg = "#f8f8f8")
-        self.hint_frame.pack(side = "right", fill = "both", expand = True)
+        self.hint_frame = tk.Frame(self.right_container, bg = "#f8f8f8")
+        self.hint_frame.pack(side = "top", fill = "x", pady = (0, 10))
 
         hint_text = (
             "← 上一張\n"
@@ -164,6 +174,756 @@ class UI:
             fg = "#666666", font = ("Segoe UI", 10)
         )
         self.selection_status_label.grid(row = 0, column = 1, sticky = "nw", padx = (20, 0))
+
+    def create_preview_area(self):
+        if not self.SHOW_PREVIEW:
+            DEBUG("Preview area is not shown as per configuration.")
+            return
+            
+        # Create preview frame with border
+        self.preview_frame = tk.Frame(self.right_container, bg = "#f8f8f8", relief = "ridge", bd = 2)
+        self.preview_frame.pack(side = "bottom", fill = "both", expand = True)
+        
+        # Add title label
+        self.preview_title = tk.Label(
+            self.preview_frame, 
+            text = "原尺寸預覽", 
+            bg = "#f8f8f8", 
+            fg = "#424242", 
+            font = ("Segoe UI", 11, "bold")
+        )
+        self.preview_title.pack(side = "top", pady = 5)
+        
+        # Create preview canvas container
+        self.preview_canvas_frame = tk.Frame(self.preview_frame, bg = "#f8f8f8")
+        self.preview_canvas_frame.pack(side = "top", fill = "both", expand = True, padx = 10, pady = (0, 10))
+        
+        # Create scrollbars
+        self.preview_v_scrollbar = tk.Scrollbar(self.preview_canvas_frame, orient = "vertical")
+        self.preview_h_scrollbar = tk.Scrollbar(self.preview_canvas_frame, orient = "horizontal")
+        
+        # Create preview canvas with fixed size
+        self.preview_canvas = tk.Canvas(
+            self.preview_canvas_frame,
+            bg = "white",
+            width = 300,
+            height = 300,
+            highlightthickness = 1,
+            highlightbackground = "#cccccc",
+            yscrollcommand = self.preview_v_scrollbar.set,
+            xscrollcommand = self.preview_h_scrollbar.set
+        )
+        
+        # Configure scrollbars
+        self.preview_v_scrollbar.config(command = self.preview_canvas.yview)
+        self.preview_h_scrollbar.config(command = self.preview_canvas.xview)
+        
+        # Pack canvas and scrollbars
+        self.preview_canvas.grid(row = 0, column = 0, sticky = "nsew")
+        self.preview_v_scrollbar.grid(row = 0, column = 1, sticky = "ns")
+        self.preview_h_scrollbar.grid(row = 1, column = 0, sticky = "ew")
+        
+        # Configure grid weights
+        self.preview_canvas_frame.grid_rowconfigure(0, weight = 1)
+        self.preview_canvas_frame.grid_columnconfigure(0, weight = 1)
+        
+        # Initialize preview state
+        self.preview_image = None
+        self.preview_photo_image = None
+        
+        # Add placeholder text
+        self.preview_canvas.create_text(
+            150, 150,
+            text = "尚未載入圖片",
+            fill = "#999999",
+            font = ("Segoe UI", 12),
+            tags = "placeholder"
+        )
+        
+        # Bind magnifier events to preview canvas
+        self.preview_canvas.bind("<Enter>", self.on_preview_enter)
+        self.preview_canvas.bind("<Leave>", self.on_preview_leave)
+        self.preview_canvas.bind("<Button-1>", self.on_preview_left_click)
+        self.preview_canvas.bind("<Button-3>", self.on_preview_right_drag_start)
+        self.preview_canvas.bind("<B3-Motion>", self.on_preview_right_drag)
+        self.preview_canvas.bind("<ButtonRelease-3>", self.on_preview_right_drag_end)
+        
+        # Initialize magnifier state
+        self.magnifier_tooltip = None
+        self.is_dragging_preview = False
+        self.drag_start_x = 0
+        self.drag_start_y = 0
+        
+        # Initialize magnifier cache (LRU cache for magnified regions) 
+        self.magnifier_cache = {}
+        self.cache_access_order = []
+        
+        # Load magnifier configuration
+        self.load_magnifier_config()
+
+    def load_magnifier_config(self):
+        """Load magnifier configuration from config file"""
+        try:
+            import config_utils
+            
+            self.magnifier_enabled = config_utils.get_magnifier_enabled()
+            self.magnifier_zoom_factor = config_utils.get_magnifier_zoom_factor()
+            self.magnifier_tooltip_size = config_utils.get_magnifier_tooltip_size()
+            self.magnifier_cursor_type = config_utils.get_magnifier_cursor_type()
+            self.magnifier_region_size = config_utils.get_magnifier_region_size()
+            self.max_cache_size = config_utils.get_magnifier_cache_size()
+            
+            # Set magnifier cursor based on configuration
+            self.magnifier_cursor = self.get_magnifier_cursor()
+            
+            DEBUG("Magnifier config loaded: enabled={}, zoom={}, tooltip_size={}, cursor={}, region_size={}, cache_size={}", 
+                  self.magnifier_enabled, self.magnifier_zoom_factor, self.magnifier_tooltip_size,
+                  self.magnifier_cursor_type, self.magnifier_region_size, self.max_cache_size)
+                  
+        except Exception as e:
+            # Use defaults if config loading fails
+            ERROR("Failed to load magnifier config: {}, using defaults", str(e))
+            self.magnifier_enabled = True
+            self.magnifier_zoom_factor = 3.0
+            self.magnifier_tooltip_size = 200
+            self.magnifier_cursor_type = "target"
+            self.magnifier_region_size = 50
+            self.max_cache_size = 10
+            self.magnifier_cursor = self.get_magnifier_cursor()
+            
+    def get_magnifier_cursor(self):
+        """Get appropriate magnifier cursor based on configuration"""
+        cursor_options = {
+            "target": "target",           # 🎯 Target/crosshair - looks like magnifier focus
+            "dotbox": "dotbox",           # ⚈ Dotted box - frame-like
+            "tcross": "tcross",           # ✚ Thick cross - precision tool  
+            "crosshair": "crosshair",     # + Thin crosshair - classic precision
+            "plus": "plus",               # ➕ Plus sign - zoom indication
+            "circle": "circle",           # ○ Circle - magnifier lens shape
+            "sizing": "sizing"            # ⚏ Original option (fallback)
+        }
+        
+        # Get configured cursor type
+        cursor_type = cursor_options.get(self.magnifier_cursor_type, "target")
+        
+        DEBUG("Selected magnifier cursor: {} -> {}", self.magnifier_cursor_type, cursor_type)
+        return cursor_type
+        
+    def set_magnifier_cursor_type(self, cursor_type):
+        """Dynamically change magnifier cursor type (for testing different options)
+        
+        Args:
+            cursor_type: One of: "target", "dotbox", "tcross", "crosshair", "plus", "circle", "sizing"
+        """
+        self.magnifier_cursor_type = cursor_type
+        self.magnifier_cursor = self.get_magnifier_cursor()
+        
+        # Update cursor immediately if mouse is over preview canvas
+        if hasattr(self, 'preview_canvas') and self.preview_canvas:
+            try:
+                self.preview_canvas.config(cursor=self.magnifier_cursor)
+                DEBUG("Magnifier cursor updated to: {}", cursor_type)
+            except:
+                pass
+
+    def set_original_image(self, original_image):
+        """Set the original image reference for preview functionality
+        
+        Args:
+            original_image: OpenCV image (numpy array)
+        """
+        self.original_image = original_image
+        # Clear magnifier cache when image changes
+        self.clear_magnifier_cache()
+        DEBUG("Original image reference updated for preview")
+
+    def update_preview(self, original_image):
+        """Update preview with the full original image
+        
+        Args:
+            original_image: PIL Image object
+        """
+        if not self.SHOW_PREVIEW or self.preview_canvas is None:
+            return
+            
+        from PIL import Image, ImageTk
+        
+        # Clear magnifier cache when preview updates
+        self.clear_magnifier_cache()
+        
+        # Clear previous preview
+        self.preview_canvas.delete("all")
+        
+        # Get original image dimensions
+        img_width, img_height = original_image.size
+        
+        # Calculate scale to fit in preview window while maintaining aspect ratio
+        preview_width = 300
+        preview_height = 300
+        scale_x = preview_width / img_width
+        scale_y = preview_height / img_height
+        scale = min(scale_x, scale_y)
+        
+        # Calculate new dimensions
+        new_width = int(img_width * scale)
+        new_height = int(img_height * scale)
+        
+        # Resize image to fit preview
+        pil_image_resized = original_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        
+        # Convert to PhotoImage for Tkinter
+        self.preview_photo_image = ImageTk.PhotoImage(pil_image_resized)
+        
+        # Calculate position to center image in canvas
+        x_offset = (preview_width - new_width) // 2
+        y_offset = (preview_height - new_height) // 2
+        
+        # Display on preview canvas
+        self.preview_canvas.create_image(x_offset, y_offset, anchor = "nw", image = self.preview_photo_image, tags = "preview_image")
+        
+        # Add info text
+        info_text = f"原始尺寸: {img_width}×{img_height}"
+        self.preview_canvas.create_text(
+            150, 290,
+            text = info_text,
+            fill = "#666666",
+            font = ("Segoe UI", 9),
+            tags = "info_text"
+        )
+        
+        # Update scroll region (no scroll needed for fitted image)
+        self.preview_canvas.config(scrollregion = (0, 0, preview_width, preview_height))
+        
+        DEBUG("Preview updated with full image: {}×{} (scaled to {}×{})", img_width, img_height, new_width, new_height)
+
+    def clear_preview(self):
+        """Clear the preview canvas"""
+        if not self.SHOW_PREVIEW or self.preview_canvas is None:
+            return
+            
+        # Hide any visible magnifier tooltip
+        self.hide_magnifier_tooltip()
+        
+        # Clear magnifier cache
+        self.clear_magnifier_cache()
+            
+        # Delete all items
+        self.preview_canvas.delete("all")
+        
+        # Show placeholder text
+        self.preview_canvas.create_text(
+            150, 150,
+            text = "尚未載入圖片",
+            fill = "#999999",
+            font = ("Segoe UI", 12),
+            tags = "placeholder"
+        )
+        
+        # Reset scroll region
+        self.preview_canvas.config(scrollregion = (0, 0, 300, 300))
+        
+        # Clear stored references
+        self.preview_photo_image = None
+    
+    def toggle_preview(self, show=None):
+        """Toggle preview panel visibility
+        
+        Args:
+            show (bool, optional): If provided, set visibility to this value.
+                                 If not provided, toggle current state.
+        """
+        if show is not None:
+            self.SHOW_PREVIEW = show
+        else:
+            self.SHOW_PREVIEW = not self.SHOW_PREVIEW
+        
+        if hasattr(self, 'preview_frame'):
+            if self.SHOW_PREVIEW:
+                # Show preview frame
+                self.preview_frame.pack(side = "bottom", fill = "both", expand = True)
+                DEBUG("Preview panel shown")
+                
+                # Update preview if original image is available
+                if self.original_image is not None:
+                    self.update_preview(self.original_image)
+            else:
+                # Hide preview frame
+                self.preview_frame.pack_forget()
+                DEBUG("Preview panel hidden")
+
+    # Magnifier functionality for preview panel
+    def on_preview_enter(self, event):
+        """Handle mouse enter event on preview canvas - change cursor to magnifier"""
+        if not self.SHOW_PREVIEW or self.preview_canvas is None or not self.magnifier_enabled:
+            return
+            
+        DEBUG("Mouse entered preview canvas")
+        self.preview_canvas.config(cursor=self.magnifier_cursor)
+        
+    def on_preview_leave(self, event):
+        """Handle mouse leave event on preview canvas - restore normal cursor"""
+        if not self.SHOW_PREVIEW or self.preview_canvas is None:
+            return
+            
+        DEBUG("Mouse left preview canvas")
+        self.preview_canvas.config(cursor="")
+        
+        # Hide magnifier tooltip if visible
+        self.hide_magnifier_tooltip()
+        
+    def on_preview_left_click(self, event):
+        """Handle left click on preview canvas - show magnified tooltip"""
+        if not self.SHOW_PREVIEW or self.preview_canvas is None or self.original_image is None or not self.magnifier_enabled:
+            return
+            
+        DEBUG("Left click on preview canvas at ({}, {})", event.x, event.y)
+        
+        # Hide existing tooltip first
+        self.hide_magnifier_tooltip()
+        
+        # Show magnifier tooltip at clicked position
+        self.show_magnifier_tooltip(event.x, event.y)
+        
+    def show_magnifier_tooltip(self, canvas_x, canvas_y):
+        """Create and show magnifier tooltip with 3x zoomed region
+        
+        Args:
+            canvas_x, canvas_y: Click position on preview canvas
+        """
+        if not self.original_image:
+            DEBUG("No original image available for magnification")
+            return
+            
+        try:
+            from PIL import Image, ImageTk
+            
+            # Convert canvas coordinates to original image coordinates
+            img_x, img_y = self.canvas_to_image_coords(canvas_x, canvas_y)
+            if img_x is None or img_y is None:
+                DEBUG("Invalid coordinates for magnification")
+                return
+                
+            # Extract magnified region from original image using configured parameters
+            magnified_image = self.extract_magnified_region(
+                img_x, img_y, 
+                zoom_factor=self.magnifier_zoom_factor,
+                region_size=self.magnifier_region_size
+            )
+            if magnified_image is None:
+                DEBUG("Failed to extract magnified region")
+                return
+                
+            # Create tooltip window
+            self.magnifier_tooltip = tk.Toplevel(self.window)
+            self.magnifier_tooltip.wm_overrideredirect(True)  # Remove window decorations
+            self.magnifier_tooltip.configure(bg="black", bd=2, relief="solid")
+            
+            # Create label for magnified image
+            tooltip_label = tk.Label(self.magnifier_tooltip, image=magnified_image, bg="black")
+            tooltip_label.pack()
+            
+            # Calculate tooltip position to avoid screen edges
+            tooltip_x, tooltip_y = self.calculate_tooltip_position(canvas_x, canvas_y)
+            self.magnifier_tooltip.geometry(f"+{tooltip_x}+{tooltip_y}")
+            
+            # Store image reference to prevent garbage collection
+            self.magnifier_tooltip.image = magnified_image
+            
+            DEBUG("Magnifier tooltip shown at canvas position ({}, {}) -> image position ({}, {})", 
+                  canvas_x, canvas_y, img_x, img_y)
+                  
+            # Dispatch magnifier show event
+            if self.dispatch:
+                self.dispatch(UIEvent.MAGNIFIER_SHOW, {
+                    "canvas_x": canvas_x,
+                    "canvas_y": canvas_y,
+                    "image_x": img_x,
+                    "image_y": img_y
+                })
+                  
+        except Exception as e:
+            ERROR("Failed to show magnifier tooltip: {}", str(e))
+            
+    def hide_magnifier_tooltip(self):
+        """Hide magnifier tooltip if visible"""
+        if self.magnifier_tooltip:
+            try:
+                self.magnifier_tooltip.destroy()
+                self.magnifier_tooltip = None
+                DEBUG("Magnifier tooltip hidden")
+                
+                # Dispatch magnifier hide event
+                if self.dispatch:
+                    self.dispatch(UIEvent.MAGNIFIER_HIDE, {})
+            except:
+                pass
+                
+    def canvas_to_image_coords(self, canvas_x, canvas_y):
+        """Convert preview canvas coordinates to original image coordinates
+        
+        Args:
+            canvas_x, canvas_y: Coordinates on preview canvas
+            
+        Returns:
+            tuple: (img_x, img_y) in original image coordinates, or (None, None) if invalid
+        """
+        if not self.original_image or not self.preview_photo_image:
+            return None, None
+            
+        try:
+            # Get original image dimensions
+            img_width, img_height = self.original_image.size
+            
+            # Get preview canvas dimensions
+            preview_width = 300
+            preview_height = 300
+            
+            # Calculate scale used in preview
+            scale_x = preview_width / img_width
+            scale_y = preview_height / img_height
+            scale = min(scale_x, scale_y)
+            
+            # Calculate scaled dimensions and offset
+            new_width = int(img_width * scale)
+            new_height = int(img_height * scale)
+            x_offset = (preview_width - new_width) // 2
+            y_offset = (preview_height - new_height) // 2
+            
+            # Convert canvas coordinates to scaled image coordinates
+            scaled_x = canvas_x - x_offset
+            scaled_y = canvas_y - y_offset
+            
+            # Check if coordinates are within image bounds
+            if scaled_x < 0 or scaled_y < 0 or scaled_x >= new_width or scaled_y >= new_height:
+                return None, None
+                
+            # Convert to original image coordinates
+            img_x = int(scaled_x / scale)
+            img_y = int(scaled_y / scale)
+            
+            # Clamp to image bounds
+            img_x = max(0, min(img_width - 1, img_x))
+            img_y = max(0, min(img_height - 1, img_y))
+            
+            return img_x, img_y
+            
+        except Exception as e:
+            ERROR("Failed to convert canvas coordinates to image coordinates: {}", str(e))
+            return None, None
+            
+    def extract_magnified_region(self, center_x, center_y, zoom_factor=3.0, region_size=50):
+        """Extract and magnify a region from original image with caching
+        
+        Args:
+            center_x, center_y: Center point in original image coordinates
+            zoom_factor: Magnification factor (default 3x)
+            region_size: Size of region to extract in pixels
+            
+        Returns:
+            ImageTk.PhotoImage: Magnified region image, or None if failed
+        """
+        if not self.original_image:
+            return None
+            
+        # Generate cache key based on position and parameters
+        cache_key = f"{center_x}_{center_y}_{zoom_factor}_{region_size}_{id(self.original_image)}"
+        
+        # Check cache first
+        cached_result = self.get_from_magnifier_cache(cache_key)
+        if cached_result:
+            DEBUG("Using cached magnified region for key: {}", cache_key)
+            return cached_result
+            
+        try:
+            from PIL import Image, ImageTk
+            
+            img_width, img_height = self.original_image.size
+            half_region = region_size // 2
+            
+            # Calculate extraction bounds with boundary checks
+            left = max(0, center_x - half_region)
+            top = max(0, center_y - half_region)
+            right = min(img_width, center_x + half_region)
+            bottom = min(img_height, center_y + half_region)
+            
+            # Ensure we have a valid region
+            if right <= left or bottom <= top:
+                ERROR("Invalid region bounds: ({}, {}) to ({}, {})", left, top, right, bottom)
+                return None
+            
+            # Extract region efficiently
+            region = self.original_image.crop((left, top, right, bottom))
+            
+            # Calculate magnified size
+            region_width = right - left
+            region_height = bottom - top
+            magnified_width = max(1, int(region_width * zoom_factor))
+            magnified_height = max(1, int(region_height * zoom_factor))
+            
+            # Use high-quality interpolation for better results
+            if magnified_width > region_width or magnified_height > region_height:
+                # Upscaling - use Lanczos for best quality
+                resample_method = Image.Resampling.LANCZOS
+            else:
+                # Downscaling - use area averaging
+                resample_method = Image.Resampling.LANCZOS
+                
+            magnified_region = region.resize(
+                (magnified_width, magnified_height), 
+                resample_method
+            )
+            
+            # Convert to PhotoImage
+            photo_image = ImageTk.PhotoImage(magnified_region)
+            
+            # Cache the result
+            self.add_to_magnifier_cache(cache_key, photo_image)
+            
+            DEBUG("Created and cached magnified region: {}x{} -> {}x{}", 
+                  region_width, region_height, magnified_width, magnified_height)
+            
+            return photo_image
+            
+        except Exception as e:
+            ERROR("Failed to extract magnified region: {}", str(e))
+            return None
+            
+    def get_from_magnifier_cache(self, cache_key):
+        """Get magnified region from cache (LRU access)
+        
+        Args:
+            cache_key: Cache key string
+            
+        Returns:
+            ImageTk.PhotoImage or None: Cached image if found
+        """
+        if cache_key in self.magnifier_cache:
+            # Move to end of access order (most recently used)
+            self.cache_access_order.remove(cache_key)
+            self.cache_access_order.append(cache_key)
+            return self.magnifier_cache[cache_key]
+        return None
+        
+    def add_to_magnifier_cache(self, cache_key, photo_image):
+        """Add magnified region to cache with LRU eviction
+        
+        Args:
+            cache_key: Cache key string
+            photo_image: ImageTk.PhotoImage to cache
+        """
+        # Remove if already exists
+        if cache_key in self.magnifier_cache:
+            self.cache_access_order.remove(cache_key)
+        
+        # Add to cache
+        self.magnifier_cache[cache_key] = photo_image
+        self.cache_access_order.append(cache_key)
+        
+        # Evict least recently used if cache is full
+        while len(self.cache_access_order) > self.max_cache_size:
+            lru_key = self.cache_access_order.pop(0)
+            if lru_key in self.magnifier_cache:
+                del self.magnifier_cache[lru_key]
+                DEBUG("Evicted from magnifier cache: {}", lru_key)
+        
+        DEBUG("Added to magnifier cache: {} (cache size: {})", 
+              cache_key, len(self.cache_access_order))
+              
+    def clear_magnifier_cache(self):
+        """Clear all cached magnified regions (called when image changes)"""
+        self.magnifier_cache.clear()
+        self.cache_access_order.clear()
+        DEBUG("Magnifier cache cleared")
+            
+    def calculate_tooltip_position(self, canvas_x, canvas_y):
+        """Calculate optimal tooltip position to avoid screen edges
+        
+        Args:
+            canvas_x, canvas_y: Click position on canvas
+            
+        Returns:
+            tuple: (x, y) screen coordinates for tooltip
+        """
+        # Get canvas position on screen
+        canvas_abs_x = self.preview_canvas.winfo_rootx()
+        canvas_abs_y = self.preview_canvas.winfo_rooty()
+        
+        # Calculate initial tooltip position (offset from click)
+        tooltip_x = canvas_abs_x + canvas_x + 20
+        tooltip_y = canvas_abs_y + canvas_y + 20
+        
+        # Get screen dimensions
+        screen_width = self.window.winfo_screenwidth()
+        screen_height = self.window.winfo_screenheight()
+        
+        # Estimate tooltip size (will be adjusted based on magnified region)
+        tooltip_width = 150  # Approximate
+        tooltip_height = 150
+        
+        # Adjust position to avoid screen edges
+        if tooltip_x + tooltip_width > screen_width:
+            tooltip_x = canvas_abs_x + canvas_x - tooltip_width - 20
+            
+        if tooltip_y + tooltip_height > screen_height:
+            tooltip_y = canvas_abs_y + canvas_y - tooltip_height - 20
+            
+        # Ensure tooltip is not off-screen
+        tooltip_x = max(0, tooltip_x)
+        tooltip_y = max(0, tooltip_y)
+        
+        return tooltip_x, tooltip_y
+        
+    def on_preview_right_drag_start(self, event):
+        """Handle right mouse button press - start dragging if image is larger than canvas"""
+        if not self.SHOW_PREVIEW or self.preview_canvas is None or not self.is_image_draggable():
+            return
+            
+        DEBUG("Right drag start on preview canvas at ({}, {})", event.x, event.y)
+        self.is_dragging_preview = True
+        self.drag_start_x = event.x
+        self.drag_start_y = event.y
+        
+        # Change cursor to indicate dragging mode
+        self.preview_canvas.config(cursor="fleur")
+        
+        # Dispatch preview drag start event
+        if self.dispatch:
+            self.dispatch(UIEvent.PREVIEW_DRAG_START, {
+                "x": event.x,
+                "y": event.y
+            })
+        
+    def on_preview_right_drag(self, event):
+        """Handle right mouse drag - update image position"""
+        if not self.is_dragging_preview or not self.SHOW_PREVIEW:
+            return
+            
+        # Calculate drag offset
+        dx = event.x - self.drag_start_x
+        dy = event.y - self.drag_start_y
+        
+        DEBUG("Right drag on preview canvas: dx={}, dy={}", dx, dy)
+        
+        # Update preview view position
+        self.update_preview_view(dx, dy)
+        
+        # Update drag start position for next iteration
+        self.drag_start_x = event.x
+        self.drag_start_y = event.y
+        
+        # Dispatch preview drag event
+        if self.dispatch:
+            self.dispatch(UIEvent.PREVIEW_DRAG, {
+                "x": event.x,
+                "y": event.y,
+                "dx": dx,
+                "dy": dy
+            })
+        
+    def on_preview_right_drag_end(self, event):
+        """Handle right mouse button release - end dragging"""
+        if not self.is_dragging_preview:
+            return
+            
+        DEBUG("Right drag end on preview canvas")
+        self.is_dragging_preview = False
+        
+        # Restore magnifier cursor
+        self.preview_canvas.config(cursor=self.magnifier_cursor)
+        
+        # Dispatch preview drag end event
+        if self.dispatch:
+            self.dispatch(UIEvent.PREVIEW_DRAG_END, {
+                "x": event.x,
+                "y": event.y
+            })
+        
+    def is_image_draggable(self):
+        """Check if current image is large enough to support dragging
+        
+        Returns:
+            bool: True if image can be dragged, False otherwise
+        """
+        if not self.original_image or not self.preview_photo_image:
+            return False
+            
+        try:
+            # Get original image dimensions
+            img_width, img_height = self.original_image.size
+            
+            # Get preview canvas dimensions
+            preview_width = 300
+            preview_height = 300
+            
+            # Calculate scale used in preview
+            scale_x = preview_width / img_width
+            scale_y = preview_height / img_height
+            scale = min(scale_x, scale_y)
+            
+            # Calculate scaled dimensions
+            scaled_width = img_width * scale
+            scaled_height = img_height * scale
+            
+            # Image is draggable if it's larger than canvas in either dimension
+            draggable = scaled_width > preview_width or scaled_height > preview_height
+            
+            DEBUG("Image draggable check: {}x{} (scaled: {:.1f}x{:.1f}) vs {}x{} -> {}", 
+                  img_width, img_height, scaled_width, scaled_height, 
+                  preview_width, preview_height, draggable)
+                  
+            return draggable
+            
+        except Exception as e:
+            ERROR("Failed to check if image is draggable: {}", str(e))
+            return False
+            
+    def update_preview_view(self, dx, dy):
+        """Update preview canvas view position based on drag offset
+        
+        Args:
+            dx, dy: Drag offset in pixels
+        """
+        if not self.SHOW_PREVIEW or self.preview_canvas is None:
+            return
+            
+        try:
+            # Get current scroll position (0.0 to 1.0)
+            current_x_top, current_x_bottom = self.preview_canvas.xview()
+            current_y_top, current_y_bottom = self.preview_canvas.yview()
+            
+            # Calculate scroll region dimensions
+            scroll_region = self.preview_canvas.cget("scrollregion").split()
+            if len(scroll_region) != 4:
+                return
+                
+            total_width = float(scroll_region[2]) - float(scroll_region[0])
+            total_height = float(scroll_region[3]) - float(scroll_region[1])
+            
+            # Calculate canvas dimensions
+            canvas_width = self.preview_canvas.winfo_width()
+            canvas_height = self.preview_canvas.winfo_height()
+            
+            if total_width <= canvas_width and total_height <= canvas_height:
+                return  # No scrolling needed
+                
+            # Convert drag offset to scroll ratio
+            scroll_dx = -dx / total_width if total_width > canvas_width else 0
+            scroll_dy = -dy / total_height if total_height > canvas_height else 0
+            
+            # Calculate new scroll positions
+            new_x_top = max(0.0, min(1.0, current_x_top + scroll_dx))
+            new_y_top = max(0.0, min(1.0, current_y_top + scroll_dy))
+            
+            # Apply new scroll positions
+            if total_width > canvas_width:
+                self.preview_canvas.xview_moveto(new_x_top)
+            if total_height > canvas_height:
+                self.preview_canvas.yview_moveto(new_y_top)
+                
+            DEBUG("Updated preview view: x={:.3f}, y={:.3f}", new_x_top, new_y_top)
+            
+        except Exception as e:
+            ERROR("Failed to update preview view: {}", str(e))
 
     def show_class_id_buttons(self, var, labels):
         if self.SHOW_CLASS_ID_BUTTONS:
