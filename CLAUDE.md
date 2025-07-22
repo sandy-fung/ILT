@@ -47,6 +47,9 @@ python main.py
 
 ### Configuration
 - **config.ini** - Stores application state (folders, current image, dimensions)
+  - `[ImageInfo]` - Image dimensions
+  - `[Path]` - Folder paths, current image index, selected class ID
+  - `[preview_magnifier]` - Magnifier settings (enabled, zoom_factor, cursor_type, region_size, cache_size)
 - Automatically creates empty .txt label files for images without labels
 - Supports JPG, JPEG, PNG image formats
 
@@ -57,11 +60,17 @@ python main.py
 - Automatic image resizing with window
 - Displays current image index
 
+### Image Management
+- **Delete Current Image**: Bottom toolbar "Delete" button removes current image file and associated label file
+- Automatic navigation to next available image after deletion
+- Confirmation dialog to prevent accidental deletion
+
 ### UI Components
 - Top toolbar: "Reselect Folders", "Crop", "Add" buttons
 - Main canvas with image display and bounding box visualization
 - Right panel: Class ID selection buttons (0-9, A-Z) for character annotation (optional)
 - Text box showing label content in YOLO format (optional)
+- Bottom toolbar: "Delete" button for removing current image and associated labels
 - Hint area with keyboard shortcuts (in Chinese)
 - Status display: Shows drawing mode, selection status, and sorting feedback
 
@@ -85,22 +94,30 @@ python main.py
   - Uses 50% vertical overlap threshold for plate detection
   - Re-sorts after adding, deleting, or moving boxes
 
-### Original Size Preview
+### Original Size Preview with Interactive Magnifier
 - **Location**: Bottom-right corner of the interface
-- **Features**:
+- **Basic Features**:
   - Shows full original image scaled to fit 300x300 preview window
   - Maintains original aspect ratio with centered display
   - Displays original image dimensions info
   - Automatically updates when loading new images
-- **Toggle**: Can be hidden/shown via `SHOW_PREVIEW` configuration or `toggle_preview()` method
+- **Interactive Magnifier Features**:
+  - **Smart Cursor**: Mouse cursor changes to target/crosshair when hovering over preview
+  - **Left-click Zoom**: Click anywhere to display 3x magnified tooltip with boundary detection
+  - **Right-drag Navigation**: Drag large images to view different regions when they exceed panel size
+  - **Performance Optimized**: LRU cache system for smooth magnification experience
+- **Configuration**: 
+  - Toggle via `SHOW_PREVIEW` configuration or `toggle_preview()` method
+  - Magnifier settings in `[preview_magnifier]` config section (zoom factor, cursor type, cache size)
 
 ### Event System
 Events are defined in `UI_event.py` and handled through the Controller:
 - Keyboard events: LEFT/RIGHT navigation, Left/Right Ctrl modifiers, Delete key
 - Mouse events: Left/right clicks, drag operations, bounding box interactions
-- Button events: Toolbar button clicks, class ID selection
+- Button events: Toolbar button clicks, class ID selection, image deletion
 - System events: Window ready, canvas resize
 - Bounding box events: Drawing mode toggle, selection, deletion, dragging, resizing
+- Magnifier events: MAGNIFIER_SHOW, MAGNIFIER_HIDE, PREVIEW_DRAG_START/DRAG/DRAG_END
 
 ## Development Notes
 
@@ -133,3 +150,7 @@ Events are defined in `UI_event.py` and handled through the Controller:
 - Graceful error handling for missing/corrupt config files
 - Automatic config creation with sensible defaults
 - Improved error messages for Windows-specific issues (e.g., file path access errors)
+- **Magnifier Configuration**: Full API in `config_utils.py` for managing preview magnifier settings
+  - `get_magnifier_*()` functions for reading configuration
+  - `save_magnifier_config()` for updating settings
+  - Dynamic cursor switching with 7 available cursor types (target, dotbox, tcross, crosshair, plus, circle, sizing)
