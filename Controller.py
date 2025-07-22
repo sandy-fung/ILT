@@ -211,22 +211,8 @@ class Controller:
 
         elif event_type == UIEvent.MOUSE_RIGHT_CLICK:
             DEBUG("Controller: Mouse Right clicked.")
-            event = event_data.get("value")
-            DEBUG("Right click at ({}, {})", event.x, event.y)
-            
-            # 取得 bbox_controller 從 view
-            bbox_controller = getattr(self.view, 'bbox_controller', None)
-            if bbox_controller and bbox_controller.get_selected_label():
-                # 如果有選中的標籤，檢查右鍵是否點擊在選中的標籤上
-                selected_label = bbox_controller.get_selected_label()
-                canvas_width = self.view.get_canvas_size()[1]
-                canvas_height = self.view.get_canvas_size()[0]
-                if selected_label.contains(event.x, event.y, canvas_width, canvas_height):
-                    # 顯示右鍵菜單
-                    if hasattr(self.view, 'show_context_menu'):
-                        self.view.show_context_menu(event)
-                    else:
-                        DEBUG("Context menu not implemented in view")
+            self.handle_mouse_right_click(event_data)
+
 
         elif event_type == UIEvent.RESELECT_BT_CLICK:
             DEBUG("Controller: Reselect button clicked.")
@@ -248,116 +234,150 @@ class Controller:
             DEBUG("Controller: Add button clicked.")
             DEBUG("entry_value:", event_data.get("value"))
             DEBUG("do ADD EVENT")
-            
+
         elif event_type == UIEvent.CLASS_ID_CHANGE:
             DEBUG("Controller: Class ID changed.")
             DEBUG("entry_label:{}", event_data.get("label"))
             DEBUG("do CLASS ID CHANGE EVENT")
-
             config_utils.save_class_id_vars(event_data.get("label"))
+
         elif event_type == UIEvent.MOUSE_LEFT_PRESS:
-            x = event_data.get("x", 0)
-            y = event_data.get("y", 0)
-            supports_resize = event_data.get("supports_resize", False)
-            DEBUG("Controller: Mouse left press at ({}, {})", x, y)
-            
-            # 取得 bbox_controller 從 view
-            bbox_controller = getattr(self.view, 'bbox_controller', None)
-            if not bbox_controller:
-                DEBUG("No bbox_controller found in view")
-                return
-                
-            # 檢查是否在繪製模式
-            if bbox_controller.is_in_drawing_mode():
-                DEBUG("In drawing mode - start drawing")
-                # Handle drawing mode
-            else:
-                DEBUG("In normal mode - handle selection, dragging, and resizing")
-                
-                # Handle operations in priority order: resize > drag > select
-                if supports_resize and hasattr(bbox_controller, 'handle_mouse_press_with_resize'):
-                    operation_type = bbox_controller.handle_mouse_press_with_resize(x, y, self.current_labels)
-                    DEBUG("Mouse press operation type: {}", operation_type)
-                    
-                    if operation_type == "resize":
-                        DEBUG("Started resizing")
-                        # 觸發視覺更新以顯示 resizing 狀態
-                        self.view.draw_labels_on_canvas(self.current_labels)
-                        # 更新狀態顯示
-                        if hasattr(self.view, 'update_selection_status_display'):
-                            resizing_label = bbox_controller.resizing_label
-                            self.view.update_selection_status_display(resizing_label)
-                    elif operation_type == "drag":
-                        DEBUG("Started dragging")
-                        # Handle dragging operation
-                    elif operation_type == "select":
-                        selected_label = bbox_controller.get_selected_label()
-                        DEBUG("Selected label with class_id: {}", selected_label.class_id if selected_label else "None")
-                        # 觸發視覺更新
-                        self.view.draw_labels_on_canvas(self.current_labels)
-                        # 更新狀態顯示
-                        if hasattr(self.view, 'update_selection_status_display'):
-                            self.view.update_selection_status_display(selected_label)
-                    else:  # "none"
-                        DEBUG("No operation started")
-                        # 更新狀態顯示
-                        if hasattr(self.view, 'update_selection_status_display'):
-                            self.view.update_selection_status_display(None)
-                else:
-                    # Fallback to standard selection handling
-                    # Try to start dragging
-                    if bbox_controller.start_drag(x, y, self.current_labels):
-                        DEBUG("Started dragging selected label")
-                        return
-                    
-                    # Handle selection if dragging didn't start
-                    selected_label = bbox_controller.handle_selection(x, y, self.current_labels)
-                    if selected_label:
-                        DEBUG("Selected label with class_id: {}", selected_label.class_id)
-                        # 觸發視覺更新
-                        self.view.draw_labels_on_canvas(self.current_labels)
-                        # 更新狀態顯示
-                        if hasattr(self.view, 'update_selection_status_display'):
-                            self.view.update_selection_status_display(selected_label)
-                    else:
-                        DEBUG("No label selected")
-                        # 更新狀態顯示
-                        if hasattr(self.view, 'update_selection_status_display'):
-                            self.view.update_selection_status_display(None)
-            
+            self.handle_mouse_left_press(event_data)
+
         elif event_type == UIEvent.MOUSE_LEFT_RELEASE:
             DEBUG("Controller: Mouse left release.")
-            
+            drawing_result = event_data.get("drawing_result")
+            self.handle_mouse_right_release(event_data)
+
+        elif event_type == UIEvent.MOUSE_DRAG:
+            DEBUG("Controller: Mouse drag.")
+            self.handle_mouse_drag(event_data)
+
+
+        elif event_type == UIEvent.DELETE_KEY:
+            DEBUG("Controller: Delete key pressed.")
+            self.delete_selected_label()
+
+
+    def update_label_view(self, label):
+        if hasattr(self.view, 'update_selection_status_display'):
+            self.view.update_selection_status_display(label)
+
+    def handle_mouse_right_click(self, event_data):
+        event = event_data.get("value")
+        DEBUG("Right click at ({}, {})", event.x, event.y)
+        # 取得 bbox_controller 從 view
+        bbox_controller = getattr(self.view, 'bbox_controller', None)
+        if bbox_controller and bbox_controller.get_selected_label():
+            # 如果有選中的標籤，檢查右鍵是否點擊在選中的標籤上
+            selected_label = bbox_controller.get_selected_label()
+            canvas_width = self.view.get_canvas_size()[1]
+            canvas_height = self.view.get_canvas_size()[0]
+            if selected_label.contains(event.x, event.y, canvas_width, canvas_height):
+                # 顯示右鍵菜單
+                if hasattr(self.view, 'show_context_menu'):
+                    self.view.show_context_menu(event)
+                else:
+                    DEBUG("Context menu not implemented in view")
+
+
+    def handle_mouse_left_press(self, event_data):
+        x = event_data.get("x", 0)
+        y = event_data.get("y", 0)
+        supports_resize = event_data.get("supports_resize", False)
+        DEBUG("Controller: Mouse left press at ({}, {})", x, y)
+        # 取得 bbox_controller 從 view
+        bbox_controller = getattr(self.view, 'bbox_controller', None)
+        # 取得 bbox_controller 從 view
+        if not bbox_controller:
+            DEBUG("No bbox_controller found in view")
+            return
+        # 檢查是否在繪製模式
+        if bbox_controller.is_in_drawing_mode():
+            DEBUG("In drawing mode - start drawing")
+            # Handle drawing mode
+        else:
+            DEBUG("In normal mode - handle selection, dragging, and resizing")
+            # Handle operations in priority order: resize > drag > select
+            if supports_resize and hasattr(bbox_controller, 'handle_mouse_press_with_resize'):
+                operation_type = bbox_controller.handle_mouse_press_with_resize(x, y, self.current_labels)
+                DEBUG("Mouse press operation type: {}", operation_type)
+                self._handle_operation_type(operation_type, bbox_controller)
+            else:
+                # Fallback to standard selection handling
+                # Try to start dragging
+                if bbox_controller.start_drag(x, y, self.current_labels):
+                    DEBUG("Started dragging selected label")
+                    return
+                self._handle_selection(bbox_controller, x, y)
+
+
+
+    def _handle_operation_type(self, operation_type, bbox_controller):
+            if operation_type == "resize":
+                DEBUG("Started resizing")
+                # 觸發視覺更新以顯示 resizing 狀態
+                self.view.draw_labels_on_canvas(self.current_labels)
+                # 更新狀態顯示
+                resizing_label = bbox_controller.resizing_label
+                self.update_label_view(resizing_label)
+
+            elif operation_type == "drag":
+                    DEBUG("Started dragging")
+                    # Handle dragging operation
+            elif operation_type == "select":
+                    selected_label = bbox_controller.get_selected_label()
+                    DEBUG("Selected label with class_id: {}", selected_label.class_id if selected_label else "None")
+                    # 觸發視覺更新
+                    self.view.draw_labels_on_canvas(self.current_labels)
+                    # 更新狀態顯示
+                    self.update_label_view(selected_label)
+
+            else:  # "none"
+                    DEBUG("No operation started")
+                    # 更新狀態顯示
+                    self.update_label_view(None)
+
+    def _handle_selection(self, bbox_controller, x, y):
+             # Handle selection if dragging didn't start
+            selected_label = bbox_controller.handle_selection(x, y, self.current_labels)
+            if selected_label:
+                DEBUG("Selected label with class_id: {}", selected_label.class_id)
+                # 觸發視覺更新
+                self.view.draw_labels_on_canvas(self.current_labels)
+                # 更新狀態顯示
+                self.update_label_view(selected_label)
+
+            else:
+                DEBUG("No label selected")
+                # 更新狀態顯示
+                self.update_label_view(None)
+   
+    def handle_mouse_right_release(self, event_data):
             # 處理繪製完成
             drawing_result = event_data.get("drawing_result")
             if drawing_result:
                 DEBUG("Drawing completed")
                 self.handle_new_bbox(drawing_result)
-                
+
             # 處理 resize 完成
             resized_label = event_data.get("resized_label")
             if resized_label:
                 DEBUG("Resizing completed for label with class_id: {}", resized_label.class_id)
                 self.handle_resized_bbox(resized_label)
-                
+
             # 處理拖曳完成
             dragged_label = event_data.get("dragged_label")
             if dragged_label:
                 DEBUG("Dragging completed for label with class_id: {}", dragged_label.class_id)
                 self.handle_dragged_bbox(dragged_label)
-                
-        elif event_type == UIEvent.MOUSE_DRAG:
-            DEBUG("Controller: Mouse drag.")
-            
+
+    def handle_mouse_drag(self, event_data):
             # 檢查是否在拖曳或縮放模式中需要重繪
             bbox_controller = getattr(self.view, 'bbox_controller', None)
             if bbox_controller and (bbox_controller.is_dragging or bbox_controller.is_resizing):
                 # Redraw to prevent visual artifacts
                 self.view.draw_labels_on_canvas(self.current_labels)
-            
-        elif event_type == UIEvent.DELETE_KEY:
-            DEBUG("Controller: Delete key pressed.")
-            self.delete_selected_label()
 
     def handle_new_bbox(self, drawing_result):
         """Handle newly drawn bounding box"""
@@ -365,31 +385,25 @@ class Controller:
             yolo_coords = drawing_result['yolo_coords']
             canvas_coords = drawing_result['canvas_coords']
             size = drawing_result['size']
-            
+
             # Create new LabelObject (default class_id=0)
             cx, cy, w_ratio, h_ratio = yolo_coords
             new_label = label_display_utils.LabelObject(0, cx, cy, w_ratio, h_ratio)
-            
+
             # Add to current labels list
             self.current_labels.append(new_label)
             DEBUG("Added new bbox: cx={:.6f}, cy={:.6f}, w={:.6f}, h={:.6f}", cx, cy, w_ratio, h_ratio)
-            
+
             # 重新排序標籤
             if len(self.current_labels) > 1:
                 original_count = len(self.current_labels)
                 self.current_labels, plate_count = label_display_utils.sort_labels_by_position(self.current_labels)
                 DEBUG("Re-sorted {} labels after adding new bbox", original_count)
-            
-            # Save to label file
-            self.save_current_labels()
-            
-            # Update UI display
-            self.update_label_display()
-            self.load_label(self.labels_path)  # 更新文字框顯示
-            
+            self.refresh()
+
         except Exception as e:
             ERROR("Error handling new bbox: {}", e)
-    
+
     def handle_dragged_bbox(self, dragged_label):
         """
         處理拖曳完成的 bounding box
@@ -398,28 +412,23 @@ class Controller:
             dragged_label (LabelObject): 被拖曳的標籤對象
         """
         try:
-            DEBUG("Processing dragged bbox: class_id={}, coords=({:.6f}, {:.6f}, {:.6f}, {:.6f})", 
-                  dragged_label.class_id, dragged_label.cx_ratio, 
+            DEBUG("Processing dragged bbox: class_id={}, coords=({:.6f}, {:.6f}, {:.6f}, {:.6f})",
+                  dragged_label.class_id, dragged_label.cx_ratio,
                   dragged_label.cy_ratio, dragged_label.w_ratio, dragged_label.h_ratio)
-            
+
             # 重新排序標籤（因為位置改變了）
             if len(self.current_labels) > 1:
                 original_count = len(self.current_labels)
                 self.current_labels, plate_count = label_display_utils.sort_labels_by_position(self.current_labels)
                 DEBUG("Re-sorted {} labels after dragging", original_count)
-            
-            # 儲存更新後的標籤文件
-            self.save_current_labels()
-            
-            # 更新 UI 顯示
-            self.update_label_display()
-            self.load_label(self.labels_path)  # 更新文字框顯示
-            
+
+            self.refresh()
+
             DEBUG("Dragged bbox processing completed")
-            
+
         except Exception as e:
             ERROR("Error handling dragged bbox: {}", e)
-    
+
     def handle_resized_bbox(self, resized_label):
         """
         處理 resize 完成的 bounding box
@@ -428,46 +437,51 @@ class Controller:
             resized_label (LabelObject): 被 resize 的標籤對象
         """
         try:
-            DEBUG("Processing resized bbox: class_id={}, coords=({:.6f}, {:.6f}, {:.6f}, {:.6f})", 
-                  resized_label.class_id, resized_label.cx_ratio, 
+            DEBUG("Processing resized bbox: class_id={}, coords=({:.6f}, {:.6f}, {:.6f}, {:.6f})",
+                  resized_label.class_id, resized_label.cx_ratio,
                   resized_label.cy_ratio, resized_label.w_ratio, resized_label.h_ratio)
-            
-            # 儲存更新後的標籤文件
-            self.save_current_labels()
-            
-            # 更新 UI 顯示
-            self.update_label_display()
-            
+
+            self.refresh()
+
             DEBUG("Resized bbox processing completed")
-            
+
         except Exception as e:
             ERROR("Error handling resized bbox: {}", e)
-    
+
+    def refresh(self):
+        # 保存更新後的標籤文件
+        self.save_current_labels()
+
+        # 刷新畫布顯示
+        self.update_label_display()
+        # 更新文字框顯示
+        self.load_label(self.labels_path)
+
     def save_current_labels(self):
         """Save current labels list to file"""
         if self.image_index < len(self.labels_path):
             label_file_path = self.labels_path[self.image_index]
-            
+
             try:
                 with open(label_file_path, 'w', encoding='utf-8') as f:
                     for label in self.current_labels:
                         yolo_line = f"{label.class_id} {label.cx_ratio:.17f} {label.cy_ratio:.17f} {label.w_ratio:.17f} {label.h_ratio:.17f}\n"
                         f.write(yolo_line)
-                        
+
                 DEBUG("Saved {} labels to {}", len(self.current_labels), label_file_path)
-                
+
             except Exception as e:
                 ERROR("Error saving labels to file: {}", e)
-    
+
     def update_label_display(self):
         """Update label display"""
         # Update label boxes display on canvas
         if self.current_labels:
             self.view.draw_labels_on_canvas(self.current_labels)
-        
+
         # Update text box display
         self.load_label(self.labels_path)
-        
+
     def delete_selected_label(self):
         """刪除選中的標籤"""
         # 取得 bbox_controller 從 view
@@ -496,14 +510,9 @@ class Controller:
                     original_count = len(self.current_labels)
                     self.current_labels, plate_count = label_display_utils.sort_labels_by_position(self.current_labels)
                     DEBUG("Re-sorted {} labels after deletion", original_count)
-                
-                # 保存更新後的標籤文件
-                self.save_current_labels()
-                
-                # 刷新畫布顯示
-                self.update_label_display()
-                self.load_label(self.labels_path)  # 更新文字框顯示
-                
+
+                self.refresh()
+
                 # 更新狀態顯示
                 if hasattr(self.view, 'update_selection_status_display'):
                     self.view.update_selection_status_display(None)
