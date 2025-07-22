@@ -539,7 +539,7 @@ class Controller:
             if hasattr(self.view, "clear_input_box"):
                 self.view.clear_input_box()
             if hasattr(self.view, "focus_input_box"):
-                self.biew.focus_input_box()
+                self.view.focus_input_box()
                 
             return
         
