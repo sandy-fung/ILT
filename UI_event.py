@@ -24,3 +24,10 @@ class UIEvent(Enum):
 
     WINDOW_READY = auto()
     CANVAS_RESIZE = auto()
+    
+    # Magnifier events for preview panel
+    MAGNIFIER_SHOW = auto()
+    MAGNIFIER_HIDE = auto()
+    PREVIEW_DRAG_START = auto()
+    PREVIEW_DRAG = auto()
+    PREVIEW_DRAG_END = auto()
