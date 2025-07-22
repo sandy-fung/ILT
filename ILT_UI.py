@@ -23,9 +23,13 @@ class UI:
 
         # Initialize drawing-related states
         self.bbox_controller = None
+        
+        # Store reference to original image for preview
+        self.original_image = None
 
-        self.SHOW_CLASS_ID_BUTTONS = False
-        self.SHOW_TEXT_BOX = False
+        self.SHOW_CLASS_ID_BUTTONS = True
+        self.SHOW_TEXT_BOX = True
+        self.SHOW_PREVIEW = True
 
         self.setup_ui()
         self.setup_events()
@@ -94,7 +98,13 @@ class UI:
         self.bottom_frame.pack(side = "bottom", fill = "x")
 
         self.create_text_area()
+        
+        # Create right container for hint and preview areas
+        self.right_container = tk.Frame(self.bottom_frame, bg = "#f8f8f8")
+        self.right_container.pack(side = "right", fill = "both", expand = True)
+        
         self.create_hint_area()
+        self.create_preview_area()
 
     def create_text_area(self):
         self.text_frame = tk.Frame(self.bottom_frame, bg = "#f8f8f8")
@@ -114,8 +124,8 @@ class UI:
         self.text_box.pack(side = "top", fill = "x", padx = 20, pady = 20)
 
     def create_hint_area(self):
-        self.hint_frame = tk.Frame(self.bottom_frame, bg = "#f8f8f8")
-        self.hint_frame.pack(side = "right", fill = "both", expand = True)
+        self.hint_frame = tk.Frame(self.right_container, bg = "#f8f8f8")
+        self.hint_frame.pack(side = "top", fill = "x", pady = (0, 10))
 
         hint_text = (
             "← 上一張\n"
@@ -152,6 +162,185 @@ class UI:
             fg = "#666666", font = ("Segoe UI", 10)
         )
         self.selection_status_label.grid(row = 0, column = 1, sticky = "nw", padx = (20, 0))
+
+    def create_preview_area(self):
+        if not self.SHOW_PREVIEW:
+            DEBUG("Preview area is not shown as per configuration.")
+            return
+            
+        # Create preview frame with border
+        self.preview_frame = tk.Frame(self.right_container, bg = "#f8f8f8", relief = "ridge", bd = 2)
+        self.preview_frame.pack(side = "bottom", fill = "both", expand = True)
+        
+        # Add title label
+        self.preview_title = tk.Label(
+            self.preview_frame, 
+            text = "原尺寸預覽", 
+            bg = "#f8f8f8", 
+            fg = "#424242", 
+            font = ("Segoe UI", 11, "bold")
+        )
+        self.preview_title.pack(side = "top", pady = 5)
+        
+        # Create preview canvas container
+        self.preview_canvas_frame = tk.Frame(self.preview_frame, bg = "#f8f8f8")
+        self.preview_canvas_frame.pack(side = "top", fill = "both", expand = True, padx = 10, pady = (0, 10))
+        
+        # Create scrollbars
+        self.preview_v_scrollbar = tk.Scrollbar(self.preview_canvas_frame, orient = "vertical")
+        self.preview_h_scrollbar = tk.Scrollbar(self.preview_canvas_frame, orient = "horizontal")
+        
+        # Create preview canvas with fixed size
+        self.preview_canvas = tk.Canvas(
+            self.preview_canvas_frame,
+            bg = "white",
+            width = 300,
+            height = 300,
+            highlightthickness = 1,
+            highlightbackground = "#cccccc",
+            yscrollcommand = self.preview_v_scrollbar.set,
+            xscrollcommand = self.preview_h_scrollbar.set
+        )
+        
+        # Configure scrollbars
+        self.preview_v_scrollbar.config(command = self.preview_canvas.yview)
+        self.preview_h_scrollbar.config(command = self.preview_canvas.xview)
+        
+        # Pack canvas and scrollbars
+        self.preview_canvas.grid(row = 0, column = 0, sticky = "nsew")
+        self.preview_v_scrollbar.grid(row = 0, column = 1, sticky = "ns")
+        self.preview_h_scrollbar.grid(row = 1, column = 0, sticky = "ew")
+        
+        # Configure grid weights
+        self.preview_canvas_frame.grid_rowconfigure(0, weight = 1)
+        self.preview_canvas_frame.grid_columnconfigure(0, weight = 1)
+        
+        # Initialize preview state
+        self.preview_image = None
+        self.preview_photo_image = None
+        
+        # Add placeholder text
+        self.preview_canvas.create_text(
+            150, 150,
+            text = "尚未載入圖片",
+            fill = "#999999",
+            font = ("Segoe UI", 12),
+            tags = "placeholder"
+        )
+
+    def set_original_image(self, original_image):
+        """Set the original image reference for preview functionality
+        
+        Args:
+            original_image: OpenCV image (numpy array)
+        """
+        self.original_image = original_image
+        DEBUG("Original image reference updated for preview")
+
+    def update_preview(self, original_image):
+        """Update preview with the full original image
+        
+        Args:
+            original_image: PIL Image object
+        """
+        if not self.SHOW_PREVIEW or self.preview_canvas is None:
+            return
+            
+        from PIL import Image, ImageTk
+        
+        # Clear previous preview
+        self.preview_canvas.delete("all")
+        
+        # Get original image dimensions
+        img_width, img_height = original_image.size
+        
+        # Calculate scale to fit in preview window while maintaining aspect ratio
+        preview_width = 300
+        preview_height = 300
+        scale_x = preview_width / img_width
+        scale_y = preview_height / img_height
+        scale = min(scale_x, scale_y)
+        
+        # Calculate new dimensions
+        new_width = int(img_width * scale)
+        new_height = int(img_height * scale)
+        
+        # Resize image to fit preview
+        pil_image_resized = original_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        
+        # Convert to PhotoImage for Tkinter
+        self.preview_photo_image = ImageTk.PhotoImage(pil_image_resized)
+        
+        # Calculate position to center image in canvas
+        x_offset = (preview_width - new_width) // 2
+        y_offset = (preview_height - new_height) // 2
+        
+        # Display on preview canvas
+        self.preview_canvas.create_image(x_offset, y_offset, anchor = "nw", image = self.preview_photo_image, tags = "preview_image")
+        
+        # Add info text
+        info_text = f"原始尺寸: {img_width}×{img_height}"
+        self.preview_canvas.create_text(
+            150, 290,
+            text = info_text,
+            fill = "#666666",
+            font = ("Segoe UI", 9),
+            tags = "info_text"
+        )
+        
+        # Update scroll region (no scroll needed for fitted image)
+        self.preview_canvas.config(scrollregion = (0, 0, preview_width, preview_height))
+        
+        DEBUG("Preview updated with full image: {}×{} (scaled to {}×{})", img_width, img_height, new_width, new_height)
+
+    def clear_preview(self):
+        """Clear the preview canvas"""
+        if not self.SHOW_PREVIEW or self.preview_canvas is None:
+            return
+            
+        # Delete all items
+        self.preview_canvas.delete("all")
+        
+        # Show placeholder text
+        self.preview_canvas.create_text(
+            150, 150,
+            text = "尚未載入圖片",
+            fill = "#999999",
+            font = ("Segoe UI", 12),
+            tags = "placeholder"
+        )
+        
+        # Reset scroll region
+        self.preview_canvas.config(scrollregion = (0, 0, 300, 300))
+        
+        # Clear stored references
+        self.preview_photo_image = None
+    
+    def toggle_preview(self, show=None):
+        """Toggle preview panel visibility
+        
+        Args:
+            show (bool, optional): If provided, set visibility to this value.
+                                 If not provided, toggle current state.
+        """
+        if show is not None:
+            self.SHOW_PREVIEW = show
+        else:
+            self.SHOW_PREVIEW = not self.SHOW_PREVIEW
+        
+        if hasattr(self, 'preview_frame'):
+            if self.SHOW_PREVIEW:
+                # Show preview frame
+                self.preview_frame.pack(side = "bottom", fill = "both", expand = True)
+                DEBUG("Preview panel shown")
+                
+                # Update preview if original image is available
+                if self.original_image is not None:
+                    self.update_preview(self.original_image)
+            else:
+                # Hide preview frame
+                self.preview_frame.pack_forget()
+                DEBUG("Preview panel hidden")
 
     def show_class_id_buttons(self, var, labels):
         if self.SHOW_CLASS_ID_BUTTONS:

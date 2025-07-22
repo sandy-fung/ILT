@@ -97,6 +97,14 @@ class Controller:
         self.image = image_utils.convert_to_tk(resized)
 
         self.view.update_image_canvas(self.image)
+        
+        # Set original image reference in UI for preview functionality
+        if hasattr(self.view, 'set_original_image'):
+            self.view.set_original_image(self.original_image)
+            # Update preview with the full image
+            if hasattr(self.view, 'update_preview'):
+                self.view.update_preview(self.original_image)
+        
         DEBUG("Controller.load_image() completed")
         self.view.update_index_label(self.image_index, self.images_path)
         
