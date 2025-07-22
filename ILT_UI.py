@@ -1271,7 +1271,8 @@ class UI:
             ERROR("bbox_controller is None!")
 
         if self.dispatch:
-            self.dispatch(UIEvent.RIGHT_CTRL_PRESS, {"value": event}, drawing_mode = True)
+            self.drawing_mode = True
+            self.dispatch(UIEvent.RIGHT_CTRL_PRESS, {"value": event, "drawing_mode": self.drawing_mode})
 
     def on_rc_release(self, event):
         DEBUG("on_rc_release")
@@ -1283,7 +1284,8 @@ class UI:
             ERROR("bbox_controller is None!")
 
         if self.dispatch:
-            self.dispatch(UIEvent.RIGHT_CTRL_RELEASE, {"value": event}, drawing_mode = False)
+            self.drawing_mode = False
+            self.dispatch(UIEvent.RIGHT_CTRL_RELEASE, {"value": event, "drawing_mode": self.drawing_mode})
 
     def on_delete_key(self, event):
         DEBUG("on_delete_key")
