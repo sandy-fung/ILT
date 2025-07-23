@@ -21,8 +21,14 @@ class UIEvent(Enum):
     RESELECT_BT_CLICK = auto()
     CROP_BT_CLICK = auto()
     ADD_BT_CLICK = auto()
+    CONFIGURATION_BT_CLICK = auto()
     CLASS_ID_CHANGE = auto()
     INPUT_ENTER = auto()
+    
+    # Settings dialog events
+    SETTINGS_DIALOG_CONFIRM = auto()
+    SETTINGS_DIALOG_CANCEL = auto()
+    UI_SETTINGS_CHANGED = auto()
 
     WINDOW_READY = auto()
     CANVAS_RESIZE = auto()

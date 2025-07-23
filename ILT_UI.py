@@ -5,6 +5,8 @@ from log_levels import DEBUG, INFO, ERROR
 from tkinter import messagebox
 import label_display_utils
 import bbox_controller
+from settings_dialog import SettingsDialog
+import config_utils
 
 class UI:
     def __init__(self):
@@ -28,10 +30,11 @@ class UI:
         # Store reference to original image for preview
         self.original_image = None
 
-        self.SHOW_CLASS_ID_BUTTONS = False
-        self.SHOW_TEXT_BOX = True
-        self.SHOW_PREVIEW = True
-        self.SHOW_INPUT_BOX = True
+        # Load UI settings from config
+        self.SHOW_CLASS_ID_BUTTONS = config_utils.get_show_class_id_buttons()
+        self.SHOW_TEXT_BOX = config_utils.get_show_text_box()
+        self.SHOW_PREVIEW = config_utils.get_show_preview()
+        self.SHOW_INPUT_BOX = config_utils.get_show_input_box()
 
         self.setup_ui()
         self.setup_events()
@@ -84,6 +87,15 @@ class UI:
             command = self.on_delete_image_button)
         self.del_button.pack(side = "left", padx = 5)
 
+        self.configuration_button = tk.Button(
+            self.toolbar,
+            width = 12, height = 1,
+            text = "Configuration", fg = "#008378",
+            relief = "flat", bd = 2,
+            command = self.on_configuration_click
+        )
+        self.configuration_button.pack(side = "left", padx = 5)
+
     def create_middle_area(self):
         self.middle_frame = tk.Frame(self.window)
         self.middle_frame.pack(side = "top", fill = "both", expand = True)
@@ -121,6 +133,7 @@ class UI:
         self.text_frame = tk.Frame(self.bottom_frame, bg = "#f8f8f8")
         self.text_frame.pack(side = "left", fill = "both", expand = True)
 
+        # Initialize input box if enabled
         if self.SHOW_INPUT_BOX:
             self.input_box = tk.Entry(self.text_frame, font = ("Segoe UI", 11), fg = "#424242")
             self.input_box.pack(side = "top", fill  = "x", padx = 20, pady = 10)
@@ -134,8 +147,9 @@ class UI:
 
         else:
             DEBUG("Input box is not shown as per configuration.")
-            return
+            self.input_box = None
 
+        # Initialize text box if enabled
         if self.SHOW_TEXT_BOX:
             self.text_box = tk.Text(
                 self.text_frame,
@@ -149,6 +163,7 @@ class UI:
 
         else:
             DEBUG("Text box is not shown as per configuration.")
+            self.text_box = None
         
 
     def create_hint_area(self):
@@ -449,31 +464,6 @@ class UI:
         # Clear stored references
         self.preview_photo_image = None
     
-    def toggle_preview(self, show=None):
-        """Toggle preview panel visibility
-        
-        Args:
-            show (bool, optional): If provided, set visibility to this value.
-                                 If not provided, toggle current state.
-        """
-        if show is not None:
-            self.SHOW_PREVIEW = show
-        else:
-            self.SHOW_PREVIEW = not self.SHOW_PREVIEW
-        
-        if hasattr(self, 'preview_frame'):
-            if self.SHOW_PREVIEW:
-                # Show preview frame
-                self.preview_frame.pack(side = "bottom", fill = "both", expand = True)
-                DEBUG("Preview panel shown")
-                
-                # Update preview if original image is available
-                if self.original_image is not None:
-                    self.update_preview(self.original_image)
-            else:
-                # Hide preview frame
-                self.preview_frame.pack_forget()
-                DEBUG("Preview panel hidden")
 
     # Magnifier functionality for preview panel
     def on_preview_enter(self, event):
@@ -1304,6 +1294,217 @@ class UI:
         DEBUG("on_delete_image_button")
         if self.dispatch:
             self.dispatch(UIEvent.DELETE_IMAGE,  None)
+
+    def on_configuration_click(self):
+        """Handle configuration button click"""
+        DEBUG("on_configuration_click")
+        if self.dispatch:
+            self.dispatch(UIEvent.CONFIGURATION_BT_CLICK, None)
+    
+    def show_settings_dialog(self, current_settings, on_confirm_callback):
+        """Show settings dialog"""
+        try:
+            DEBUG("Opening settings dialog")
+            dialog = SettingsDialog(self.window, current_settings, on_confirm_callback)
+            dialog.show()
+        except Exception as e:
+            ERROR("Error showing settings dialog: {}", e)
+    
+    def apply_ui_settings(self, settings):
+        """Apply UI settings to show/hide components"""
+        try:
+            DEBUG("Applying UI settings: {}", settings)
+            
+            # Update internal settings
+            self.SHOW_CLASS_ID_BUTTONS = settings.get('show_class_id_buttons', False)
+            self.SHOW_TEXT_BOX = settings.get('show_text_box', True)
+            self.SHOW_PREVIEW = settings.get('show_preview', True)
+            self.SHOW_INPUT_BOX = settings.get('show_input_box', True)
+            
+            # Apply input box visibility (should be first, like in original creation)
+            self.toggle_input_box(self.SHOW_INPUT_BOX)
+            
+            # Apply text box visibility (should be second, like in original creation)
+            self.toggle_text_box(self.SHOW_TEXT_BOX)
+            
+            # Apply class ID buttons visibility
+            self.toggle_class_id_buttons(self.SHOW_CLASS_ID_BUTTONS)
+            
+            # Apply preview panel visibility
+            self.toggle_preview(self.SHOW_PREVIEW)
+            
+            DEBUG("UI settings applied successfully")
+            
+        except Exception as e:
+            ERROR("Error applying UI settings: {}", e)
+    
+    def toggle_class_id_buttons(self, show):
+        """Toggle class ID buttons panel visibility"""
+        try:
+            if show:
+                # If we want to show but frame doesn't exist, create it
+                if not hasattr(self, 'class_id_frame') or self.class_id_frame is None:
+                    DEBUG("Creating class ID frame for show operation")
+                    # Import here to avoid circular import issues
+                    import config_utils
+                    import Words_Label_mapping as wlm
+                    current_var = config_utils.get_class_id_vars()
+                    labels = wlm.get_labels()
+                    
+                    # Create the frame
+                    self.class_id_frame = tk.Frame(self.middle_frame, bg="#f8f8f8")
+                    
+                    # Create the buttons
+                    self.class_id_vars = tk.StringVar(value=current_var or "0")
+                    for i, label in enumerate(labels):
+                        column = i // 13
+                        row = i % 13
+                        button = tk.Radiobutton(
+                            self.class_id_frame, bg="#f8f8f8", font=("Segoe UI Mono", 10),
+                            text=label, variable=self.class_id_vars, value=label, width=3, anchor="center", indicatoron=True,
+                            command=lambda l=label: self.dispatch(UIEvent.CLASS_ID_CHANGE, {"label": l}) if self.dispatch else None
+                        )
+                        button.grid(row=row, column=column, padx=5, pady=5)
+                
+                # Show the frame
+                try:
+                    # Check if already packed by trying to get pack_info
+                    self.class_id_frame.pack_info()
+                except tk.TclError:
+                    # Not packed, so pack it
+                    self.class_id_frame.pack(side="right", fill="y")
+                    DEBUG("Class ID buttons shown")
+            else:
+                # Hide the frame if it exists
+                if hasattr(self, 'class_id_frame') and self.class_id_frame:
+                    try:
+                        # Check if packed by trying to get pack_info
+                        self.class_id_frame.pack_info()
+                        # If we get here, it's packed, so forget it
+                        self.class_id_frame.pack_forget()
+                        DEBUG("Class ID buttons hidden")
+                    except tk.TclError:
+                        # Already not packed
+                        pass
+        except Exception as e:
+            ERROR("Error toggling class ID buttons: {}", e)
+    
+    def toggle_text_box(self, show):
+        """Toggle text box visibility"""
+        try:
+            if show:
+                # If we want to show but text_box doesn't exist, create it
+                if not hasattr(self, 'text_box') or self.text_box is None:
+                    DEBUG("Creating text box for show operation")
+                    if hasattr(self, 'text_frame'):
+                        self.text_box = tk.Text(
+                            self.text_frame,
+                            height=15, bg="white",
+                            font=("Segoe UI", 11), fg="#424242",
+                            relief="sunken",
+                            wrap="word"
+                        )
+                        self.text_box.tag_configure("left", justify="left")
+                
+                # Show the text box
+                if hasattr(self, 'text_box') and self.text_box:
+                    try:
+                        # Check if already packed by trying to get pack_info
+                        self.text_box.pack_info()
+                    except tk.TclError:
+                        # Not packed, so pack it
+                        self.text_box.pack(side="top", fill="x", padx=20, pady=10)
+                        DEBUG("Text box shown")
+            else:
+                # Hide the text box if it exists
+                if hasattr(self, 'text_box') and self.text_box:
+                    try:
+                        # Check if packed by trying to get pack_info
+                        self.text_box.pack_info()
+                        # If we get here, it's packed, so forget it
+                        self.text_box.pack_forget()
+                        DEBUG("Text box hidden")
+                    except tk.TclError:
+                        # Already not packed
+                        pass
+        except Exception as e:
+            ERROR("Error toggling text box: {}", e)
+    
+    def toggle_preview(self, show=None):
+        """Toggle preview panel visibility"""
+        try:
+            if show is not None:
+                self.SHOW_PREVIEW = show
+            else:
+                self.SHOW_PREVIEW = not self.SHOW_PREVIEW
+                
+            if hasattr(self, 'preview_frame'):
+                if self.SHOW_PREVIEW:
+                    try:
+                        # Check if already packed by trying to get pack_info
+                        self.preview_frame.pack_info()
+                    except tk.TclError:
+                        # Not packed, so pack it
+                        self.preview_frame.pack(side="bottom", fill="both", expand=True)
+                        DEBUG("Preview panel shown")
+                        # Update preview if original image is available
+                        if self.original_image is not None:
+                            self.update_preview(self.original_image)
+                else:
+                    try:
+                        # Check if packed by trying to get pack_info
+                        self.preview_frame.pack_info()
+                        # If we get here, it's packed, so forget it
+                        self.preview_frame.pack_forget()
+                        DEBUG("Preview panel hidden")
+                    except tk.TclError:
+                        # Already not packed
+                        pass
+            else:
+                # If preview_frame doesn't exist yet but we want to show it, may need to trigger creation
+                if show:
+                    DEBUG("Preview frame not found, but show=True. May need to trigger creation first.")
+        except Exception as e:
+            ERROR("Error toggling preview: {}", e)
+    
+    def toggle_input_box(self, show):
+        """Toggle input box visibility"""
+        try:
+            if show:
+                # If we want to show but input_box doesn't exist, create it
+                if not hasattr(self, 'input_box') or self.input_box is None:
+                    DEBUG("Creating input box for show operation")
+                    if hasattr(self, 'text_frame'):
+                        self.input_box = tk.Entry(self.text_frame, font=("Segoe UI", 11), fg="#424242")
+                        self.input_box.insert(0, "請輸入車牌號碼")
+                        self.input_box.bind("<FocusIn>", self._on_input_focus_in)
+                        self.input_box.bind("<FocusOut>", self._on_input_focus_out)
+                        self.input_box.bind("<Return>", self.input_enter)
+                        self.input_box.bind("<KeyRelease>", self.force_uppercase)
+                
+                # Show the input box
+                if hasattr(self, 'input_box') and self.input_box:
+                    try:
+                        # Check if already packed by trying to get pack_info
+                        self.input_box.pack_info()
+                    except tk.TclError:
+                        # Not packed, so pack it
+                        self.input_box.pack(side="top", fill="x", padx=20, pady=10)
+                        DEBUG("Input box shown")
+            else:
+                # Hide the input box if it exists
+                if hasattr(self, 'input_box') and self.input_box:
+                    try:
+                        # Check if packed by trying to get pack_info
+                        self.input_box.pack_info()
+                        # If we get here, it's packed, so forget it
+                        self.input_box.pack_forget()
+                        DEBUG("Input box hidden")
+                    except tk.TclError:
+                        # Already not packed
+                        pass
+        except Exception as e:
+            ERROR("Error toggling input box: {}", e)
 
     def next_image(self, event):
         DEBUG("next_image")

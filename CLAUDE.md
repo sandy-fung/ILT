@@ -37,10 +37,11 @@ python main.py
 - **main.py** - Entry point, initializes UI and Controller
 - **ILT_UI.py** - Complete UI implementation with canvas, toolbar, and controls
 - **Controller.py** - Handles all business logic, image navigation, and event dispatching
+- **settings_dialog.py** - UI customization dialog for toggling component visibility
 - **bbox_controller.py** - Manages bounding box interactions (drawing, selection, dragging, resizing)
 - **label_display_utils.py** - YOLO label parsing, sorting, and LabelObject management
 - **Words_Label_mapping.py** - Character-to-class mapping for license plate annotation (0-9, A-Z)
-- **config_utils.py** - Manages config.ini file operations
+- **config_utils.py** - Manages config.ini file operations and UI settings
 - **folder_utils.py** - Scans image folders and manages label files
 - **image_utils.py** - Image loading, processing, and PIL conversion
 - **log_levels.py** - Custom logging system
@@ -49,6 +50,7 @@ python main.py
 - **config.ini** - Stores application state (folders, current image, dimensions)
   - `[ImageInfo]` - Image dimensions
   - `[Path]` - Folder paths, current image index, selected class ID
+  - `[UISettings]` - UI component visibility settings (show_class_id_buttons, show_text_box, show_preview, show_input_box)
   - `[preview_magnifier]` - Magnifier settings (enabled, zoom_factor, cursor_type, region_size, cache_size)
   - `[LabelFiles]` - Label file handling settings (auto_create_labels)
 - **Label File Strategy**: Uses lazy creation approach
@@ -70,18 +72,34 @@ python main.py
 - Confirmation dialog to prevent accidental deletion
 
 ### UI Components
-- Top toolbar: "Reselect Folders", "Crop", "Add" buttons
+- Top toolbar: "Reselect Folders", "Crop", "Add", "Delete", "Configuration" buttons
 - Main canvas with image display and bounding box visualization
 - Right panel: Class ID selection buttons (0-9, A-Z) for character annotation (optional)
 - Text box showing label content in YOLO format (optional)
-- Bottom toolbar: "Delete" button for removing current image and associated labels
+- Bottom toolbar: Additional tools and controls
 - Hint area with keyboard shortcuts (in Chinese)
 - Status display: Shows drawing mode, selection status, and sorting feedback
+
+### UI Customization
+The application includes a **Configuration** button in the top toolbar that opens a settings dialog for UI customization.
+
+**Configuration Dialog Features:**
+- Fixed size (400x300 pixels) modal dialog with compact layout
+- Checkboxes for toggling UI component visibility:
+  - Show Class ID Buttons (0-9, A-Z)
+  - Show Text Box
+  - Show Preview Panel
+  - Show Input Box
+- Save and Cancel buttons
+- Keyboard shortcuts: Enter (Save), Escape (Cancel)
+- **Real-time UI updates**: Settings applied immediately without restart
+- Settings automatically saved to config.ini for persistence
 
 **UI Configuration Options:**
 - `SHOW_CLASS_ID_BUTTONS`: Toggle class ID button panel visibility
 - `SHOW_TEXT_BOX`: Toggle text box visibility for streamlined interface
 - `SHOW_PREVIEW`: Toggle original size preview panel visibility
+- `SHOW_INPUT_BOX`: Toggle input box visibility
 
 ### Bounding Box Features
 - **Visualization**: Display YOLO format labels as colored bounding boxes with class ID
@@ -154,6 +172,13 @@ Events are defined in `UI_event.py` and handled through the Controller:
 - Graceful error handling for missing/corrupt config files
 - Automatic config creation with sensible defaults
 - Improved error messages for Windows-specific issues (e.g., file path access errors)
+- **UI Settings Management**: Complete API for UI customization
+  - `get_show_*()` functions for reading UI component visibility settings
+  - `save_ui_settings()` for batch updating UI settings
+  - `get_all_ui_settings()` for retrieving all settings as dictionary
+  - Dynamic UI component show/hide with `apply_ui_settings()` method
+  - Intelligent `toggle_*()` methods with automatic component creation and proper pack management
+  - Unified pack checking logic using try-except pattern for reliable widget state detection
 - **Magnifier Configuration**: Full API in `config_utils.py` for managing preview magnifier settings
   - `get_magnifier_*()` functions for reading configuration
   - `save_magnifier_config()` for updating settings
