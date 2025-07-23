@@ -982,17 +982,29 @@ class UI:
         self.canvas.create_image(self.canvas_width//2, self.canvas_height//2, anchor = "center", image = image)
         DEBUG("Image updated on canvas with height: {}, width: {}", self.canvas_height, self.canvas_width)
 
+    def clear_all_labels_canvas(self):
+        """Clear all items on the canvas"""
+        # DEBUG("Clearing all items on canvas")
+        all_items = self.canvas.find_all()
+        DEBUG("All items on canvas: {}", all_items)
+        for item_id in all_items:
+            item_type = self.canvas.type(item_id)
+            if item_type in ["rectangle", "text"]:
+                self.canvas.delete(item_id)
+                DEBUG("Deleted item ID {} of type {}", item_id, item_type)
+
+
     def draw_labels_on_canvas(self, labels):
         """Draw label bounding boxes on canvas with resize handles"""
         # Clear all previous label-related items
         # Clear all previous label-related items
         self.canvas.delete("label_box")
         self.canvas.delete("label_box_selected")
-        self.canvas.delete("label_box_dragging") 
+        self.canvas.delete("label_box_dragging")
         self.canvas.delete("label_box_resizing")
         self.canvas.delete("label_text")
         self.canvas.delete("resize_handle")
-        
+
         # Remove any remaining items
         for item in self.canvas.find_withtag("label_box"):
             self.canvas.delete(item)
