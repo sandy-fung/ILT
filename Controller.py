@@ -332,7 +332,7 @@ class Controller:
                 if bbox_controller.start_drag(x, y, self.current_labels):
                     DEBUG("Started dragging selected label")
                     return
-                self._handle_selection(bbox_controller, x, y)
+            self._handle_selection(bbox_controller, x, y)
 
 
 
@@ -364,6 +364,8 @@ class Controller:
     def _handle_selection(self, bbox_controller, x, y):
              # Handle selection if dragging didn't start
             selected_label = bbox_controller.handle_selection(x, y, self.current_labels)
+            self.view.draw_labels_on_canvas(self.current_labels)
+   
             if selected_label:
                 DEBUG("Selected label with class_id: {}", selected_label.class_id)
                 # 觸發視覺更新
@@ -375,7 +377,7 @@ class Controller:
                 DEBUG("No label selected")
                 # 更新狀態顯示
                 self.update_label_view(None)
-   
+
     def handle_mouse_right_release(self, event_data):
             # 處理繪製完成
             drawing_result = event_data.get("drawing_result")
