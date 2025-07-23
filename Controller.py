@@ -289,8 +289,9 @@ class Controller:
 
         elif event_type == UIEvent.MOUSE_LEFT_RELEASE:
             DEBUG("Controller: Mouse left release.")
-            drawing_result = event_data.get("drawing_result")
-            self.handle_mouse_right_release(event_data)
+
+
+            self.handle_mouse_left_release(event_data)
 
         elif event_type == UIEvent.MOUSE_DRAG:
             DEBUG("Controller: Mouse drag.")
@@ -417,13 +418,14 @@ class Controller:
                 DEBUG("No label selected")
                 # 更新狀態顯示
                 self.update_label_view(None)
-   
-    def handle_mouse_right_release(self, event_data):
+
+    def handle_mouse_left_release(self, event_data):
             # 處理繪製完成
             drawing_result = event_data.get("drawing_result")
+            class_id = event_data.get("class_id")
             if drawing_result:
                 DEBUG("Drawing completed")
-                self.handle_new_bbox(drawing_result)
+                self.handle_new_bbox(drawing_result, class_id)
 
             # 處理 resize 完成
             resized_label = event_data.get("resized_label")
@@ -444,7 +446,7 @@ class Controller:
                 # Redraw to prevent visual artifacts
                 self.view.draw_labels_on_canvas(self.current_labels)
 
-    def handle_new_bbox(self, drawing_result):
+    def handle_new_bbox(self, drawing_result, class_id):
         """Handle newly drawn bounding box"""
         try:
             yolo_coords = drawing_result['yolo_coords']
@@ -453,7 +455,7 @@ class Controller:
 
             # Create new LabelObject (default class_id=0)
             cx, cy, w_ratio, h_ratio = yolo_coords
-            new_label = label_display_utils.LabelObject(0, cx, cy, w_ratio, h_ratio)
+            new_label = label_display_utils.LabelObject(class_id, cx, cy, w_ratio, h_ratio)
 
             # Add to current labels list
             self.current_labels.append(new_label)
