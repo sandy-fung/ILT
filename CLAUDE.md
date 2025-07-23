@@ -97,14 +97,14 @@ python main.py
 ### Original Size Preview with Interactive Magnifier
 - **Location**: Bottom-right corner of the interface
 - **Basic Features**:
-  - Shows full original image scaled to fit 300x300 preview window
-  - Maintains original aspect ratio with centered display
-  - Displays original image dimensions info
+  - Shows images at their original size without scaling
+  - Displays original image dimensions info in top-left corner
   - Automatically updates when loading new images
+  - Scrollbars appear automatically when image exceeds preview panel size
 - **Interactive Magnifier Features**:
   - **Smart Cursor**: Mouse cursor changes to target/crosshair when hovering over preview
   - **Left-click Zoom**: Click anywhere to display 3x magnified tooltip with boundary detection
-  - **Right-drag Navigation**: Drag large images to view different regions when they exceed panel size
+  - **Right-drag Navigation**: Drag to navigate through images larger than the preview panel
   - **Performance Optimized**: LRU cache system for smooth magnification experience
 - **Configuration**: 
   - Toggle via `SHOW_PREVIEW` configuration or `toggle_preview()` method
