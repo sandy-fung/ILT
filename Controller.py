@@ -505,6 +505,8 @@ class Controller:
         # Update label boxes display on canvas
         if self.current_labels:
             self.view.draw_labels_on_canvas(self.current_labels)
+        else:
+            self.view.clear_all_labels_canvas()
 
         # Update text box display
         self.load_label(self.labels_path)
