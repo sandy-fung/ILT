@@ -7,6 +7,7 @@ import label_display_utils
 import bbox_controller
 from settings_dialog import SettingsDialog
 import config_utils
+import Words_Label_mapping as wlm
 
 DEFAULT_W = 1920
 DEFAULT_H = 1080
@@ -1236,7 +1237,10 @@ class UI:
             # Drawing mode: complete drawing
             drawing_result = self.bbox_controller.finish_drawing(event.x, event.y)
             if drawing_result and self.dispatch:
-                self.dispatch(UIEvent.MOUSE_LEFT_RELEASE, {"value": event, "drawing_result": drawing_result})
+                class_id_select = self.class_id_vars.get()
+                class_id = wlm.get_class_id(class_id_select)
+                print("XXXXXXXXXXXX Selected class ID:", class_id)
+                self.dispatch(UIEvent.MOUSE_LEFT_RELEASE, {"value": event, "drawing_result": drawing_result, "class_id": class_id})
         elif self.bbox_controller and self.bbox_controller.is_resizing:
             # Resizing mode: complete resizing
             resized_label = self.bbox_controller.finish_resize()
@@ -1378,7 +1382,7 @@ class UI:
                     DEBUG("Creating class ID frame for show operation")
                     # Import here to avoid circular import issues
                     import config_utils
-                    import Words_Label_mapping as wlm
+
                     current_var = config_utils.get_class_id_vars()
                     labels = wlm.get_labels()
                     
