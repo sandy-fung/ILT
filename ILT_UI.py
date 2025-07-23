@@ -67,40 +67,40 @@ class UI:
         self.create_bottom_area()
 
     def create_top_area(self):
-        self.toolbar =  tk.Frame(self.window)
+        self.toolbar =  tk.Frame(self.window, bg = "#F4F4F4")
         self.toolbar.pack(side = "top", fill = "x")
 
         self.reselect_button = tk.Button(
-            self.toolbar,
+            self.toolbar, bg = "#F4F4F4",
             width = 16, height = 1,
-            text = "Reselect Folders", fg = "#008378",
+            text = "Reselect Folders", font=("Segoe UI", 10), fg = "#0C0CC0",
             relief = "flat", bd = 2,
             command = self.on_bt_click_reselect
         )
         self.reselect_button.pack(side = "left", padx = 5)
         
         self.crop_button = tk.Button(
-            self.toolbar,
+            self.toolbar, bg = "#F4F4F4",
             width = 4, height = 1,
-            text = "Crop", fg = "#008378",
+            text = "Crop", font=("Segoe UI", 10), fg = "#0C0CC0",
             relief = "flat", bd = 2,
             command = self.on_bt_click_crop
         )
         self.crop_button.pack(side = "left")
         
         self.add_button = tk.Button(
-            self.toolbar,
+            self.toolbar, bg = "#F4F4F4",
             width = 4, height = 1,
-            text = "Add", fg = "#008378", 
+            text = "Add", font=("Segoe UI", 10), fg = "#0C0CC0",
             relief = "flat", bd = 2,
             command = self.on_bt_click_add
         )
         self.add_button.pack(side = "left", padx = 5)
 
         self.del_button = tk.Button(
-            self.toolbar,
+            self.toolbar, bg = "#F4F4F4",
             width = 4, height = 1,
-            text="Delete", fg = "#008378",
+            text="Delete", font=("Segoe UI", 10), fg = "#0C0CC0",
             relief = "flat", bd = 2,
             command = self.on_delete_image_button)
         self.del_button.pack(side = "left", padx = 5)
@@ -134,7 +134,7 @@ class UI:
 
 
     def create_bottom_area(self):
-        self.bottom_frame = tk.Frame(self.window, relief = "ridge", bd = 2, bg = "#f8f8f8")
+        self.bottom_frame = tk.Frame(self.window, relief = "ridge", bd = 2, bg = "#FAFAFA")
         self.bottom_frame.pack(side = "bottom", fill = "x")
 
 
@@ -144,12 +144,12 @@ class UI:
         self.create_preview_area()
 
     def create_text_area(self):
-        self.text_frame = tk.Frame(self.bottom_frame, bg = "#f8f8f8")
+        self.text_frame = tk.Frame(self.bottom_frame, bg = "#FAFAFA")
         self.text_frame.pack(side = "left", fill = "both", expand = True)
 
         # Initialize input box if enabled
         if self.SHOW_INPUT_BOX:
-            self.input_box = tk.Entry(self.text_frame, font = ("Segoe UI", 11), fg = "#424242")
+            self.input_box = tk.Entry(self.text_frame, font = ("Segoe UI", 11), fg = "#8E8E79")
             self.input_box.pack(side = "top", expand = True, fill  = "x", padx = 20, pady = 10)
 
             self.input_box.insert(0, "請輸入車牌號碼")
@@ -168,7 +168,7 @@ class UI:
             self.text_box = tk.Text(
                 self.text_frame,
                 height = 15, bg = "white",
-                font = ("Segoe UI", 11), fg = "#424242",
+                font = ("Segoe UI", 11), fg = "#2d2d2d",
                 relief = "sunken",
                 wrap = "word"
             )
@@ -181,7 +181,7 @@ class UI:
         
 
     def create_hint_area(self):
-        self.hint_frame = tk.Frame(self.bottom_frame, bg = "#f8f8f8")
+        self.hint_frame = tk.Frame(self.bottom_frame, bg = "#FAFAFA")
         self.hint_frame.pack(side = "left", expand = True, fill = "y", pady = (0, 10))
 
         hint_text = (
@@ -198,25 +198,25 @@ class UI:
             )
         self.hint_label = tk.Label(
             self.hint_frame,
-            width = 50, height = 10, bg = "#f8f8f8",
-            text = hint_text, justify = "left", anchor = "w", fg = "#424242", font = ("Segoe UI", 11)
+            width = 50, height = 10, bg = "#FAFAFA",
+            text = hint_text, justify = "left", anchor = "w", fg = "#2d2d2d", font = ("Segoe UI", 10)
         )
         self.hint_label.grid(row = 1, column = 0, columnspan = 2, sticky = "s", pady = (10, 0))
-        self.index_label = tk.Label(self.hint_frame, bg = "#f8f8f8", text = " : ", fg = "#829901", font = ("Segoe UI", 11))
+        self.index_label = tk.Label(self.hint_frame, bg = "#FAFAFA", text = " : ", fg = "#C0C00C", font = ("Segoe UI", 11))
         self.index_label.grid(row = 0, column = 2, sticky = "nwse")
 
 
     # Add drawing mode status display
         self.drawing_mode_label = tk.Label(
-            self.hint_frame, bg = "#f8f8f8", text = "普通模式", 
-            fg = "#424242", font = ("Segoe UI", 11, "bold")
+            self.hint_frame, bg = "#FAFAFA", text = "普通模式", 
+            fg = "#8E8E79", font = ("Segoe UI", 11)
         )
         self.drawing_mode_label.grid(row = 0, column = 0, sticky = "nw")
         
         # Add selection status display
         self.selection_status_label = tk.Label(
-            self.hint_frame, bg = "#f8f8f8", text = "未選中任何框", 
-            fg = "#666666", font = ("Segoe UI", 10)
+            self.hint_frame, bg = "#FAFAFA", text = "未選中任何框", 
+            fg = "#8E8E79", font = ("Segoe UI", 11)
         )
         self.selection_status_label.grid(row = 0, column = 1, sticky = "nw", padx = (20, 0))
 
@@ -226,7 +226,7 @@ class UI:
             return
             
         # Create preview frame with border
-        self.preview_frame = tk.Frame(self.bottom_frame, bg = "#f8f8f8", relief = "ridge", bd = 2)
+        self.preview_frame = tk.Frame(self.bottom_frame, bg = "#FAFAFA", relief = "ridge", bd = 2)
         self.preview_frame.pack(side = "right", fill = "both", expand = True)
         
         # Set minimum size for preview frame
@@ -237,14 +237,14 @@ class UI:
         self.preview_title = tk.Label(
             self.preview_frame, 
             text = "原尺寸預覽", 
-            bg = "#f8f8f8", 
-            fg = "#424242", 
+            bg = "#FAFAFA", 
+            fg = "#2d2d2d", 
             font = ("Segoe UI", 11, "bold")
         )
         self.preview_title.pack(side = "top", pady = 5)
         
         # Create preview canvas container
-        self.preview_canvas_frame = tk.Frame(self.preview_frame, bg = "#f8f8f8")
+        self.preview_canvas_frame = tk.Frame(self.preview_frame, bg = "#FAFAFA")
         self.preview_canvas_frame.pack(side = "top", fill = "both", expand = True, padx = 10, pady = (0, 10))
         
         # Create scrollbars
@@ -316,7 +316,7 @@ class UI:
         self.preview_canvas.create_text(
             canvas_width // 2, canvas_height // 2,
             text = "尚未載入圖片",
-            fill = "#999999",
+            fill = "#8E8E79",
             font = ("Segoe UI", 12),
             tags = "placeholder"
         )
@@ -436,7 +436,7 @@ class UI:
         self.preview_canvas.create_text(
             10, 10,
             text = info_text,
-            fill = "#666666",
+            fill = "#8E8E79",
             font = ("Segoe UI", 9),
             anchor = "nw",
             tags = ("info_text", "overlay")
@@ -467,7 +467,7 @@ class UI:
         self.preview_canvas.create_text(
             canvas_width // 2, canvas_height // 2,
             text = "尚未載入圖片",
-            fill = "#999999",
+            fill = "#8E8E79",
             font = ("Segoe UI", 12),
             tags = "placeholder"
         )
@@ -933,7 +933,7 @@ class UI:
     def show_class_id_buttons(self, var, labels):
         if self.SHOW_CLASS_ID_BUTTONS:
             DEBUG("show_class_id_buttons with var: {}, labels: {}", var, labels)
-            self.class_id_frame = tk.Frame(self.middle_frame, bg = "#f8f8f8")
+            self.class_id_frame = tk.Frame(self.middle_frame, bg = "#FAFAFA")
             self.class_id_frame.pack(side = "right", fill = "y")
 
             self.class_id_vars = tk.StringVar(value = var)
@@ -941,7 +941,7 @@ class UI:
                 column = i // 13
                 row = i % 13
                 button = tk.Radiobutton(
-                    self.class_id_frame, bg = "#f8f8f8", font = ("Segoe UI Mono", 10),
+                    self.class_id_frame, bg = "#FAFAFA", font = ("Segoe UI Mono", 10),
                     text = label, variable = self.class_id_vars, value = label, width = 3, anchor = "center", indicatoron = True,
                     command = lambda l = label: self.dispatch(UIEvent.CLASS_ID_CHANGE, {"label": l})
              ) if self.dispatch else None
@@ -1000,12 +1000,17 @@ class UI:
         """Draw label bounding boxes on canvas with resize handles"""
         # Clear all previous label-related items
         # Clear all previous label-related items
+
+              
         self.canvas.delete("label_box")
         self.canvas.delete("label_box_selected")
         self.canvas.delete("label_box_dragging")
         self.canvas.delete("label_box_resizing")
         self.canvas.delete("label_text")
         self.canvas.delete("resize_handle")
+    
+
+        
 
         # Remove any remaining items
         for item in self.canvas.find_withtag("label_box"):
@@ -1048,27 +1053,27 @@ class UI:
             # Determine color and style based on state
             if self.bbox_controller and self.bbox_controller.is_resizing and label == self.bbox_controller.resizing_label:
                 # Resizing: special style with dotted line and bright color
-                color = "#FF6B35"  # Orange for resizing
-                width = 4
-                tags = "label_box_resizing"
+                color = "#C00CC0"  # Purple for resizing
+                width = 2
+                tags = ("label_box", "label_box_resizing")
                 dash = (3, 3)  # Dotted line pattern for resizing
             elif self.bbox_controller and self.bbox_controller.is_dragging and label == self.bbox_controller.dragging_label:
                 # Dragging: special style with dashed line and bright color
-                color = "#00FFFF"  # Cyan for dragging
-                width = 4
-                tags = "label_box_dragging"
+                color = "#0CC0C0"  # Cyan for dragging
+                width = 3
+                tags = ("label_box", "label_box_dragging")
                 dash = (5, 5)  # Dashed line pattern
             elif hasattr(label, 'selected') and label.selected:
                 # Selected: red color with thicker border
-                color = "#FF0000"  # Red
-                width = 3
-                tags = "label_box_selected"
+                color = "#C00C0C"  # Red
+                width = 2
+                tags = ("label_box", "label_box_selected")
                 dash = None
             else:
                 # Not selected: green color
-                color = "green"
+                color = "#0CC00C"
                 width = 2
-                tags = "label_box"
+                tags = ("label_box",)
                 dash = None
             
             # Draw bounding box
@@ -1104,6 +1109,7 @@ class UI:
             
             DEBUG("Drew label: class_id={}, coords=({:.1f},{:.1f},{:.1f},{:.1f})", 
                   label.class_id, x1, y1, x2, y2)
+            
 
     def draw_resize_handles(self, label, x1, y1, x2, y2, color):
         """
@@ -1177,12 +1183,12 @@ class UI:
     def _on_input_focus_in(self, event):
         if self.input_box.get() == "請輸入車牌號碼":
             self.input_box.delete(0, tk.END)
-            self.input_box.config(fg = "#000000")
+            self.input_box.config(fg = "#8E8E79")
 
     def _on_input_focus_out(self, event):
         if not self.input_box.get():
             self.input_box.insert(0, "請輸入車牌號碼")
-            self.input_box.config(fg = "#777777")
+            self.input_box.config(fg = "#8E8E79")
 
 
 
@@ -1610,9 +1616,9 @@ class UI:
     def update_drawing_mode_display(self):
         """Update drawing mode status display"""
         if self.drawing_mode and self.bbox_controller.is_in_drawing_mode():
-            self.drawing_mode_label.config(text="繪框模式", fg="#FF6B35")
+            self.drawing_mode_label.config(text="繪框模式", fg="#C00CC0")
         else:
-            self.drawing_mode_label.config(text="普通模式", fg="#424242")
+            self.drawing_mode_label.config(text="普通模式", fg="#2d2d2d")
     
     def update_selection_status_display(self, selected_label=None):
         """Update selection status display"""
@@ -1620,12 +1626,12 @@ class UI:
             # 拖曳模式顯示
             dragging_label = self.bbox_controller.dragging_label
             status_text = f"拖曳中：class_id={dragging_label.class_id}"
-            self.selection_status_label.config(text=status_text, fg="#00FFFF")
+            self.selection_status_label.config(text=status_text, fg="#0CC0C0")
         elif selected_label:
             status_text = f"已選中：class_id={selected_label.class_id}"
-            self.selection_status_label.config(text=status_text, fg="#FF0000")
+            self.selection_status_label.config(text=status_text, fg="#C00C0C")
         else:
-            self.selection_status_label.config(text="未選中任何框", fg="#666666")
+            self.selection_status_label.config(text="未選中任何框", fg="#8E8E79")
     
     def update_dragging_status_display(self, is_dragging=False, dragged_label=None):
         """
@@ -1637,7 +1643,7 @@ class UI:
         """
         if is_dragging and dragged_label:
             status_text = f"拖曳中：class_id={dragged_label.class_id}, 座標=({dragged_label.cx_ratio:.3f}, {dragged_label.cy_ratio:.3f})"
-            self.selection_status_label.config(text=status_text, fg="#00FFFF")
+            self.selection_status_label.config(text=status_text, fg="#0CC0C0")
         else:
             # Restore selection status display
             self.update_selection_status_display(self.bbox_controller.get_selected_label() if self.bbox_controller else None)
@@ -1652,7 +1658,7 @@ class UI:
         """
         if label_count > 0:
             status_text = f"標籤已自動排序：{label_count} 個標籤，{plate_count} 個車牌"
-            self.selection_status_label.config(text=status_text, fg="#008800")
+            self.selection_status_label.config(text=status_text, fg="#C0C00C")
             # 3秒後恢復正常狀態顯示
             self.window.after(3000, lambda: self.update_selection_status_display())
 
