@@ -1,4 +1,5 @@
 from configparser import ConfigParser
+from log_levels import ERROR
 
 DEFAULT_CONFI_PATH = "config.ini"
 
@@ -154,6 +155,52 @@ def set_auto_create_labels(enabled):
     if not config.has_section("LabelFiles"):
         config.add_section("LabelFiles")
     config.set("LabelFiles", "auto_create_labels", str(enabled).lower())
-    
+
+    with open(DEFAULT_CONFI_PATH, "w") as f:
+        config.write(f)
+
+
+
+def get_window_size():
+    """Get saved window size"""
+    try:
+        width = config.getint("Window", "width")
+        height = config.getint("Window", "height")
+        return width, height
+    except:
+        ERROR("width or height is not a valid integer.")
+        return None, None  # Default size
+
+
+def save_window_size(width, height):
+    """Save window size"""
+    print(f"Saving window size: {width}x{height}")
+    if not config.has_section("Window"):
+        config.add_section("Window")
+    config.set("Window", "width", str(width))
+    config.set("Window", "height", str(height))
+
+    with open(DEFAULT_CONFI_PATH, "w") as f:
+        config.write(f)
+
+
+
+def get_window_position():
+    """Get saved window position"""
+    try:
+        x = config.getint("Window", "x")
+        y = config.getint("Window", "y")
+        return x, y
+    except:
+        ERROR("x or y is not a valid integer.")
+        return None, None  # Default position
+
+def save_window_position(x, y):
+    """Save window position"""
+    if not config.has_section("Window"):
+        config.add_section("Window")
+    config.set("Window", "x", str(x))
+    config.set("Window", "y", str(y))
+
     with open(DEFAULT_CONFI_PATH, "w") as f:
         config.write(f)
