@@ -29,7 +29,7 @@ class UI:
         self.original_image = None
 
         self.SHOW_CLASS_ID_BUTTONS = False
-        self.SHOW_TEXT_BOX = True
+        self.SHOW_TEXT_BOX = False
         self.SHOW_PREVIEW = True
         self.SHOW_INPUT_BOX = True
 
@@ -104,16 +104,12 @@ class UI:
 
 
     def create_bottom_area(self):
-        self.bottom_frame = tk.Frame(self.window, relief = "ridge", bd = 2)
+        self.bottom_frame = tk.Frame(self.window, relief = "ridge", bd = 2, bg = "#f8f8f8")
         self.bottom_frame.pack(side = "bottom", fill = "x")
 
 
         self.create_text_area()
-        
-        # Create right container for hint and preview areas
-        self.right_container = tk.Frame(self.bottom_frame, bg = "#f8f8f8")
-        self.right_container.pack(side = "right", fill = "both", expand = True)
-        
+
         self.create_hint_area()
         self.create_preview_area()
 
@@ -123,7 +119,7 @@ class UI:
 
         if self.SHOW_INPUT_BOX:
             self.input_box = tk.Entry(self.text_frame, font = ("Segoe UI", 11), fg = "#424242")
-            self.input_box.pack(side = "top", fill  = "x", padx = 20, pady = 10)
+            self.input_box.pack(side = "top", expand = True, fill  = "x", padx = 20, pady = 10)
 
             self.input_box.insert(0, "請輸入車牌號碼")
             self.input_box.bind("<FocusIn>", self._on_input_focus_in)
@@ -145,15 +141,15 @@ class UI:
                 wrap = "word"
             )
             self.text_box.tag_configure("left", justify = "left")
-            self.text_box.pack(side = "top", fill = "x", padx = 20, pady = 10)
+            self.text_box.pack(side = "top", fill = "x", expand = True, padx = 20, pady = 10)
 
         else:
             DEBUG("Text box is not shown as per configuration.")
         
 
     def create_hint_area(self):
-        self.hint_frame = tk.Frame(self.right_container, bg = "#f8f8f8")
-        self.hint_frame.pack(side = "top", fill = "x", pady = (0, 10))
+        self.hint_frame = tk.Frame(self.bottom_frame, bg = "#f8f8f8")
+        self.hint_frame.pack(side = "left", expand = True, fill = "y", pady = (0, 10))
 
         hint_text = (
             "← 上一張\n"
@@ -172,7 +168,7 @@ class UI:
             width = 50, height = 10, bg = "#f8f8f8",
             text = hint_text, justify = "left", anchor = "w", fg = "#424242", font = ("Segoe UI", 11)
         )
-        self.hint_label.grid(row = 1, column = 0, columnspan = 2, sticky = "s", padx = 20)
+        self.hint_label.grid(row = 1, column = 0, columnspan = 2, sticky = "s", pady = (10, 0))
         self.index_label = tk.Label(self.hint_frame, bg = "#f8f8f8", text = " : ", fg = "#829901", font = ("Segoe UI", 11))
         self.index_label.grid(row = 0, column = 2, sticky = "nwse")
 
@@ -182,7 +178,7 @@ class UI:
             self.hint_frame, bg = "#f8f8f8", text = "普通模式", 
             fg = "#424242", font = ("Segoe UI", 11, "bold")
         )
-        self.drawing_mode_label.grid(row = 0, column = 0, sticky = "nw", padx = 20)
+        self.drawing_mode_label.grid(row = 0, column = 0, sticky = "nw")
         
         # Add selection status display
         self.selection_status_label = tk.Label(
@@ -197,8 +193,8 @@ class UI:
             return
             
         # Create preview frame with border
-        self.preview_frame = tk.Frame(self.right_container, bg = "#f8f8f8", relief = "ridge", bd = 2)
-        self.preview_frame.pack(side = "bottom", fill = "both", expand = True)
+        self.preview_frame = tk.Frame(self.bottom_frame, bg = "#f8f8f8", relief = "ridge", bd = 2)
+        self.preview_frame.pack(side = "right", fill = "both", expand = True)
         
         # Set minimum size for preview frame
         self.preview_frame.update_idletasks()
