@@ -31,16 +31,35 @@ class Controller:
         self.check_config()
 
 
+    def check_paths_exist(self):
+        if not os.path.exists(self.image_folder_path):
+            ERROR("Error: Image folder path does not exist: {}", self.image_folder_path)
+            return False
+        if not os.path.exists(self.label_folder_path):
+            ERROR("Error: Label folder path does not exist: {}", self.label_folder_path)
+            return False
+        DEBUG("Both paths exist: Image folder path: {}, Label folder path: {}", self.image_folder_path, self.label_folder_path)
+        return True
 
     def check_config(self):
+
         self.image_folder_path = config_utils.get_image_folder_path()
         self.label_folder_path = config_utils.get_label_folder_path()
         if not self.image_folder_path or not self.label_folder_path:
-            self.select_folders()
+                self.select_folders()
+
         else:
+            if self.check_paths_exist() is False:
+                self.select_folders()
+
             self.load_folder()
 
+
     def select_folders(self):
+        # Reset image index
+        self.image_index = 0
+        config_utils.save_image_index(self.image_index)
+
         self.image_folder_path = self.view.select_folder("Select Image Folder")
         if not self.image_folder_path:
             msg = "No image folder selected."
@@ -57,10 +76,6 @@ class Controller:
 
         # Save paths to config
         config_utils.save_paths(self.image_folder_path, self.label_folder_path)
-
-        # Reset image index
-        self.image_index = 0
-        config_utils.save_image_index(self.image_index)
 
         self.load_image(self.images_path)
 
