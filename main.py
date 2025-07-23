@@ -2,8 +2,6 @@ from Controller import Controller
 from ILT_UI import UI
 from log_levels import DEBUG, INFO, ERROR
 
-
-
 def main():
 
     ui = UI()
