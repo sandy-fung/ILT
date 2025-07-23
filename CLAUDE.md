@@ -50,7 +50,11 @@ python main.py
   - `[ImageInfo]` - Image dimensions
   - `[Path]` - Folder paths, current image index, selected class ID
   - `[preview_magnifier]` - Magnifier settings (enabled, zoom_factor, cursor_type, region_size, cache_size)
-- Automatically creates empty .txt label files for images without labels
+  - `[LabelFiles]` - Label file handling settings (auto_create_labels)
+- **Label File Strategy**: Uses lazy creation approach
+  - Label files are created only when actually needed (when saving labels)
+  - Empty label files are handled based on `auto_create_labels` configuration (default: False)
+  - Significantly improves performance when opening large datasets
 - Supports JPG, JPEG, PNG image formats
 
 ## Application Features
@@ -97,14 +101,14 @@ python main.py
 ### Original Size Preview with Interactive Magnifier
 - **Location**: Bottom-right corner of the interface
 - **Basic Features**:
-  - Shows full original image scaled to fit 300x300 preview window
-  - Maintains original aspect ratio with centered display
-  - Displays original image dimensions info
+  - Shows images at their original size without scaling
+  - Displays original image dimensions info in top-left corner
   - Automatically updates when loading new images
+  - Scrollbars appear automatically when image exceeds preview panel size
 - **Interactive Magnifier Features**:
   - **Smart Cursor**: Mouse cursor changes to target/crosshair when hovering over preview
   - **Left-click Zoom**: Click anywhere to display 3x magnified tooltip with boundary detection
-  - **Right-drag Navigation**: Drag large images to view different regions when they exceed panel size
+  - **Right-drag Navigation**: Drag to navigate through images larger than the preview panel
   - **Performance Optimized**: LRU cache system for smooth magnification experience
 - **Configuration**: 
   - Toggle via `SHOW_PREVIEW` configuration or `toggle_preview()` method
@@ -154,3 +158,17 @@ Events are defined in `UI_event.py` and handled through the Controller:
   - `get_magnifier_*()` functions for reading configuration
   - `save_magnifier_config()` for updating settings
   - Dynamic cursor switching with 7 available cursor types (target, dotbox, tcross, crosshair, plus, circle, sizing)
+- **Label File Configuration**: Enhanced performance-oriented settings
+  - `get_auto_create_labels()` and `set_auto_create_labels()` for controlling empty label file creation
+  - Backward compatibility maintained for existing projects
+
+### Performance Optimization
+- **Lazy Label File Creation**: Advanced on-demand file creation strategy
+  - Eliminated pre-creation of thousands of empty label files
+  - Folder selection time reduced from minutes to seconds for large datasets
+  - Memory usage optimized by avoiding unnecessary file operations
+  - Files created only when labels are actually saved
+- **Efficient Folder Scanning**: Only scans image files during folder selection
+- **Configurable Behavior**: Users can choose between lazy creation (default) and eager creation modes
+  - Use `config_utils.set_auto_create_labels(True)` to enable eager creation
+  - Use `config_utils.set_auto_create_labels(False)` to enable lazy creation (recommended)

@@ -1,5 +1,4 @@
 import os
-import config_utils
 from log_levels import DEBUG, INFO, ERROR
 import shutil
 
@@ -28,18 +27,16 @@ def scan_label_folder(images, label_folder):
         labels_path.append(label_path)
     return labels, labels_path
 
-def ensure_labels_exist(labels_path):
-    for f in labels_path:
-        if not os.path.exists(f):
-            open(f, 'w').close()  # Create empty txt
-
 def load_label(path):
-    with open(path, 'r', encoding = 'utf-8') as f:
-        content = f.read()
-    DEBUG("Label loaded from path: {}", path)
-    return content
-
-
+    """Load label file, return empty string if not exists"""
+    if os.path.exists(path):
+        with open(path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        DEBUG("Label loaded from path: {}", path)
+        return content
+    else:
+        DEBUG("Label file not found: {}, returning empty content", path)
+        return ""
 
 def move_file(src, dst):
     try:

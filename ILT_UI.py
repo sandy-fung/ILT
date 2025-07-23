@@ -200,6 +200,10 @@ class UI:
         self.preview_frame = tk.Frame(self.right_container, bg = "#f8f8f8", relief = "ridge", bd = 2)
         self.preview_frame.pack(side = "bottom", fill = "both", expand = True)
         
+        # Set minimum size for preview frame
+        self.preview_frame.update_idletasks()
+        self.preview_frame.configure(width=250, height=250)
+        
         # Add title label
         self.preview_title = tk.Label(
             self.preview_frame, 
@@ -218,12 +222,10 @@ class UI:
         self.preview_v_scrollbar = tk.Scrollbar(self.preview_canvas_frame, orient = "vertical")
         self.preview_h_scrollbar = tk.Scrollbar(self.preview_canvas_frame, orient = "horizontal")
         
-        # Create preview canvas with fixed size
+        # Create preview canvas with dynamic size
         self.preview_canvas = tk.Canvas(
             self.preview_canvas_frame,
             bg = "white",
-            width = 300,
-            height = 300,
             highlightthickness = 1,
             highlightbackground = "#cccccc",
             yscrollcommand = self.preview_v_scrollbar.set,
@@ -247,14 +249,8 @@ class UI:
         self.preview_image = None
         self.preview_photo_image = None
         
-        # Add placeholder text
-        self.preview_canvas.create_text(
-            150, 150,
-            text = "尚未載入圖片",
-            fill = "#999999",
-            font = ("Segoe UI", 12),
-            tags = "placeholder"
-        )
+        # Schedule placeholder text after window is rendered
+        self.preview_canvas.after_idle(self._add_preview_placeholder)
         
         # Bind magnifier events to preview canvas
         self.preview_canvas.bind("<Enter>", self.on_preview_enter)
@@ -276,6 +272,25 @@ class UI:
         
         # Load magnifier configuration
         self.load_magnifier_config()
+    
+    def _add_preview_placeholder(self):
+        """Add placeholder text to preview canvas after it has been rendered"""
+        if not self.preview_canvas:
+            return
+            
+        # Get actual canvas dimensions
+        self.preview_canvas.update_idletasks()
+        canvas_width = self.preview_canvas.winfo_width()
+        canvas_height = self.preview_canvas.winfo_height()
+        
+        # Add placeholder text at center
+        self.preview_canvas.create_text(
+            canvas_width // 2, canvas_height // 2,
+            text = "尚未載入圖片",
+            fill = "#999999",
+            font = ("Segoe UI", 12),
+            tags = "placeholder"
+        )
 
     def load_magnifier_config(self):
         """Load magnifier configuration from config file"""
@@ -373,44 +388,32 @@ class UI:
         # Get original image dimensions
         img_width, img_height = original_image.size
         
-        # Calculate scale to fit in preview window while maintaining aspect ratio
-        preview_width = 300
-        preview_height = 300
-        scale_x = preview_width / img_width
-        scale_y = preview_height / img_height
-        scale = min(scale_x, scale_y)
+        # Convert to PhotoImage for Tkinter (original size)
+        self.preview_photo_image = ImageTk.PhotoImage(original_image)
         
-        # Calculate new dimensions
-        new_width = int(img_width * scale)
-        new_height = int(img_height * scale)
+        # Display on preview canvas at original size
+        self.preview_canvas.create_image(0, 0, anchor = "nw", image = self.preview_photo_image, tags = "preview_image")
         
-        # Resize image to fit preview
-        pil_image_resized = original_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        # Update scroll region to match original image size
+        self.preview_canvas.config(scrollregion = (0, 0, img_width, img_height))
         
-        # Convert to PhotoImage for Tkinter
-        self.preview_photo_image = ImageTk.PhotoImage(pil_image_resized)
+        # Get canvas dimensions for info text positioning
+        self.preview_canvas.update_idletasks()
+        canvas_width = self.preview_canvas.winfo_width()
+        canvas_height = self.preview_canvas.winfo_height()
         
-        # Calculate position to center image in canvas
-        x_offset = (preview_width - new_width) // 2
-        y_offset = (preview_height - new_height) // 2
-        
-        # Display on preview canvas
-        self.preview_canvas.create_image(x_offset, y_offset, anchor = "nw", image = self.preview_photo_image, tags = "preview_image")
-        
-        # Add info text
+        # Add info text at visible position
         info_text = f"原始尺寸: {img_width}×{img_height}"
         self.preview_canvas.create_text(
-            150, 290,
+            10, 10,
             text = info_text,
             fill = "#666666",
             font = ("Segoe UI", 9),
-            tags = "info_text"
+            anchor = "nw",
+            tags = ("info_text", "overlay")
         )
         
-        # Update scroll region (no scroll needed for fitted image)
-        self.preview_canvas.config(scrollregion = (0, 0, preview_width, preview_height))
-        
-        DEBUG("Preview updated with full image: {}×{} (scaled to {}×{})", img_width, img_height, new_width, new_height)
+        DEBUG("Preview updated with original size image: {}×{}", img_width, img_height)
 
     def clear_preview(self):
         """Clear the preview canvas"""
@@ -426,17 +429,22 @@ class UI:
         # Delete all items
         self.preview_canvas.delete("all")
         
-        # Show placeholder text
+        # Get current canvas dimensions
+        self.preview_canvas.update_idletasks()
+        canvas_width = self.preview_canvas.winfo_width()
+        canvas_height = self.preview_canvas.winfo_height()
+        
+        # Show placeholder text at center
         self.preview_canvas.create_text(
-            150, 150,
+            canvas_width // 2, canvas_height // 2,
             text = "尚未載入圖片",
             fill = "#999999",
             font = ("Segoe UI", 12),
             tags = "placeholder"
         )
         
-        # Reset scroll region
-        self.preview_canvas.config(scrollregion = (0, 0, 300, 300))
+        # Reset scroll region to canvas size
+        self.preview_canvas.config(scrollregion = (0, 0, canvas_width, canvas_height))
         
         # Clear stored references
         self.preview_photo_image = None
@@ -590,32 +598,18 @@ class UI:
             # Get original image dimensions
             img_width, img_height = self.original_image.size
             
-            # Get preview canvas dimensions
-            preview_width = 300
-            preview_height = 300
+            # Since image is displayed at original size, we need to account for scrolling
+            # Convert canvas coordinates to window coordinates
+            canvas_x_scroll = self.preview_canvas.canvasx(canvas_x)
+            canvas_y_scroll = self.preview_canvas.canvasy(canvas_y)
             
-            # Calculate scale used in preview
-            scale_x = preview_width / img_width
-            scale_y = preview_height / img_height
-            scale = min(scale_x, scale_y)
-            
-            # Calculate scaled dimensions and offset
-            new_width = int(img_width * scale)
-            new_height = int(img_height * scale)
-            x_offset = (preview_width - new_width) // 2
-            y_offset = (preview_height - new_height) // 2
-            
-            # Convert canvas coordinates to scaled image coordinates
-            scaled_x = canvas_x - x_offset
-            scaled_y = canvas_y - y_offset
+            # Direct mapping since no scaling
+            img_x = int(canvas_x_scroll)
+            img_y = int(canvas_y_scroll)
             
             # Check if coordinates are within image bounds
-            if scaled_x < 0 or scaled_y < 0 or scaled_x >= new_width or scaled_y >= new_height:
+            if img_x < 0 or img_y < 0 or img_x >= img_width or img_y >= img_height:
                 return None, None
-                
-            # Convert to original image coordinates
-            img_x = int(scaled_x / scale)
-            img_y = int(scaled_y / scale)
             
             # Clamp to image bounds
             img_x = max(0, min(img_width - 1, img_x))
@@ -860,32 +854,23 @@ class UI:
         Returns:
             bool: True if image can be dragged, False otherwise
         """
-        if not self.original_image or not self.preview_photo_image:
+        if not self.original_image or not self.preview_photo_image or not self.preview_canvas:
             return False
             
         try:
             # Get original image dimensions
             img_width, img_height = self.original_image.size
             
-            # Get preview canvas dimensions
-            preview_width = 300
-            preview_height = 300
-            
-            # Calculate scale used in preview
-            scale_x = preview_width / img_width
-            scale_y = preview_height / img_height
-            scale = min(scale_x, scale_y)
-            
-            # Calculate scaled dimensions
-            scaled_width = img_width * scale
-            scaled_height = img_height * scale
+            # Get actual preview canvas dimensions
+            self.preview_canvas.update_idletasks()
+            canvas_width = self.preview_canvas.winfo_width()
+            canvas_height = self.preview_canvas.winfo_height()
             
             # Image is draggable if it's larger than canvas in either dimension
-            draggable = scaled_width > preview_width or scaled_height > preview_height
+            draggable = img_width > canvas_width or img_height > canvas_height
             
-            DEBUG("Image draggable check: {}x{} (scaled: {:.1f}x{:.1f}) vs {}x{} -> {}", 
-                  img_width, img_height, scaled_width, scaled_height, 
-                  preview_width, preview_height, draggable)
+            DEBUG("Image draggable check: {}x{} vs canvas {}x{} -> {}", 
+                  img_width, img_height, canvas_width, canvas_height, draggable)
                   
             return draggable
             

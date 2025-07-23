@@ -70,7 +70,6 @@ class Controller:
 
         # load label folder
         self.labels, self.labels_path = folder_utils.scan_label_folder(self.images, self.label_folder_path)
-        folder_utils.ensure_labels_exist(self.labels_path)
 
         # Load the current image and labels
         self.image_index = config_utils.get_image_index()
@@ -124,16 +123,13 @@ class Controller:
             self.view.draw_labels_on_canvas(self.current_labels)
 
     def load_label(self, path):
+        """Load label file and update UI display"""
         try:
             content = folder_utils.load_label(self.labels_path[self.image_index])
-        except FileNotFoundError:
-            ERROR("Label file not found at path:", path[self.image_index])
-            content = "(Label file not found)"
+            self.view.update_text_box(content)
         except Exception as e:
-            ERROR("Error loading label file:", e)
-            content = "(Error loading label file)"
-
-        self.view.update_text_box(content)
+            ERROR("Error loading label file: {}", e)
+            self.view.update_text_box("(Error loading label file)")
 
         # Labels are already parsed and drawn in update_resized_image()
 
@@ -490,15 +486,35 @@ class Controller:
             label_file_path = self.labels_path[self.image_index]
 
             try:
-                with open(label_file_path, 'w', encoding='utf-8') as f:
-                    for label in self.current_labels:
-                        yolo_line = f"{label.class_id} {label.cx_ratio:.17f} {label.cy_ratio:.17f} {label.w_ratio:.17f} {label.h_ratio:.17f}\n"
-                        f.write(yolo_line)
+                # Ensure label directory exists
+                os.makedirs(os.path.dirname(label_file_path), exist_ok=True)
+                
+                if not self.current_labels:
+                    auto_create = config_utils.get_auto_create_labels()
+                    if auto_create:
+                        with open(label_file_path, 'w', encoding='utf-8') as f:
+                            pass
+                        DEBUG("Created empty label file: {}", label_file_path)
+                    else:
+                        if os.path.exists(label_file_path):
+                            os.remove(label_file_path)
+                            DEBUG("Removed empty label file: {}", label_file_path)
+                else:
+                    with open(label_file_path, 'w', encoding='utf-8') as f:
+                        for label in self.current_labels:
+                            yolo_line = f"{label.class_id} {label.cx_ratio:.17f} {label.cy_ratio:.17f} {label.w_ratio:.17f} {label.h_ratio:.17f}\n"
+                            f.write(yolo_line)
+                    DEBUG("Saved {} labels to {}", len(self.current_labels), label_file_path)
 
-                DEBUG("Saved {} labels to {}", len(self.current_labels), label_file_path)
-
+            except PermissionError as e:
+                ERROR("Permission denied when saving label file {}: {}", label_file_path, e)
+                self.view.show_error(f"Permission denied saving label file\n{label_file_path}")
+            except OSError as e:
+                ERROR("OS error when saving label file {}: {}", label_file_path, e)
+                self.view.show_error(f"OS error saving label file\n{e}")
             except Exception as e:
-                ERROR("Error saving labels to file: {}", e)
+                ERROR("Unexpected error saving labels to file {}: {}", label_file_path, e)
+                self.view.show_error(f"Error saving label file\n{e}")
 
     def update_label_display(self):
         """Update label display"""

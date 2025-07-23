@@ -139,3 +139,21 @@ def save_magnifier_config(enabled=None, zoom_factor=None, tooltip_size=None,
 
     with open(DEFAULT_CONFI_PATH, "w") as f:
         config.write(f)
+
+
+# Label file configuration functions
+def get_auto_create_labels():
+    """Get whether to automatically create empty label files"""
+    try:
+        return config.getboolean("LabelFiles", "auto_create_labels")
+    except:
+        return False  # Default to False (lazy creation like ../image_label_tool)
+
+def set_auto_create_labels(enabled):
+    """Set whether to automatically create empty label files"""
+    if not config.has_section("LabelFiles"):
+        config.add_section("LabelFiles")
+    config.set("LabelFiles", "auto_create_labels", str(enabled).lower())
+    
+    with open(DEFAULT_CONFI_PATH, "w") as f:
+        config.write(f)
