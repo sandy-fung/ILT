@@ -310,6 +310,18 @@ class Controller:
             input_text = event_data.get("text", "")
             DEBUG("Input text:", input_text)
             self.apply_input_text_to_labels(input_text)
+            
+        elif event_type == UIEvent.CONFIGURATION_BT_CLICK:
+            DEBUG("Controller: Configuration button clicked.")
+            self.handle_configuration_button()
+            
+        elif event_type == UIEvent.SETTINGS_DIALOG_CONFIRM:
+            DEBUG("Controller: Settings dialog confirmed.")
+            self.handle_settings_confirm(event_data)
+            
+        elif event_type == UIEvent.UI_SETTINGS_CHANGED:
+            DEBUG("Controller: UI settings changed.")
+            self.handle_ui_settings_change(event_data)
 
 
     def update_label_view(self, label):
@@ -660,3 +672,53 @@ class Controller:
                     ERROR("Error deleting image or label file: {}", e)
         else:
                 ERROR("No image to delete at index: {}", self.image_index)
+
+    def handle_configuration_button(self):
+        """Handle configuration button click"""
+        try:
+            current_settings = self.get_current_ui_settings()
+            DEBUG("Opening settings dialog with current settings: {}", current_settings)
+            if hasattr(self.view, 'show_settings_dialog'):
+                self.view.show_settings_dialog(current_settings, self.on_settings_confirm)
+            else:
+                ERROR("Settings dialog not implemented in view")
+        except Exception as e:
+            ERROR("Error handling configuration button: {}", e)
+    
+    def handle_settings_confirm(self, event_data):
+        """Handle settings dialog confirmation"""
+        try:
+            settings = event_data.get("settings", {})
+            DEBUG("Applying new UI settings: {}", settings)
+            
+            # Save settings to config
+            config_utils.save_ui_settings(**settings)
+            
+            # Apply settings to UI
+            if hasattr(self.view, 'apply_ui_settings'):
+                self.view.apply_ui_settings(settings)
+            
+            INFO("UI settings updated successfully")
+        except Exception as e:
+            ERROR("Error handling settings confirmation: {}", e)
+    
+    def handle_ui_settings_change(self, event_data):
+        """Handle UI settings change"""
+        try:
+            settings = event_data.get("settings", {})
+            DEBUG("UI settings changed: {}", settings)
+            
+            # Apply settings immediately
+            if hasattr(self.view, 'apply_ui_settings'):
+                self.view.apply_ui_settings(settings)
+                
+        except Exception as e:
+            ERROR("Error handling UI settings change: {}", e)
+    
+    def get_current_ui_settings(self):
+        """Get current UI settings"""
+        return config_utils.get_all_ui_settings()
+    
+    def on_settings_confirm(self, settings):
+        """Callback for settings confirmation"""
+        self.handle_event(UIEvent.SETTINGS_DIALOG_CONFIRM, {"settings": settings})
