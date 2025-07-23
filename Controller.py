@@ -83,6 +83,12 @@ class Controller:
 
         self.original_image = image_utils.load_image(image_path)
 
+        if hasattr(self.view, "bbox_controller"):
+            self.view.bbox_controller.clear_selection(self.current_labels)
+            DEBUG("Cleared selection in bbox_controller")
+            if hasattr(self.view, "update_selection_status_display"):
+                self.view.update_selection_status_display(None)
+
         self.update_resized_image()
 
     def update_resized_image(self):
