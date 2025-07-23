@@ -5,18 +5,36 @@ from log_levels import DEBUG, INFO, ERROR
 from tkinter import messagebox
 import label_display_utils
 import bbox_controller
+import config_utils
 
+DEFAULT_W = 1920
+DEFAULT_H = 1080
 class UI:
     def __init__(self):
         self.dispatch = None
-        self.window_width = 1920
-        self.window_height = 1080
+        width, height = config_utils.get_window_size()
+        print(f"Window size from config: {width}x{height}")
+        if  width is not None and height is not None:
+            self.window_width = width
+            self.window_height = height
+        else:
+            self.window_width = DEFAULT_W
+            self.window_height = DEFAULT_H
+
 
         # Create the main window
         self.window = tk.Tk()
         self.window.title("Image Labelling Tool")
-        self.window.geometry(f"{self.window_width}x{self.window_height}")
-        
+
+        # set windows to saved size and position
+        x,y = config_utils.get_window_position()
+        if  x is not None and y is not None:
+            self.window_x = x
+            self.window_y = y
+            self.window.geometry(f"{self.window_width}x{self.window_height}+{self.window_x}+{self.window_y}")
+        else:
+            self.window.geometry(f"{self.window_width}x{self.window_height}")
+
         # Ensure window can receive keyboard focus
         self.window.focus_set()
         self.window.focus_force()
@@ -945,9 +963,21 @@ class UI:
 
         else:
             return
-        
 
 # About canvas
+
+    def get_UI_window_size(self):
+        window_width = self.window.winfo_width()
+        window_height = self.window.winfo_height()
+        DEBUG("Window size: width={}, height={}", window_width, window_height)
+        return window_width, window_height
+
+    def get_UI_window_position(self):
+        window_x = self.window.winfo_x()
+        window_y = self.window.winfo_y()
+        DEBUG("Window position: x={}, y={}", window_x, window_y)
+        return window_x, window_y
+
     def get_canvas_size(self):
         self.canvas_height = self.canvas.winfo_height()
         self.canvas_width = self.canvas.winfo_width()
@@ -1295,6 +1325,12 @@ class UI:
             self.drawing_mode = False
             self.dispatch(UIEvent.RIGHT_CTRL_RELEASE, {"value": event, "drawing_mode": self.drawing_mode})
 
+    def on_win_configure(self, event):
+        """Handle window resize or move event"""
+        # print("on_win_configure triggered")
+        if self.dispatch:
+            self.dispatch(UIEvent.WINDOW_POSITION, {})
+
     def on_delete_key(self, event):
         DEBUG("on_delete_key")
         if self.dispatch:
@@ -1319,13 +1355,16 @@ class UI:
     def setup_events(self):
         self.window.bind("<Left>", self.previous_image)
         self.window.bind("<Right>", self.next_image)
-        
+
         # Ctrl key event binding
         self.window.bind("<Control_L>", self.on_lc_press_switch_pen)
-        
+
         self.window.bind("<Control_R>", self.on_rc_press)
         self.window.bind("<KeyRelease-Control_R>", self.on_rc_release)
-        
+
+        #Windows changes posiotion or size
+        self.window.bind("<Configure>", self.on_win_configure)
+
         # Delete key event binding
         self.window.bind("<Delete>", self.on_delete_key)
 

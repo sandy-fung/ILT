@@ -24,6 +24,7 @@ class UIEvent(Enum):
     CLASS_ID_CHANGE = auto()
     INPUT_ENTER = auto()
 
+    WINDOW_POSITION = auto()
     WINDOW_READY = auto()
     CANVAS_RESIZE = auto()
     

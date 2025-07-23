@@ -122,6 +122,19 @@ class Controller:
             DEBUG("Drawing {} labels on canvas", len(self.current_labels))
             self.view.draw_labels_on_canvas(self.current_labels)
 
+        # save windows size  to default
+        window_width, window_height = self.view.get_UI_window_size()
+        config_utils.save_window_size(window_width, window_height)
+
+        window_x, window_y = self.view.get_UI_window_position()
+        config_utils.save_window_position(window_x, window_y)
+
+    def update_windows_position(self):
+        """Update window position based on saved config"""
+        # save windows position to default
+        window_x, window_y = self.view.get_UI_window_position()
+        config_utils.save_window_position(window_x, window_y)
+
     def load_label(self, path):
         """Load label file and update UI display"""
         try:
@@ -184,6 +197,8 @@ class Controller:
         elif event_type == UIEvent.CANVAS_RESIZE:
             DEBUG("Controller: Canvas resized.")
             self.update_resized_image()
+        elif event_type == UIEvent.WINDOW_POSITION:
+            self.update_windows_position()
 
         elif event_type == UIEvent.LEFT_CTRL_PRESS:
             DEBUG("Controller: Left Ctrl pressed.")
