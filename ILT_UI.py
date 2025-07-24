@@ -8,6 +8,7 @@ import bbox_controller
 from settings_dialog import SettingsDialog
 import config_utils
 import Words_Label_mapping as wlm
+from outline_font import draw_outlined_text
 
 DEFAULT_W = 1920
 DEFAULT_H = 1080
@@ -53,6 +54,7 @@ class UI:
         self.SHOW_TEXT_BOX = config_utils.get_show_text_box()
         self.SHOW_PREVIEW = config_utils.get_show_preview()
         self.SHOW_INPUT_BOX = config_utils.get_show_input_box()
+        self.LABEL_FONT_SIZE = config_utils.get_ui_label_font_size_in_config()
 
         self.setup_ui()
         self.setup_events()
@@ -955,13 +957,13 @@ class UI:
     def get_UI_window_size(self):
         window_width = self.window.winfo_width()
         window_height = self.window.winfo_height()
-        DEBUG("Window size: width={}, height={}", window_width, window_height)
+        # DEBUG("Window size: width={}, height={}", window_width, window_height)
         return window_width, window_height
 
     def get_UI_window_position(self):
         window_x = self.window.winfo_x()
         window_y = self.window.winfo_y()
-        DEBUG("Window position: x={}, y={}", window_x, window_y)
+        # DEBUG("Window position: x={}, y={}", window_x, window_y)
         return window_x, window_y
 
     def get_canvas_size(self):
@@ -1097,19 +1099,27 @@ class UI:
             # Draw class ID text
             text_x = x1
             text_y = y1 - 5 if y1 > 15 else y2 + 5
-            
-            self.canvas.create_text(
+
+            # self.canvas.create_text(
+            #     text_x, text_y,
+            #     # text=str(label.class_id),
+            #     text=wlm.get_label(label.class_id),
+            #     fill=color,
+            #     anchor="nw",
+
+            #     tags="label_text"
+            # )
+            font_size = self.LABEL_FONT_SIZE
+            draw_outlined_text(
+                self.canvas,
                 text_x, text_y,
-                text=str(label.class_id),
-                fill=color,
-                anchor="nw",
-                font=("Arial", 10, "bold"),
-                tags="label_text"
-            )
-            
-            DEBUG("Drew label: class_id={}, coords=({:.1f},{:.1f},{:.1f},{:.1f})", 
+                text=wlm.get_label(label.class_id),
+                font=("Arial", font_size, "bold"),
+                outline_color="white", fill_color="black", thickness=2, tags="label_text")
+
+            DEBUG("Drew label: class_id={}, coords=({:.1f},{:.1f},{:.1f},{:.1f})",
                   label.class_id, x1, y1, x2, y2)
-            
+
 
     def draw_resize_handles(self, label, x1, y1, x2, y2, color):
         """
@@ -1245,7 +1255,6 @@ class UI:
             if drawing_result and self.dispatch:
                 class_id_select = self.class_id_vars.get()
                 class_id = wlm.get_class_id(class_id_select)
-                print("XXXXXXXXXXXX Selected class ID:", class_id)
                 self.dispatch(UIEvent.MOUSE_LEFT_RELEASE, {"value": event, "drawing_result": drawing_result, "class_id": class_id})
         elif self.bbox_controller and self.bbox_controller.is_resizing:
             # Resizing mode: complete resizing
@@ -1361,7 +1370,8 @@ class UI:
             self.SHOW_TEXT_BOX = settings.get('show_text_box', True)
             self.SHOW_PREVIEW = settings.get('show_preview', True)
             self.SHOW_INPUT_BOX = settings.get('show_input_box', True)
-            
+            self.LABEL_FONT_SIZE = settings.get('label_font_size', 12)
+
             # Apply input box visibility (should be first, like in original creation)
             self.toggle_input_box(self.SHOW_INPUT_BOX)
             
