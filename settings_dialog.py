@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 from log_levels import DEBUG, INFO, ERROR
 
+DEFAULT_LABEL_FONT_SIZE = 10
 class SettingsDialog:
     def __init__(self, parent, current_settings, on_confirm_callback):
         """
@@ -23,7 +24,8 @@ class SettingsDialog:
         self.show_text_box_var = tk.BooleanVar()
         self.show_preview_var = tk.BooleanVar()
         self.show_input_box_var = tk.BooleanVar()
-        
+        self.label_font_size_current = str(DEFAULT_LABEL_FONT_SIZE)  # Default font size
+
         self.create_dialog()
         
     def create_dialog(self):
@@ -105,7 +107,10 @@ class SettingsDialog:
             self.show_text_box_var.set(self.current_settings.get('show_text_box', True))
             self.show_preview_var.set(self.current_settings.get('show_preview', True))
             self.show_input_box_var.set(self.current_settings.get('show_input_box', True))
-            
+            self.label_font_size_current = self.current_settings.get('label_font_size')
+
+
+
             DEBUG("Loaded current settings into dialog")
             
         except Exception as e:
@@ -158,7 +163,23 @@ class SettingsDialog:
                 variable=self.show_input_box_var
             )
             checkbox4.pack(anchor=tk.W, pady=2)
-            
+
+            # font size for label ascci
+            font_frame = ttk.LabelFrame(main_frame, text="", padding="10")
+            font_frame.pack(fill=tk.X, pady=(0, 10))
+            font_describe = tk.Label(font_frame, text="label text size", font=("Arial", 11))
+            font_describe.grid(row=0, column=0, padx=5, pady=10)
+            size = self.current_settings.get('label_font_size')
+            self.label_font_size_entry = tk.Entry(font_frame, font=("Arial", 12))
+            self.label_font_size_entry.grid(row=0, column=1, padx=5, pady=10)
+            self.label_font_size_entry.insert(0, str(size))
+            self.label_font_size_entry.config(fg="gray")
+
+            # self.label_font_size_entry.delete(0, tk.END)
+            # size =  self.current_settings.get('label_font_size', DEFAULT_LABEL_FONT_SIZE)
+            # self.label_font_size_entry.insert(0, str(size))
+            # self.label_font_size_entry.config(fg="gray")
+
             # Button frame
             button_frame = ttk.Frame(main_frame)
             button_frame.pack(fill=tk.X, pady=(10, 0))
@@ -192,7 +213,8 @@ class SettingsDialog:
             'show_class_id_buttons': self.show_class_id_buttons_var.get(),
             'show_text_box': self.show_text_box_var.get(),
             'show_preview': self.show_preview_var.get(),
-            'show_input_box': self.show_input_box_var.get()
+            'show_input_box': self.show_input_box_var.get(),
+            'label_font_size': int(self.label_font_size_entry.get())
         }
         
     def on_confirm(self):
@@ -231,15 +253,46 @@ class SettingsDialog:
                 self.dialog.grab_release()
                 self.dialog.destroy()
                 self.dialog = None
-                
+
         except Exception as e:
             ERROR("Error closing dialog: {}", e)
-            
+
     def show(self):
         """Show the dialog and wait for result"""
         try:
             if self.dialog:
                 self.dialog.wait_window()
-                
+
         except Exception as e:
             ERROR("Error showing dialog: {}", e)
+
+
+# for implementation testing
+if __name__ == "__main__":
+    def on_confirm(settings):
+        print("Settings confirmed:", settings)
+
+    root = tk.Tk()
+    root.withdraw()  # Hide the main window
+
+    parent_window = tk.Toplevel(root)
+    parent_window.title("Temporary Parent")
+    parent_window.geometry("300x200")  # Set size for the parent window
+
+    current_settings = {
+        'show_class_id_buttons': True,
+        'show_text_box': True,
+        'show_preview': True,
+        'show_input_box': True,
+        'label_font_size_entry': 12
+    }
+
+    dialog = SettingsDialog(parent_window, current_settings, on_confirm)
+    try:
+        dialog.show()
+        print("Dialog shown")
+    except Exception as e:
+        print(f"Error: {e}")
+
+    # Destroy the temporary parent window after the dialog is closed
+    parent_window.destroy()

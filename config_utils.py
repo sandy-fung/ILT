@@ -174,7 +174,6 @@ def get_window_size():
 
 def save_window_size(width, height):
     """Save window size"""
-    print(f"Saving window size: {width}x{height}")
     if not config.has_section("Window"):
         config.add_section("Window")
     config.set("Window", "width", str(width))
@@ -235,12 +234,19 @@ def get_show_input_box():
     except:
         return True  # Default to True (current setting)
 
-def save_ui_settings(show_class_id_buttons=None, show_text_box=None, 
-                    show_preview=None, show_input_box=None):
+def get_ui_label_font_size_in_config():
+    """Get the font size for UI labels"""
+    try:
+        return config.getint("UISettings", "label_font_size")
+    except:
+        return 12  # Default font size
+
+def save_ui_settings(show_class_id_buttons=None, show_text_box=None,
+                    show_preview=None, show_input_box=None, label_font_size=10):
     """Save UI settings to config file"""
     if not config.has_section("UISettings"):
         config.add_section("UISettings")
-    
+
     if show_class_id_buttons is not None:
         config.set("UISettings", "show_class_id_buttons", str(show_class_id_buttons).lower())
     if show_text_box is not None:
@@ -249,6 +255,8 @@ def save_ui_settings(show_class_id_buttons=None, show_text_box=None,
         config.set("UISettings", "show_preview", str(show_preview).lower())
     if show_input_box is not None:
         config.set("UISettings", "show_input_box", str(show_input_box).lower())
+    if label_font_size is not None:
+        config.set("UISettings", "label_font_size", str(label_font_size))
 
     with open(DEFAULT_CONFI_PATH, "w") as f:
         config.write(f)
@@ -259,5 +267,6 @@ def get_all_ui_settings():
         'show_class_id_buttons': get_show_class_id_buttons(),
         'show_text_box': get_show_text_box(),
         'show_preview': get_show_preview(),
-        'show_input_box': get_show_input_box()
+        'show_input_box': get_show_input_box(),
+        'label_font_size': get_ui_label_font_size_in_config()
     }
