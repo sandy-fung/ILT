@@ -110,7 +110,7 @@ class UI:
         self.configuration_button = tk.Button(
             self.toolbar,
             width = 12, height = 1,
-            text = "Configuration", fg = "#008378",
+            text = "Configuration", fg = "#0C0CC0",
             relief = "flat", bd = 2,
             command = self.on_configuration_click
         )
@@ -258,7 +258,7 @@ class UI:
             self.preview_canvas_frame,
             bg = "white",
             highlightthickness = 1,
-            highlightbackground = "#cccccc",
+            highlightbackground = "#8E8E79",
             yscrollcommand = self.preview_v_scrollbar.set,
             xscrollcommand = self.preview_h_scrollbar.set
         )
@@ -1056,7 +1056,7 @@ class UI:
             if self.bbox_controller and self.bbox_controller.is_resizing and label == self.bbox_controller.resizing_label:
                 # Resizing: special style with dotted line and bright color
                 color = "#C00CC0"  # Purple for resizing
-                width = 2
+                width = 3
                 tags = ("label_box", "label_box_resizing")
                 dash = (3, 3)  # Dotted line pattern for resizing
             elif self.bbox_controller and self.bbox_controller.is_dragging and label == self.bbox_controller.dragging_label:
@@ -1068,13 +1068,13 @@ class UI:
             elif hasattr(label, 'selected') and label.selected:
                 # Selected: red color with thicker border
                 color = "#C00C0C"  # Red
-                width = 2
+                width = 3
                 tags = ("label_box", "label_box_selected")
                 dash = None
             else:
                 # Not selected: green color
                 color = "#0CC00C"
-                width = 2
+                width = 3
                 tags = ("label_box",)
                 dash = None
             
@@ -1146,12 +1146,17 @@ class UI:
 
 # Update text and index labels
     def update_text_box(self, content):
+        self.text_box.unbind("<<Modified>>")
+
         if not self.SHOW_TEXT_BOX:
             DEBUG("Text box is not shown as per configuration.")
             return
         self.text_box.config(state = "normal")
         self.text_box.delete("1.0", tk.END) # Clear the text box
         self.text_box.insert(tk.END, content)
+
+        self.text_box.edit_modified(False)
+        self.text_box.bind("<<Modified>>", self.on_text_modified)
 
     def update_index_label(self, index, path):
         DEBUG("update_index_label")
@@ -1164,6 +1169,7 @@ class UI:
         if current != upper:
             self.input_box.delete(0, tk.END)
             self.input_box.insert(0, upper)
+        self.input_box.config(fg = "#2D2D2D")
 
     def input_enter(self, event):
         """Handle Enter key press in input box"""
@@ -1350,6 +1356,12 @@ class UI:
         DEBUG("on_configuration_click")
         if self.dispatch:
             self.dispatch(UIEvent.CONFIGURATION_BT_CLICK, None)
+
+    def on_text_modified(self, event):
+        if self.text_box.edit_modified():
+            self.text_box.edit_modified(False)
+            if self.dispatch:
+                self.dispatch(UIEvent.TEXT_MODIFIED, {})
     
     def show_settings_dialog(self, current_settings, on_confirm_callback):
         """Show settings dialog"""
@@ -1590,6 +1602,7 @@ class UI:
         self.canvas.bind("<B1-Motion>", self.on_mouse_drag)
         self.canvas.bind("<Button-3>", self.on_mouse_click_right)
         self.canvas.bind("<Configure>", self.on_canvas_resize)
+        self.text_box.bind("<<Modified>>", self.on_text_modified)
 
     def select_folder(self, title):
         folder_path = filedialog.askdirectory(parent = self.window, title = title)

@@ -484,3 +484,22 @@ def sort_labels_by_position(labels):
     
     INFO("Sorted {} labels in {} plates", len(sorted_labels), len(groups))
     return sorted_labels, len(groups)
+
+def parse_label_text(text: str):
+    labels = []
+    lines = text.strip().splitlines()
+    for line in lines:
+        parts = line.strip().split()
+        if not line:
+            continue
+        if len(parts) == 5:
+            try:
+                class_id = int(parts[0])
+                cx = float(parts[1])
+                cy = float(parts[2])
+                w = float(parts[3])
+                h = float(parts[4])
+                labels.append(LabelObject(class_id, cx, cy, w, h))
+            except ValueError:
+                ERROR("Invalid label format in line: {}", line)
+    return labels

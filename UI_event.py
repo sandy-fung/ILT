@@ -33,6 +33,7 @@ class UIEvent(Enum):
     WINDOW_POSITION = auto()
     WINDOW_READY = auto()
     CANVAS_RESIZE = auto()
+    TEXT_MODIFIED = auto()
     
     # Magnifier events for preview panel
     MAGNIFIER_SHOW = auto()
