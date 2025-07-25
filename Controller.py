@@ -651,29 +651,30 @@ class Controller:
                 if not os.path.exists(delete_folder_path):
                     os.makedirs(delete_folder_path)
                 try:
+                    INFO("Deleted image: {} and label: {}", image_path, label_path)
                     folder_utils.move_file(image_path,delete_folder_path)
                     folder_utils.move_file(label_path,delete_folder_path)
-
-                    DEBUG("Deleted image: {} and label: {}", image_path, label_path)
-
-                    # Remove from lists
-                    del self.images_path[self.image_index]
-                    del self.labels_path[self.image_index]
-                    del self.images[self.image_index]
-                    del self.labels[self.image_index]
-
-                    # Adjust index
-                    if self.image_index >= len(self.images_path):
-                        self.image_index = max(0, len(self.images_path) - 1)
-
-                    config_utils.save_image_index(self.image_index)
-
-                    # Reload image and labels
-                    self.load_image(self.images_path)
-                    self.load_label(self.labels_path)
-
                 except Exception as e:
                     ERROR("Error deleting image or label file: {}", e)
+                   
+
+                # Remove from lists
+                del self.images_path[self.image_index]
+                del self.labels_path[self.image_index]
+                del self.images[self.image_index]
+                del self.labels[self.image_index]
+
+                # Adjust index
+                if self.image_index >= len(self.images_path):
+                    self.image_index = max(0, len(self.images_path) - 1)
+
+                config_utils.save_image_index(self.image_index)
+
+                # Reload image and labels
+                self.load_image(self.images_path)
+                self.load_label(self.labels_path)
+
+               
         else:
                 ERROR("No image to delete at index: {}", self.image_index)
 

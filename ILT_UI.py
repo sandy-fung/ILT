@@ -436,11 +436,11 @@ class UI:
         # Add info text at visible position
         info_text = f"原始尺寸: {img_width}×{img_height}"
         self.preview_canvas.create_text(
-            10, 10,
+            10, canvas_height - 5,
             text = info_text,
             fill = "#8E8E79",
             font = ("Segoe UI", 9),
-            anchor = "nw",
+            anchor = "sw",
             tags = ("info_text", "overlay")
         )
         
