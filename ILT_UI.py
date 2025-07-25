@@ -46,7 +46,7 @@ class UI:
         self.bbox_controller = None
         self.drawing_mode = False
         
-        # Store reference to original image for preview
+        # Initialize options
         self.original_image = None
 
         # Load UI settings from config
@@ -108,7 +108,7 @@ class UI:
         self.del_button.pack(side = "left", padx = 5)
 
         self.configuration_button = tk.Button(
-            self.toolbar,
+            self.toolbar, bg = "#F4F4F4",
             width = 12, height = 1,
             text = "Configuration", fg = "#0C0CC0",
             relief = "flat", bd = 2,
@@ -176,6 +176,7 @@ class UI:
             )
             self.text_box.tag_configure("left", justify = "left")
             self.text_box.pack(side = "top", fill = "x", expand = True, padx = 20, pady = 10)
+            self.text_box.bind("<<Modified>>", self.on_text_modified)
 
         else:
             DEBUG("Text box is not shown as per configuration.")
@@ -281,15 +282,17 @@ class UI:
         self.preview_photo_image = None
         
         # Schedule placeholder text after window is rendered
-        self.preview_canvas.after_idle(self._add_preview_placeholder)
-        
+        if self.preview_canvas:
+            self.preview_canvas.after_idle(self._add_preview_placeholder)
+
         # Bind magnifier events to preview canvas
-        self.preview_canvas.bind("<Enter>", self.on_preview_enter)
-        self.preview_canvas.bind("<Leave>", self.on_preview_leave)
-        self.preview_canvas.bind("<Button-1>", self.on_preview_left_click)
-        self.preview_canvas.bind("<Button-3>", self.on_preview_right_drag_start)
-        self.preview_canvas.bind("<B3-Motion>", self.on_preview_right_drag)
-        self.preview_canvas.bind("<ButtonRelease-3>", self.on_preview_right_drag_end)
+        if self.preview_canvas:
+            self.preview_canvas.bind("<Enter>", self.on_preview_enter)
+            self.preview_canvas.bind("<Leave>", self.on_preview_leave)
+            self.preview_canvas.bind("<Button-1>", self.on_preview_left_click)
+            self.preview_canvas.bind("<Button-3>", self.on_preview_right_drag_start)
+            self.preview_canvas.bind("<B3-Motion>", self.on_preview_right_drag)
+            self.preview_canvas.bind("<ButtonRelease-3>", self.on_preview_right_drag_end)
         
         # Initialize magnifier state
         self.magnifier_tooltip = None
@@ -713,6 +716,9 @@ class UI:
         Returns:
             ImageTk.PhotoImage or None: Cached image if found
         """
+        if not self.SHOW_PREVIEW:
+            return
+        
         if cache_key in self.magnifier_cache:
             # Move to end of access order (most recently used)
             self.cache_access_order.remove(cache_key)
@@ -727,6 +733,9 @@ class UI:
             cache_key: Cache key string
             photo_image: ImageTk.PhotoImage to cache
         """
+        if not self.SHOW_PREVIEW:
+            return
+        
         # Remove if already exists
         if cache_key in self.magnifier_cache:
             self.cache_access_order.remove(cache_key)
@@ -747,6 +756,9 @@ class UI:
               
     def clear_magnifier_cache(self):
         """Clear all cached magnified regions (called when image changes)"""
+        if not self.SHOW_PREVIEW:
+            return
+        
         self.magnifier_cache.clear()
         self.cache_access_order.clear()
         DEBUG("Magnifier cache cleared")
@@ -1146,6 +1158,10 @@ class UI:
 
 # Update text and index labels
     def update_text_box(self, content):
+        if not self.SHOW_TEXT_BOX or self.text_box is None:
+            DEBUG("Text box is not shown or not initialized.")
+            return
+
         self.text_box.unbind("<<Modified>>")
 
         if not self.SHOW_TEXT_BOX:
@@ -1463,7 +1479,7 @@ class UI:
                         self.text_box = tk.Text(
                             self.text_frame,
                             height=15, bg="white",
-                            font=("Segoe UI", 11), fg="#424242",
+                            font=("Segoe UI", 11), fg="#8E8E79",
                             relief="sunken",
                             wrap="word"
                         )
@@ -1602,7 +1618,6 @@ class UI:
         self.canvas.bind("<B1-Motion>", self.on_mouse_drag)
         self.canvas.bind("<Button-3>", self.on_mouse_click_right)
         self.canvas.bind("<Configure>", self.on_canvas_resize)
-        self.text_box.bind("<<Modified>>", self.on_text_modified)
 
     def select_folder(self, title):
         folder_path = filedialog.askdirectory(parent = self.window, title = title)
@@ -1641,7 +1656,7 @@ class UI:
         if self.drawing_mode and self.bbox_controller.is_in_drawing_mode():
             self.drawing_mode_label.config(text="繪框模式", fg="#C00CC0")
         else:
-            self.drawing_mode_label.config(text="普通模式", fg="#2d2d2d")
+            self.drawing_mode_label.config(text="普通模式", fg="#8E8E79")
     
     def update_selection_status_display(self, selected_label=None):
         """Update selection status display"""

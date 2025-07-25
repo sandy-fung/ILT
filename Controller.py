@@ -724,6 +724,8 @@ class Controller:
                 self.view.apply_ui_settings(settings)
             
             INFO("UI settings updated successfully")
+
+            self.update_label_display()
         except Exception as e:
             ERROR("Error handling settings confirmation: {}", e)
     
