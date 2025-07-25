@@ -184,6 +184,24 @@ class Controller:
             self.current_labels = []
             ERROR("Invalid image index for label parsing: {}", self.image_index)
 
+    def handle_text_modified(self):
+        try:
+            text = self.view.text_box.get("1.0", "end").strip()
+
+            labels = label_display_utils.parse_label_text(text)
+
+            labels, plate_count = label_display_utils.sort_labels_by_position(labels)
+
+            self.current_labels = labels
+            self.save_current_labels()
+            self.update_label_display()
+
+            self.view.update_sorting_status(len(labels), plate_count)
+
+        except Exception as e:
+            ERROR("Error handling text modified: {}", e)
+            
+
     def next_image(self):
         DEBUG("Current image index:", self.image_index)
         if self.image_index < len(self.images) - 1:
@@ -324,6 +342,8 @@ class Controller:
             DEBUG("Controller: UI settings changed.")
             self.handle_ui_settings_change(event_data)
 
+        elif event_type == UIEvent.TEXT_MODIFIED:
+            self.handle_text_modified()
 
     def update_label_view(self, label):
         if hasattr(self.view, 'update_selection_status_display'):
