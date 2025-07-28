@@ -1275,8 +1275,12 @@ class UI:
             # Drawing mode: complete drawing
             drawing_result = self.bbox_controller.finish_drawing(event.x, event.y)
             if drawing_result and self.dispatch:
-                class_id_select = self.class_id_vars.get()
-                class_id = wlm.get_class_id(class_id_select)
+                class_id = 0
+                if hasattr(self, "class_id_vars") and self.class_id_vars:
+                    selected = self.class_id_vars.get()
+                    cid = wlm.get_class_id(selected)
+                    if cid is not None:
+                        class_id = cid
                 self.dispatch(UIEvent.MOUSE_LEFT_RELEASE, {"value": event, "drawing_result": drawing_result, "class_id": class_id})
         elif self.bbox_controller and self.bbox_controller.is_resizing:
             # Resizing mode: complete resizing

@@ -1,7 +1,7 @@
 # log_levels.py
 
 _LEVELS = {"DEBUG": 10, "INFO": 20, "ERROR": 30}
-DEBUG_LEVEL = "INFO"   # 預設等級，可在程式裡動態改
+DEBUG_LEVEL = "ERROR"   # 預設等級，可在程式裡動態改
 
 def _log(level: str, msg: str, *args, **kwargs):
     if _LEVELS[level] >= _LEVELS.get(DEBUG_LEVEL, 0):
