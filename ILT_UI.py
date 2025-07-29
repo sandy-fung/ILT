@@ -9,6 +9,8 @@ from settings_dialog import SettingsDialog
 import config_utils
 import Words_Label_mapping as wlm
 from outline_font import draw_outlined_text
+from constants import VERSION_NUM
+
 
 DEFAULT_W = 1920
 DEFAULT_H = 1080
@@ -115,6 +117,19 @@ class UI:
             command = self.on_configuration_click
         )
         self.configuration_button.pack(side = "left", padx = 5)
+
+        self.info_button = tk.Button(
+            self.toolbar, bg = "#F4F4F4",
+            width = 4, height = 1,
+            text="Info", font=("Segoe UI", 10), fg = "#0C0CC0",
+            relief = "flat", bd = 2,
+            command = self.show_info_menu)
+        self.info_button.pack(side = "left", padx =0)
+        
+         # 建立 version menu，但暫不顯示
+        self.info_menu = tk.Menu(self.window, tearoff=0)
+        self.info_menu.add_command(label="version-"+VERSION_NUM)
+
 
     def create_middle_area(self):
         self.middle_frame = tk.Frame(self.window)
@@ -1225,6 +1240,12 @@ class UI:
 
 
 # Button events
+    def show_info_menu(self):
+        # 取得按鈕在畫面中的位置
+        x = self.info_button.winfo_rootx()
+        y = self.info_button.winfo_rooty() + self.info_button.winfo_height()
+        self.info_menu.tk_popup(x, y)
+        
     def on_bt_click_reselect(self):
         DEBUG("on_bt_click_reselect")
         if self.dispatch:
