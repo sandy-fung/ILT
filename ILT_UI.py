@@ -1179,6 +1179,25 @@ class UI:
         self.index_label.config(text = f"{index + 1} : {len(path)}")
         DEBUG("Index label updated with index: {}", index)
 
+    def highlight_yolo_line_for_label(self, selected_label):
+        if not self.text_box:
+            ERROR("Text box is not initialized.")
+            return
+
+        DEBUG("Highlighting YOLO line for label: {}", selected_label)
+        self.text_box.tag_remove("highlight", "1.0", tk.END)  # Clear previous highlights
+
+        if not selected_label or not hasattr(selected_label, 'line_index'):
+            ERROR("No valid label selected.")
+            return
+        
+        line_index = selected_label.line_index
+        DEBUG("Highlighting line_index {}", line_index)
+        start = f"{line_index + 1}.0"
+        end = f"{line_index + 1}.end"
+        self.text_box.tag_add("highlight", start, end)
+        self.text_box.tag_config("highlight", background="#0C0CC0", foreground="#F0EF43")
+
     def force_uppercase(self, event):
         current = self.input_box.get()
         upper = current.upper()
