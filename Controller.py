@@ -9,6 +9,7 @@ import os
 from log_levels import DEBUG, INFO, ERROR
 
 DELETE_FILE_TMP_PATH ="delete_tmp"
+MOVE_FILE_TMP_PATH ="issue_tmp"
 class Controller:
     def __init__(self, view):
         self.view = view
@@ -322,7 +323,11 @@ class Controller:
 
         elif event_type == UIEvent.DELETE_IMAGE:
             DEBUG("Controller: Delete image button pressed.")
-            self.delete_selected_image_and_label()
+            self.move_selected_image_and_label(DELETE_FILE_TMP_PATH)
+            
+        elif event_type == UIEvent.MOVE_IMAGE:
+            DEBUG("Controller: Move image button pressed.")
+            self.move_selected_image_and_label(MOVE_FILE_TMP_PATH)
 
         elif event_type == UIEvent.INPUT_ENTER:
             DEBUG("Controller: Input enter pressed.")
@@ -662,20 +667,20 @@ class Controller:
         self.save_current_labels()
         self.update_label_display()
 
-    def delete_selected_image_and_label(self):
+    def move_selected_image_and_label(self, destination):
         if self.image_index < len(self.images_path):
                 image_path = self.images_path[self.image_index]
                 label_path = self.labels_path[self.image_index]
 
                 # Remove image and label files
-                delete_folder_path = os.path.join(self.image_folder_path, DELETE_FILE_TMP_PATH)
-                DEBUG(f"delete folder:{delete_folder_path}")
-                if not os.path.exists(delete_folder_path):
-                    os.makedirs(delete_folder_path)
+                dest_folder_path = os.path.join(self.image_folder_path, destination)
+                DEBUG(f"move to folder:{dest_folder_path}")
+                if not os.path.exists(dest_folder_path):
+                    os.makedirs(dest_folder_path)
                 try:
                     INFO("Deleted image: {} and label: {}", image_path, label_path)
-                    folder_utils.move_file(image_path,delete_folder_path)
-                    folder_utils.move_file(label_path,delete_folder_path)
+                    folder_utils.move_file(image_path,dest_folder_path)
+                    folder_utils.move_file(label_path,dest_folder_path)
                 except Exception as e:
                     ERROR("Error deleting image or label file: {}", e)
                    

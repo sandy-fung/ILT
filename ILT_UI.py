@@ -108,6 +108,15 @@ class UI:
             relief = "flat", bd = 2,
             command = self.on_delete_image_button)
         self.del_button.pack(side = "left", padx = 5)
+        
+        self.mov_button = tk.Button(
+            self.toolbar, bg = "#F4F4F4",
+            width = 8, height = 1,
+            text="Move to", font=("Segoe UI", 10), fg = "#0C0CC0",
+            relief = "flat", bd = 2,
+            command = self.on_move_image_button)
+        self.mov_button.pack(side = "left", padx = 5)
+        
 
         self.configuration_button = tk.Button(
             self.toolbar, bg = "#F4F4F4",
@@ -1410,6 +1419,11 @@ class UI:
         DEBUG("on_delete_image_button")
         if self.dispatch:
             self.dispatch(UIEvent.DELETE_IMAGE,  None)
+            
+    def on_move_image_button(self):
+        DEBUG("on_move_image_button")
+        if self.dispatch:
+            self.dispatch(UIEvent.MOVE_IMAGE,  None)
 
     def on_configuration_click(self):
         """Handle configuration button click"""
