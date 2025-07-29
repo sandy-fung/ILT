@@ -1196,7 +1196,7 @@ class UI:
         start = f"{line_index + 1}.0"
         end = f"{line_index + 1}.end"
         self.text_box.tag_add("highlight", start, end)
-        self.text_box.tag_config("highlight", background="#0C0CC0", foreground="#F0EF43")
+        self.text_box.tag_config("highlight", background="#0C0CC0", foreground="#F0EF43", font = ("Segoe UI", 11, "bold"))
 
     def force_uppercase(self, event):
         current = self.input_box.get()
