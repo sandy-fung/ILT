@@ -646,6 +646,33 @@ class Controller:
         class_ids = char_handler.convert_text_to_class_ids(input_text)
         DEBUG("Converted class IDs: {}", class_ids)
 
+        bbox_ctrl = self.view.bbox_controller
+        selected_label = bbox_ctrl.get_selected_label() if bbox_ctrl else None
+
+        if selected_label:
+            try:
+                start_idx = self.current_labels.index(selected_label)
+                DEBUG("Selected label found at index: {}", start_idx)
+
+                if len(class_ids) > len(self.current_labels) - start_idx:
+                    self.view.show_error("輸入長度超過剩餘標籤數量，請重新輸入")
+                    ERROR("Input length exceeds remaining labels count. Input: {}, Remaining: {}", len(class_ids), len(self.current_labels) - start_idx)
+                    return
+                
+                for i, cid in enumerate(class_ids):
+                    self.current_labels[start_idx + i].class_id = cid
+
+                    self.save_current_labels()
+                    self.update_label_display()
+                
+                return
+
+            except ValueError:
+                self.view.show_error()
+                ERROR("Selected label not found in current labels list")
+                return
+
+
         if not char_handler.is_same_length_as_labels(class_ids, len(self.current_labels)):
             self.view.show_error("輸入長度與標籤數量不符，請重新輸入")
 
