@@ -201,32 +201,44 @@ class Controller:
 
         except Exception as e:
             ERROR("Error handling text modified: {}", e)
-            
-
+    
+    def check_if_any_overlaps(self):
+        text = self.view.text_box.get("1.0", "end").strip()
+        labels = label_display_utils.parse_label_text(text)   
+        if label_display_utils.check_labels_horizontal_overlap(labels) is True:
+            self.view.show_error("標籤有重疊，請檢查")
+            return True
+    
+    def on_fresh_image_label(self):
+        self.load_image(self.images_path)
+        self.load_label(self.labels_path)
+        self.check_if_any_overlaps()
+        
+        
     def next_image(self):
         DEBUG("Current image index:", self.image_index)
         if self.image_index < len(self.images) - 1:
             self.image_index += 1
         config_utils.save_image_index(self.image_index)
-
-        self.load_image(self.images_path)
-        self.load_label(self.labels_path)
+        self.on_fresh_image_label()
+        
 
     def previous_image(self):
         DEBUG("Current image index:", self.image_index)
         if self.image_index > 0:
             self.image_index -= 1
         config_utils.save_image_index(self.image_index)
-
-        self.load_image(self.images_path)
-        self.load_label(self.labels_path)
-
+        self.on_fresh_image_label()
+    
+    def window_ready(self):
+        INFO("Controller: Window is ready.")
+        self.on_fresh_image_label()
+        self.view.show_class_id_buttons(config_utils.get_class_id_vars(), wlm.get_labels())
+        
+   #=====  handle_event  ===========
     def handle_event(self, event_type, event_data):
         if event_type == UIEvent.WINDOW_READY:
-            INFO("Controller: Window is ready.")
-            self.load_image(self.images_path)
-            self.load_label(self.labels_path)
-            self.view.show_class_id_buttons(config_utils.get_class_id_vars(), wlm.get_labels())
+            self.window_ready()
 
         elif event_type == UIEvent.CANVAS_RESIZE:
             DEBUG("Controller: Canvas resized.")
@@ -308,9 +320,8 @@ class Controller:
 
         elif event_type == UIEvent.MOUSE_LEFT_RELEASE:
             DEBUG("Controller: Mouse left release.")
-
-
             self.handle_mouse_left_release(event_data)
+            self.check_if_any_overlaps()
 
         elif event_type == UIEvent.MOUSE_DRAG:
             DEBUG("Controller: Mouse drag.")

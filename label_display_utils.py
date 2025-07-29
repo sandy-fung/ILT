@@ -1,6 +1,9 @@
 from log_levels import DEBUG, INFO, ERROR
 import os
-
+MAX_OVERLAP = 0.5
+# MAX_DIST_WIDTH_RATIO = 1.15
+# MIN_DIST_WIDTH_RATIO = 0.7
+# MAX_DISTANCE_VARIANCE = 0.01
 
 class LabelObject:
     def __init__(self, class_id: int, cx_ratio: float, cy_ratio: float, w_ratio: float, h_ratio: float, line_index = None):
@@ -504,3 +507,42 @@ def parse_label_text(text: str):
             except ValueError:
                 ERROR("Invalid label format in line: {}", line)
     return labels
+
+# 將YOLO格式的標籤轉換為邊界框
+def yolo_to_box(xc, yc, w, h):
+    x1 = xc - w/2
+    y1 = yc - h/2
+    x2 = xc + w/2
+    y2 = yc + h/2
+    area = w * h
+    return (x1, y1, x2, y2, area)
+
+def is_overlap(box1, box2):
+    x1 = max(box1[0], box2[0])
+    y1 = max(box1[1], box2[1])
+    x2 = min(box1[2], box2[2])
+    y2 = min(box1[3], box2[3])
+
+    intersection = max(0, (x2 - x1)) * max(0, (y2 - y1))
+    area1 = box1[4]
+    area2 = box2[4]
+
+    if intersection == 0:
+        return False
+    elif intersection / area1 > MAX_OVERLAP or intersection / area2 > MAX_OVERLAP: # 判斷重疊面積是否大於50%
+        return True
+    else:
+        return False
+
+def check_labels_horizontal_overlap(labels):
+    from itertools import combinations
+
+    has_problem = False
+    for labelj, labelk in combinations(labels, 2):
+        box1 = yolo_to_box(labelj.cx_ratio, labelj.cy_ratio, labelj.w_ratio, labelj.h_ratio)
+        box2 = yolo_to_box(labelk.cx_ratio, labelk.cy_ratio, labelk.w_ratio, labelk.h_ratio)
+
+
+        if is_overlap(box1, box2):
+            has_problem = True
+    return has_problem
