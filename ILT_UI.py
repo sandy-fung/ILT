@@ -1203,7 +1203,7 @@ class UI:
         self.text_box.tag_remove("highlight", "1.0", tk.END)  # Clear previous highlights
 
         if not selected_label or not hasattr(selected_label, 'line_index'):
-            ERROR("No valid label selected.")
+            DEBUG("No valid label selected.")
             return
         
         line_index = selected_label.line_index
@@ -1630,11 +1630,17 @@ class UI:
             ERROR("Error toggling input box: {}", e)
 
     def next_image(self, event):
+        if self.input_box and self.window.focus_get() is self.input_box:
+            return
+        
         DEBUG("next_image")
         if self.dispatch:
             self.dispatch(UIEvent.RIGHT_PRESS, {"value": event})
 
     def previous_image(self, event):
+        if self.input_box and self.window.focus_get() is self.input_box:
+            return
+        
         DEBUG("previous_image")
         if self.dispatch:
             self.dispatch(UIEvent.LEFT_PRESS, {"value": event})
@@ -1655,6 +1661,8 @@ class UI:
 
         # Delete key event binding
         self.window.bind("<Delete>", self.on_delete_key)
+
+        self.window.bind("<Button-1>", self._clear_focus)
 
         # Mouse event binding (support drawing functionality)
         self.canvas.bind("<Button-1>", self.on_mouse_press)
@@ -1743,6 +1751,10 @@ class UI:
             self.selection_status_label.config(text=status_text, fg="#C0C00C")
             # 3秒後恢復正常狀態顯示
             self.window.after(3000, lambda: self.update_selection_status_display())
+
+    def _clear_focus(self, event):
+        if self.input_box and event.widget is not self.input_box:
+            self.window.focus_set()
 
     def run(self):
         if self.dispatch:
