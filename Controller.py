@@ -131,6 +131,7 @@ class Controller:
         
         DEBUG("Controller.load_image() completed")
         self.view.update_index_label(self.image_index, self.images_path)
+        self.view.update_path_label(self.images_path[self.image_index])
 
         # Parse and draw labels for current image
         self.parse_current_labels()
@@ -457,7 +458,6 @@ class Controller:
                 DEBUG("No label selected")
                 # 更新狀態顯示
                 self.update_label_view(None)
-                self.view.highlight_yolo_line_for_label(None)
 
     def handle_mouse_left_release(self, event_data):
             # 處理繪製完成
