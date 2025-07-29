@@ -3,13 +3,14 @@ import os
 
 
 class LabelObject:
-    def __init__(self, class_id: int, cx_ratio: float, cy_ratio: float, w_ratio: float, h_ratio: float):
+    def __init__(self, class_id: int, cx_ratio: float, cy_ratio: float, w_ratio: float, h_ratio: float, line_index = None):
         self.class_id = class_id
         self.cx_ratio = cx_ratio
         self.cy_ratio = cy_ratio
         self.w_ratio = w_ratio
         self.h_ratio = h_ratio
         self.selected = False  # 選中狀態標記
+        self.line_index = line_index
 
     def update(self, cx: float, cy: float, width: float, height: float, canvas_size):
         canv_x, canv_y = canvas_size
@@ -281,7 +282,7 @@ def parse_label_file(file_path):
                         w_ratio = float(parts[3])
                         h_ratio = float(parts[4])
                         
-                        label = LabelObject(class_id, cx_ratio, cy_ratio, w_ratio, h_ratio)
+                        label = LabelObject(class_id, cx_ratio, cy_ratio, w_ratio, h_ratio, line_index = line_num -1)
                         labels.append(label)
                         DEBUG("Loaded label: {} {:.6f} {:.6f} {:.6f} {:.6f}", 
                               class_id, cx_ratio, cy_ratio, w_ratio, h_ratio)
