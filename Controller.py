@@ -187,7 +187,7 @@ class Controller:
 
     def handle_text_modified(self):
         try:
-            text = self.view.text_box.get("1.0", "end").strip()
+            text = self.view.label_text_box.get("1.0", "end").strip()
 
             labels = label_display_utils.parse_label_text(text)
 
@@ -203,7 +203,7 @@ class Controller:
             ERROR("Error handling text modified: {}", e)
     
     def check_if_any_overlaps(self):
-        text = self.view.text_box.get("1.0", "end").strip()
+        text = self.view.label_text_box.get("1.0", "end").strip()
         labels = label_display_utils.parse_label_text(text)   
         if label_display_utils.check_labels_horizontal_overlap(labels) is True:
             self.view.show_error("標籤有重疊，請檢查")

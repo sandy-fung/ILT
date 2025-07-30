@@ -18,7 +18,7 @@ class UI:
     def __init__(self):
         self.dispatch = None
         width, height = config_utils.get_window_size()
-        print(f"Window size from config: {width}x{height}")
+        DEBUG(f"Window size from config: {width}x{height}")
         if  width is not None and height is not None:
             self.window_width = width
             self.window_height = height
@@ -191,20 +191,20 @@ class UI:
 
         # Initialize text box if enabled
         if self.SHOW_TEXT_BOX:
-            self.text_box = tk.Text(
+            self.label_text_box = tk.Text(
                 self.text_frame,
                 height = 15, bg = "white",
                 font = ("Segoe UI", 11), fg = "#2d2d2d",
                 relief = "sunken",
                 wrap = "word"
             )
-            self.text_box.tag_configure("left", justify = "left")
-            self.text_box.pack(side = "top", fill = "x", expand = True, padx = 20, pady = 10)
-            self.text_box.bind("<<Modified>>", self.on_text_modified)
+            self.label_text_box.tag_configure("left", justify = "left")
+            self.label_text_box.pack(side = "top", fill = "x", expand = True, padx = 20, pady = 10)
+            self.label_text_box.bind("<<Modified>>", self.on_text_modified)
 
         else:
             DEBUG("Text box is not shown as per configuration.")
-            self.text_box = None
+            self.label_text_box = None
         
 
     def create_hint_area(self):
@@ -1182,21 +1182,21 @@ class UI:
 
 # Update text and index labels
     def update_text_box(self, content):
-        if not self.SHOW_TEXT_BOX or self.text_box is None:
+        if not self.SHOW_TEXT_BOX or self.label_text_box is None:
             DEBUG("Text box is not shown or not initialized.")
             return
 
-        self.text_box.unbind("<<Modified>>")
+        self.label_text_box.unbind("<<Modified>>")
 
         if not self.SHOW_TEXT_BOX:
             DEBUG("Text box is not shown as per configuration.")
             return
-        self.text_box.config(state = "normal")
-        self.text_box.delete("1.0", tk.END) # Clear the text box
-        self.text_box.insert(tk.END, content)
+        self.label_text_box.config(state = "normal")
+        self.label_text_box.delete("1.0", tk.END) # Clear the text box
+        self.label_text_box.insert(tk.END, content)
 
-        self.text_box.edit_modified(False)
-        self.text_box.bind("<<Modified>>", self.on_text_modified)
+        self.label_text_box.edit_modified(False)
+        self.label_text_box.bind("<<Modified>>", self.on_text_modified)
 
     def update_index_label(self, index, path):
         DEBUG("update_index_label")
@@ -1204,12 +1204,12 @@ class UI:
         DEBUG("Index label updated with index: {}", index)
 
     def highlight_yolo_line_for_label(self, selected_label):
-        if not self.text_box:
+        if not self.label_text_box:
             ERROR("Text box is not initialized.")
             return
 
         DEBUG("Highlighting YOLO line for label: {}", selected_label)
-        self.text_box.tag_remove("highlight", "1.0", tk.END)  # Clear previous highlights
+        self.label_text_box.tag_remove("highlight", "1.0", tk.END)  # Clear previous highlights
 
         if not selected_label or not hasattr(selected_label, 'line_index'):
             DEBUG("No valid label selected.")
@@ -1219,8 +1219,8 @@ class UI:
         DEBUG("Highlighting line_index {}", line_index)
         start = f"{line_index + 1}.0"
         end = f"{line_index + 1}.end"
-        self.text_box.tag_add("highlight", start, end)
-        self.text_box.tag_config("highlight", background="#0C0CC0", foreground="#F0EF43", font = ("Segoe UI", 11, "bold"))
+        self.label_text_box.tag_add("highlight", start, end)
+        self.label_text_box.tag_config("highlight", background="#0C0CC0", foreground="#F0EF43", font = ("Segoe UI", 11, "bold"))
 
     def force_uppercase(self, event):
         current = self.input_box.get()
@@ -1432,8 +1432,8 @@ class UI:
             self.dispatch(UIEvent.CONFIGURATION_BT_CLICK, None)
 
     def on_text_modified(self, event):
-        if self.text_box.edit_modified():
-            self.text_box.edit_modified(False)
+        if self.label_text_box.edit_modified():
+            self.label_text_box.edit_modified(False)
             if self.dispatch:
                 self.dispatch(UIEvent.TEXT_MODIFIED, {})
     
@@ -1530,36 +1530,36 @@ class UI:
         """Toggle text box visibility"""
         try:
             if show:
-                # If we want to show but text_box doesn't exist, create it
-                if not hasattr(self, 'text_box') or self.text_box is None:
+                # If we want to show but label_text_box doesn't exist, create it
+                if not hasattr(self, 'label_text_box') or self.label_text_box is None:
                     DEBUG("Creating text box for show operation")
                     if hasattr(self, 'text_frame'):
-                        self.text_box = tk.Text(
+                        self.label_text_box = tk.Text(
                             self.text_frame,
                             height=15, bg="white",
                             font=("Segoe UI", 11), fg="#8E8E79",
                             relief="sunken",
                             wrap="word"
                         )
-                        self.text_box.tag_configure("left", justify="left")
+                        self.label_text_box.tag_configure("left", justify="left")
                 
                 # Show the text box
-                if hasattr(self, 'text_box') and self.text_box:
+                if hasattr(self, 'label_text_box') and self.label_text_box:
                     try:
                         # Check if already packed by trying to get pack_info
-                        self.text_box.pack_info()
+                        self.label_text_box.pack_info()
                     except tk.TclError:
                         # Not packed, so pack it
-                        self.text_box.pack(side="top", fill="x", padx=20, pady=10)
+                        self.label_text_box.pack(side="top", fill="x", padx=20, pady=10)
                         DEBUG("Text box shown")
             else:
                 # Hide the text box if it exists
-                if hasattr(self, 'text_box') and self.text_box:
+                if hasattr(self, 'label_text_box') and self.label_text_box:
                     try:
                         # Check if packed by trying to get pack_info
-                        self.text_box.pack_info()
+                        self.label_text_box.pack_info()
                         # If we get here, it's packed, so forget it
-                        self.text_box.pack_forget()
+                        self.label_text_box.pack_forget()
                         DEBUG("Text box hidden")
                     except tk.TclError:
                         # Already not packed
@@ -1626,14 +1626,14 @@ class UI:
                         self.input_box.pack_info()
                     except tk.TclError:
                         # Not packed, so pack it
-                        self.input_box.pack(side="top", fill="x", padx=20, pady=10)
+                        self.input_box.pack(before=self.label_text_box,side="top", fill="x", padx=20, pady=10)
                         DEBUG("Input box shown")
             else:
                 # Hide the input box if it exists
                 if hasattr(self, 'input_box') and self.input_box:
                     try:
                         # Check if packed by trying to get pack_info
-                        self.input_box.pack_info()
+                        self.input_box_pack_info = self.input_box.pack_info()
                         # If we get here, it's packed, so forget it
                         self.input_box.pack_forget()
                         DEBUG("Input box hidden")
