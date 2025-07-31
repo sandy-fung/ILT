@@ -1243,10 +1243,11 @@ class UI:
             if input_text:
                 DEBUG("Input text: {}", input_text)
                 self.dispatch(UIEvent.INPUT_ENTER, {"text": input_text})
+                self.window.focus_set()
             else:
-                ERROR("Input box is empty!")
+                DEBUG("Input box is empty!")
         else:
-            ERROR("Dispatch is not set!")
+            DEBUG("Dispatch is not initialized.")
 
     def clear_input_box(self):
         """Clear the input box"""
