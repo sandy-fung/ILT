@@ -25,7 +25,7 @@ class Controller:
         self.image_width = 0
         self.image_height = 0
 
-        # Drawing mode state
+        # initial state
         self.drawing_mode = False
         
         # Dragging redraw strategy (複用 image_label_tool 的完整重繪策略)
@@ -215,20 +215,20 @@ class Controller:
         self.load_label(self.labels_path)
         self.check_if_any_overlaps()
         
-        
     def next_image(self):
         DEBUG("Current image index:", self.image_index)
         if self.image_index < len(self.images) - 1:
             self.image_index += 1
         config_utils.save_image_index(self.image_index)
+
         self.on_fresh_image_label()
-        
 
     def previous_image(self):
         DEBUG("Current image index:", self.image_index)
         if self.image_index > 0:
             self.image_index -= 1
         config_utils.save_image_index(self.image_index)
+
         self.on_fresh_image_label()
     
     def window_ready(self):
@@ -322,7 +322,6 @@ class Controller:
         elif event_type == UIEvent.MOUSE_LEFT_RELEASE:
             DEBUG("Controller: Mouse left release.")
             self.handle_mouse_left_release(event_data)
-            self.check_if_any_overlaps()
 
         elif event_type == UIEvent.MOUSE_DRAG:
             DEBUG("Controller: Mouse drag.")
