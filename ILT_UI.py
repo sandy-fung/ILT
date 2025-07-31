@@ -1210,7 +1210,7 @@ class UI:
 
     def highlight_yolo_line_for_label(self, selected_label):
         if not self.text_box:
-            ERROR("Text box is not initialized.")
+            DEBUG("Text box is not initialized.")
             return
 
         DEBUG("Highlighting YOLO line for label: {}", selected_label)
@@ -1772,7 +1772,7 @@ class UI:
             self.window.after(3000, lambda: self.update_selection_status_display())
 
     def _clear_focus(self, event):
-        if self.input_box and event.widget is not self.input_box:
+        if event.widget not in (self.input_box, self.text_box):
             self.window.focus_set()
 
     def run(self):

@@ -458,6 +458,7 @@ class Controller:
                 DEBUG("No label selected")
                 # 更新狀態顯示
                 self.update_label_view(None)
+                self.view.highlight_yolo_line_for_label(None)
 
     def handle_mouse_left_release(self, event_data):
             # 處理繪製完成
