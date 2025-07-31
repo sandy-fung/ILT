@@ -193,7 +193,7 @@ class UI:
         if self.SHOW_TEXT_BOX:
             self.label_text_box = tk.Text(
                 self.text_frame,
-                height = 15, bg = "white",
+                height = 15, bg = "#FAFAFA",
                 font = ("Segoe UI", 11), fg = "#2d2d2d",
                 relief = "sunken",
                 wrap = "word"
@@ -205,7 +205,9 @@ class UI:
         else:
             DEBUG("Text box is not shown as per configuration.")
             self.label_text_box = None
-        
+
+        self.path_label = tk.Label(self.text_frame, bg = "#FAFAFA", font = ("Segoe UI", 11), fg = "#C0C00C", anchor = "w")
+        self.path_label.pack(side = "bottom", fill = "x", padx = 20, pady = 10)
 
     def create_hint_area(self):
         self.hint_frame = tk.Frame(self.bottom_frame, bg = "#FAFAFA")
@@ -1203,9 +1205,12 @@ class UI:
         self.index_label.config(text = f"{index + 1} : {len(path)}")
         DEBUG("Index label updated with index: {}", index)
 
+    def update_path_label(self, path):
+        self.path_label.config(text = f"{path}")
+
     def highlight_yolo_line_for_label(self, selected_label):
         if not self.label_text_box:
-            ERROR("Text box is not initialized.")
+            DEBUG("Text box is not initialized.")
             return
 
         DEBUG("Highlighting YOLO line for label: {}", selected_label)
@@ -1767,7 +1772,7 @@ class UI:
             self.window.after(3000, lambda: self.update_selection_status_display())
 
     def _clear_focus(self, event):
-        if self.input_box and event.widget is not self.input_box:
+        if event.widget not in (self.input_box, self.text_box):
             self.window.focus_set()
 
     def run(self):

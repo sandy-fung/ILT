@@ -131,6 +131,7 @@ class Controller:
         
         DEBUG("Controller.load_image() completed")
         self.view.update_index_label(self.image_index, self.images_path)
+        self.view.update_path_label(self.images_path[self.image_index])
 
         # Parse and draw labels for current image
         self.parse_current_labels()
