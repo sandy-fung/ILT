@@ -485,6 +485,10 @@ def sort_labels_by_position(labels):
         sorted_group = sorted(group, key=lambda l: l.cx_ratio)
         sorted_labels.extend(sorted_group)
         DEBUG("Plate {}: {} labels sorted by X position", group_idx + 1, len(sorted_group))
+
+    # 為每個label設定對應的line_index
+    for i, label in enumerate(sorted_labels):
+        label.line_index = i
     
     INFO("Sorted {} labels in {} plates", len(sorted_labels), len(groups))
     return sorted_labels, len(groups)
