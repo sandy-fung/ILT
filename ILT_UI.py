@@ -10,7 +10,7 @@ import config_utils
 import Words_Label_mapping as wlm
 from outline_font import draw_outlined_text
 from constants import VERSION_NUM
-
+from constants import CLASS_ID_COLOR_MAP
 
 DEFAULT_W = 1920
 DEFAULT_H = 1080
@@ -1129,7 +1129,7 @@ class UI:
                 x1, y1, x2, y2,
                 **rect_kwargs
             )
-            
+           
             # Draw resize handles for selected labels
             if hasattr(label, 'selected') and label.selected and self.bbox_controller:
                 self.draw_resize_handles(label, x1, y1, x2, y2, color)
@@ -1148,12 +1148,13 @@ class UI:
             #     tags="label_text"
             # )
             font_size = self.LABEL_FONT_SIZE
+            color = CLASS_ID_COLOR_MAP.get(label.class_id, "black")
             draw_outlined_text(
                 self.canvas,
                 text_x, text_y,
                 text=wlm.get_label(label.class_id),
                 font=("Arial", font_size, "bold"),
-                outline_color="white", fill_color="black", thickness=2, tags="label_text")
+                outline_color="white", fill_color=color, thickness=2, tags="label_text")
 
             DEBUG("Drew label: class_id={}, coords=({:.1f},{:.1f},{:.1f},{:.1f})",
                   label.class_id, x1, y1, x2, y2)
@@ -1773,7 +1774,7 @@ class UI:
             self.window.after(3000, lambda: self.update_selection_status_display())
 
     def _clear_focus(self, event):
-        if event.widget not in (self.input_box, self.text_box):
+        if event.widget not in (self.input_box, self.label_text_box):
             self.window.focus_set()
 
     def run(self):
