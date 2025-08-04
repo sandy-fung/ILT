@@ -32,6 +32,7 @@ class BBoxController:
         self.resize_start_x = 0         # Resize start X coordinate (canvas)
         self.resize_start_y = 0         # Resize start Y coordinate (canvas)
         self.is_resizing = False        # Resizing in progress flag
+        self.resize_handle_type = None  # Track which handle is being dragged
         
         # Minimum box size constraints
         self.min_box_width = 5
@@ -357,16 +358,32 @@ class BBoxController:
             self.resize_start_x = x
             self.resize_start_y = y
             
+            # 獲取被點擊的 handle 類型
+            canvas_width = self.canvas.winfo_width()
+            canvas_height = self.canvas.winfo_height()
+            self.resize_handle_type = label.get_handle_type_at_position(x, y, canvas_width, canvas_height, self.handle_size)
+            
             # 設定該 label 為選中狀態
             self.clear_selection(labels)
             label.set_selected(True)
             self.selected_label = label
             
-            # Update cursor style
-            self.canvas.config(cursor="sizing")
+            # Update cursor style based on handle type
+            cursor_map = {
+                "top-left": "top_left_corner",
+                "top": "top_side", 
+                "top-right": "top_right_corner",
+                "right": "right_side",
+                "bottom-right": "bottom_right_corner", 
+                "bottom": "bottom_side",
+                "bottom-left": "bottom_left_corner",
+                "left": "left_side"
+            }
+            cursor = cursor_map.get(self.resize_handle_type, "sizing")
+            self.canvas.config(cursor=cursor)
             
-            DEBUG("Started resizing label: class_id={}, start_pos=({}, {})", 
-                  label.class_id, x, y)
+            DEBUG("Started resizing label: class_id={}, handle_type={}, start_pos=({}, {})", 
+                  label.class_id, self.resize_handle_type, x, y)
             return True
         
         return False
@@ -393,9 +410,8 @@ class BBoxController:
         canvas_width = self.canvas.winfo_width()
         canvas_height = self.canvas.winfo_height()
         
-        # 使用 resize_by_delta 方法調整大小
-        # self.resizing_box.resize(self.resizing_box.width + dx, self.resizing_box.height + dy)
-        self.resizing_label.resize_by_delta(dx, dy, canvas_width, canvas_height)
+        # 使用 resize_by_delta 方法調整大小，傳入 handle 類型
+        self.resizing_label.resize_by_delta(dx, dy, canvas_width, canvas_height, self.resize_handle_type)
         
         DEBUG("Resizing label moved by delta ({}, {}), new size=({:.3f}, {:.3f})", 
               dx, dy, self.resizing_label.w_ratio, self.resizing_label.h_ratio)
@@ -417,6 +433,7 @@ class BBoxController:
         self.resizing_label = None
         self.resize_start_x = 0
         self.resize_start_y = 0
+        self.resize_handle_type = None
         
         # 恢復光標樣式
         if self.drawing_mode:

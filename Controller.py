@@ -761,7 +761,7 @@ class Controller:
             settings = event_data.get("settings", {})
             DEBUG("Applying new UI settings: {}", settings)
             
-            # Save settings to config
+            # Save UI settings
             config_utils.save_ui_settings(**settings)
             
             # Apply settings to UI

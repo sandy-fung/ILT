@@ -1132,7 +1132,15 @@ class UI:
            
             # Draw resize handles for selected labels
             if hasattr(label, 'selected') and label.selected and self.bbox_controller:
-                self.draw_resize_handles(label, x1, y1, x2, y2, color)
+                # 檢查是否有任何進行中的操作
+                if ((self.bbox_controller.is_resizing and self.bbox_controller.resizing_label == label) or
+                    (self.bbox_controller.is_dragging and self.bbox_controller.dragging_label == label)):
+                    # 任何拖曳操作時（resize或drag）都隱藏所有handle
+                    # 讓用戶專注於當前操作，無視覺干擾
+                    pass  # 跳過handle繪製
+                else:
+                    # 靜態選中狀態：顯示所有 handles 供用戶選擇操作
+                    self.draw_resize_handles(label, x1, y1, x2, y2, color)
             
             # Draw class ID text
             text_x = x1
@@ -1162,7 +1170,7 @@ class UI:
 
     def draw_resize_handles(self, label, x1, y1, x2, y2, color):
         """
-        繪製 resize handle (右下角)
+        繪製所有 resize handles
         
         Args:
             label (LabelObject): 標籤對象
@@ -1171,17 +1179,35 @@ class UI:
         """
         handle_size = self.bbox_controller.handle_size if self.bbox_controller else 10
         
-        # 只繪製右下角 handle
-        self.canvas.create_rectangle(
-            x2 - handle_size,
-            y2 - handle_size,
-            x2,
-            y2,
-            fill="gray",
-            tags="resize_handle"
-        )
+        # 計算中點
+        mid_x = (x1 + x2) / 2
+        mid_y = (y1 + y2) / 2
+        half_size = handle_size / 2
         
-        DEBUG("Drew resize handle for label: class_id={}", label.class_id)
+        # 8 個 handle 的位置：四個角 + 四條邊的中點
+        handle_positions = [
+            (x1, y1),              # 左上角
+            (mid_x, y1),           # 上邊中點
+            (x2, y1),              # 右上角
+            (x2, mid_y),           # 右邊中點
+            (x2, y2),              # 右下角
+            (mid_x, y2),           # 下邊中點
+            (x1, y2),              # 左下角
+            (x1, mid_y),           # 左邊中點
+        ]
+        
+        # 繪製所有 handles
+        for hx, hy in handle_positions:
+            self.canvas.create_rectangle(
+                hx - half_size,
+                hy - half_size,
+                hx + half_size,
+                hy + half_size,
+                fill="gray",
+                tags="resize_handle"
+            )
+        
+        DEBUG("Drew resize handles")
 
 # Update text and index labels
     def update_text_box(self, content):

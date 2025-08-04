@@ -84,25 +84,100 @@ class LabelObject:
             canvas_width (int): Canvas 寬度  
             canvas_height (int): Canvas 高度
         """
-        # 計算 bounding box 的邊界
-        half_w = max(0.001, min(0.5, self.w_ratio / 2))  # Constrain to valid range
-        half_h = max(0.001, min(0.5, self.h_ratio / 2))
+        # 首先約束尺寸，防止bbox大於畫面
+        self.w_ratio = max(0.001, min(1.0, self.w_ratio))  # 寬度限制在 [0.001, 1.0]
+        self.h_ratio = max(0.001, min(1.0, self.h_ratio))  # 高度限制在 [0.001, 1.0]
         
-        # 約束中心點，確保 bounding box 完全在 [0,1] 範圍內
+        # 計算 bounding box 的半寬和半高
+        half_w = self.w_ratio / 2
+        half_h = self.h_ratio / 2
+        
+        # 計算中心點的允許範圍，確保 bounding box 完全在 [0,1] 範圍內
         min_cx = half_w
         max_cx = 1.0 - half_w
         min_cy = half_h  
         max_cy = 1.0 - half_h
         
-        # 應用約束 (加強邊界檢查)
-        if min_cx < max_cx and min_cy < max_cy:  # 確保約束有效
+        # 約束中心點位置
+        if min_cx <= max_cx and min_cy <= max_cy:  # 確保約束範圍有效
             self.cx_ratio = max(min_cx, min(max_cx, self.cx_ratio))
             self.cy_ratio = max(min_cy, min(max_cy, self.cy_ratio))
         else:
-            # Handle edge case: oversized bounding box
+            # 極端情況：bbox尺寸過大，強制調整
+            self.w_ratio = min(1.0, self.w_ratio)
+            self.h_ratio = min(1.0, self.h_ratio)
             self.cx_ratio = 0.5
             self.cy_ratio = 0.5
-            DEBUG("Applied fallback constraints for oversized box")
+            DEBUG("Applied emergency constraints for oversized box: w={:.3f}, h={:.3f}", 
+                  self.w_ratio, self.h_ratio)
+
+    def apply_resize_boundary_constraints(self, canvas_width, canvas_height, handle_type):
+        """
+        Resize專用邊界約束：只約束被拖曳的邊，固定相對邊不動
+        
+        Args:
+            canvas_width (int): Canvas 寬度
+            canvas_height (int): Canvas 高度  
+            handle_type (str): 正在拖曳的handle類型
+        """
+        # 先約束尺寸在合理範圍
+        self.w_ratio = max(0.001, min(1.0, self.w_ratio))  
+        self.h_ratio = max(0.001, min(1.0, self.h_ratio))
+        
+        # 計算當前邊界位置（像素座標）
+        half_w = self.w_ratio / 2
+        half_h = self.h_ratio / 2
+        
+        left_edge = self.cx_ratio - half_w
+        right_edge = self.cx_ratio + half_w
+        top_edge = self.cy_ratio - half_h
+        bottom_edge = self.cy_ratio + half_h
+        
+        # 根據拖曳的handle類型，只約束對應的邊，固定相對邊
+        adjusted = False
+        
+        if handle_type in ['left', 'top-left', 'bottom-left']:
+            # 拖曳左邊：如果左邊越界，固定右邊位置，調整左邊到邊界
+            if left_edge < 0:
+                fixed_right = right_edge  # 固定right邊位置
+                new_left = 0              # left邊限制在邊界
+                new_width = fixed_right - new_left
+                self.w_ratio = min(1.0, new_width)  # 約束寬度
+                self.cx_ratio = new_left + self.w_ratio / 2  # 重新計算中心
+                adjusted = True
+                
+        elif handle_type in ['right', 'top-right', 'bottom-right']:
+            # 拖曳右邊：如果右邊越界，固定左邊位置，調整右邊到邊界
+            if right_edge > 1.0:
+                fixed_left = left_edge     # 固定left邊位置  
+                new_right = 1.0            # right邊限制在邊界
+                new_width = new_right - fixed_left
+                self.w_ratio = min(1.0, new_width)  # 約束寬度
+                self.cx_ratio = fixed_left + self.w_ratio / 2  # 重新計算中心
+                adjusted = True
+                
+        if handle_type in ['top', 'top-left', 'top-right']:
+            # 拖曳上邊：如果上邊越界，固定下邊位置，調整上邊到邊界
+            if top_edge < 0:
+                fixed_bottom = bottom_edge  # 固定bottom邊位置
+                new_top = 0                 # top邊限制在邊界
+                new_height = fixed_bottom - new_top
+                self.h_ratio = min(1.0, new_height)  # 約束高度
+                self.cy_ratio = new_top + self.h_ratio / 2  # 重新計算中心
+                adjusted = True
+                
+        elif handle_type in ['bottom', 'bottom-left', 'bottom-right']:
+            # 拖曳下邊：如果下邊越界，固定上邊位置，調整下邊到邊界
+            if bottom_edge > 1.0:
+                fixed_top = top_edge        # 固定top邊位置
+                new_bottom = 1.0            # bottom邊限制在邊界
+                new_height = new_bottom - fixed_top  
+                self.h_ratio = min(1.0, new_height)  # 約束高度
+                self.cy_ratio = fixed_top + self.h_ratio / 2  # 重新計算中心
+                adjusted = True
+        
+        if adjusted:
+            DEBUG("Applied boundary constraint for {}", handle_type)
 
     def get_canvas_center(self, canvas_width, canvas_height):
         """
@@ -135,9 +210,52 @@ class LabelObject:
         # 應用邊界約束
         self.apply_boundary_constraints(canvas_width, canvas_height)
 
+    def get_handle_type_at_position(self, x, y, canvas_width, canvas_height, handle_size=10):
+        """
+        Identify which resize handle is at the given position
+        
+        Args:
+            x (float): Click X coordinate (canvas pixels)
+            y (float): Click Y coordinate (canvas pixels)
+            canvas_width (int): Canvas width
+            canvas_height (int): Canvas height
+            handle_size (int): Handle size (default: 10 pixels)
+            
+        Returns:
+            str: Handle type string ("top-left", "top", etc.) or None
+        """
+        # Get bounding box coordinates
+        x1, y1, x2, y2 = convert_label_to_canvas_coords(self, canvas_width, canvas_height)
+        
+        # Calculate midpoints
+        mid_x = (x1 + x2) / 2
+        mid_y = (y1 + y2) / 2
+        half_size = handle_size / 2
+        
+        # Check each handle position and return type
+        if (x1 - half_size <= x <= x1 + half_size and y1 - half_size <= y <= y1 + half_size):
+            return "top-left"
+        elif (mid_x - half_size <= x <= mid_x + half_size and y1 - half_size <= y <= y1 + half_size):
+            return "top"
+        elif (x2 - half_size <= x <= x2 + half_size and y1 - half_size <= y <= y1 + half_size):
+            return "top-right"
+        elif (x2 - half_size <= x <= x2 + half_size and mid_y - half_size <= y <= mid_y + half_size):
+            return "right"
+        elif (x2 - half_size <= x <= x2 + half_size and y2 - half_size <= y <= y2 + half_size):
+            return "bottom-right"
+        elif (mid_x - half_size <= x <= mid_x + half_size and y2 - half_size <= y <= y2 + half_size):
+            return "bottom"
+        elif (x1 - half_size <= x <= x1 + half_size and y2 - half_size <= y <= y2 + half_size):
+            return "bottom-left"
+        elif (x1 - half_size <= x <= x1 + half_size and mid_y - half_size <= y <= mid_y + half_size):
+            return "left"
+        
+        return None
+    
     def is_on_resize_handle(self, x, y, canvas_width, canvas_height, handle_size=10):
         """
-        檢測點擊是否在 resize handle 上 (只有右下角)
+        檢測點擊是否在 resize handle 上
+        現在總是檢查所有 8 個 handles
         
         Args:
             x (float): 點擊的 X 座標 (canvas 像素)
@@ -149,61 +267,88 @@ class LabelObject:
         Returns:
             bool: 如果在 resize handle 上返回 True，否則返回 False
         """
-        # 轉換為 canvas 座標的邊界框
-        x1, y1, x2, y2 = convert_label_to_canvas_coords(self, canvas_width, canvas_height)
-        
-        # 只檢查右下角 handle
-        return (x2 - handle_size <= x <= x2 and y2 - handle_size <= y <= y2)
+        # Simply check if any handle type exists at position
+        return self.get_handle_type_at_position(x, y, canvas_width, canvas_height, handle_size) is not None
 
-    def resize(self, new_width_pixels, new_height_pixels, canvas_width, canvas_height):
+    def resize_by_delta(self, dx, dy, canvas_width, canvas_height, handle_type=None):
         """
-        調整 bounding box 大小，保持中心點不變
-        
-        Args:
-            new_width_pixels (float): 新的寬度 (canvas 像素)
-            new_height_pixels (float): 新的高度 (canvas 像素) 
-            canvas_width (int): Canvas 寬度
-            canvas_height (int): Canvas 高度
-        """
-        # 設定最小尺寸限制
-        min_width_pixels = max(10, new_width_pixels)
-        min_height_pixels = max(10, new_height_pixels)
-        
-        # 轉換為 YOLO 比例
-        new_w_ratio = min_width_pixels / canvas_width
-        new_h_ratio = min_height_pixels / canvas_height
-        
-        # 更新尺寸
-        self.w_ratio = new_w_ratio
-        self.h_ratio = new_h_ratio
-        
-        # 應用邊界約束 (確保調整後的 box 不超出邊界)
-        self.apply_boundary_constraints(canvas_width, canvas_height)
-        
-        DEBUG("Resized label: new size=({:.3f}, {:.3f}), canvas_size=({}, {})", 
-              self.w_ratio, self.h_ratio, canvas_width, canvas_height)
-
-    def resize_by_delta(self, dx, dy, canvas_width, canvas_height):
-        """
-        根據滑鼠拖拽增量調整大小
-        保持中心點不變，只調整寬度和高度
+        根據滑鼠拖拽增量和 handle 類型調整大小
         
         Args:
             dx (float): X 方向增量 (canvas 像素)
             dy (float): Y 方向增量 (canvas 像素)
             canvas_width (int): Canvas 寬度
             canvas_height (int): Canvas 高度
+            handle_type (str): Handle 類型 ("top-left", "top", "top-right", etc.)
         """
-        # 獲取當前像素尺寸
-        _, _, current_width, current_height = label_to_pixel_position(self, canvas_width, canvas_height)
+        # 轉換為 canvas 座標
+        x1, y1, x2, y2 = convert_label_to_canvas_coords(self, canvas_width, canvas_height)
         
-        # 根據增量計算新的寬度和高度
-        # Calculate new dimensions based on delta
-        new_width = current_width + dx
-        new_height = current_height + dy
+        # 根據 handle 類型調整不同的邊界
+        new_x1, new_y1, new_x2, new_y2 = x1, y1, x2, y2
         
-        # 應用新的尺寸（resize 方法會保持中心點不變）
-        self.resize(new_width, new_height, canvas_width, canvas_height)
+        if handle_type == "top-left":
+            # 固定右下角，調整左上角
+            new_x1 = x1 + dx
+            new_y1 = y1 + dy
+        elif handle_type == "top":
+            # 固定底邊，調整頂邊
+            new_y1 = y1 + dy
+        elif handle_type == "top-right":
+            # 固定左下角，調整右上角
+            new_x2 = x2 + dx
+            new_y1 = y1 + dy
+        elif handle_type == "right":
+            # 固定左邊，調整右邊
+            new_x2 = x2 + dx
+        elif handle_type == "bottom-right":
+            # 固定左上角，調整右下角
+            new_x2 = x2 + dx
+            new_y2 = y2 + dy
+        elif handle_type == "bottom":
+            # 固定頂邊，調整底邊
+            new_y2 = y2 + dy
+        elif handle_type == "bottom-left":
+            # 固定右上角，調整左下角
+            new_x1 = x1 + dx
+            new_y2 = y2 + dy
+        elif handle_type == "left":
+            # 固定右邊，調整左邊
+            new_x1 = x1 + dx
+        else:
+            # 預設行為：調整右下角（相容舊代碼）
+            new_x2 = x2 + dx
+            new_y2 = y2 + dy
+        
+        # 確保不會創建負尺寸的框
+        min_size = 5
+        if new_x2 <= new_x1:
+            if handle_type in ["left", "top-left", "bottom-left"]:
+                new_x1 = new_x2 - min_size
+            else:
+                new_x2 = new_x1 + min_size
+        if new_y2 <= new_y1:
+            if handle_type in ["top", "top-left", "top-right"]:
+                new_y1 = new_y2 - min_size
+            else:
+                new_y2 = new_y1 + min_size
+        
+        # 計算新的中心點和尺寸
+        new_cx = (new_x1 + new_x2) / 2
+        new_cy = (new_y1 + new_y2) / 2
+        new_width = new_x2 - new_x1
+        new_height = new_y2 - new_y1
+        
+        # 更新 YOLO 格式的座標
+        self.cx_ratio = new_cx / canvas_width
+        self.cy_ratio = new_cy / canvas_height
+        self.w_ratio = new_width / canvas_width
+        self.h_ratio = new_height / canvas_height
+        
+        # 應用resize專用邊界約束，避免改變正在調整的邊界
+        self.apply_resize_boundary_constraints(canvas_width, canvas_height, handle_type)
+        
+        DEBUG("Resized by {}", handle_type)
 
 
 def label_to_pixel_position(label, canvas_width, canvas_height):

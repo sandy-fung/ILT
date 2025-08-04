@@ -270,3 +270,4 @@ def get_all_ui_settings():
         'show_input_box': get_show_input_box(),
         'label_font_size': get_ui_label_font_size_in_config()
     }
+
