@@ -1773,7 +1773,7 @@ class UI:
             self.window.after(3000, lambda: self.update_selection_status_display())
 
     def _clear_focus(self, event):
-        if event.widget not in (self.input_box, self.text_box):
+        if event.widget not in (self.input_box, self.label_text_box):
             self.window.focus_set()
 
     def run(self):
