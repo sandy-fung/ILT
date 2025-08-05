@@ -1,11 +1,10 @@
 import tkinter as tk
 from tkinter import ttk
 from log_levels import DEBUG, INFO, ERROR
-import config_utils
 
 DEFAULT_LABEL_FONT_SIZE = 10
 DIALOG_WIDTH = 400
-DIALOG_HEIGHT = 300
+DIALOG_HEIGHT = 360
 class SettingsDialog:
     def __init__(self, parent, current_settings, on_confirm_callback):
         """
@@ -37,7 +36,7 @@ class SettingsDialog:
             # Create toplevel window with fixed size
             self.dialog = tk.Toplevel(self.parent)
             self.dialog.title("Configuration")
-            self.dialog.geometry(f"{DIALOG_WIDTH}x{DIALOG_HEIGHT}")
+            self.dialog.geometry("400x300")
             self.dialog.resizable(False, False)
 
             # Make dialog modal
@@ -112,6 +111,8 @@ class SettingsDialog:
             self.show_input_box_var.set(self.current_settings.get('show_input_box', True))
             self.label_font_size_current = self.current_settings.get('label_font_size')
 
+
+
             DEBUG("Loaded current settings into dialog")
 
         except Exception as e:
@@ -169,10 +170,10 @@ class SettingsDialog:
             font_frame = ttk.LabelFrame(main_frame, text="", padding="10")
             font_frame.pack(fill=tk.X, pady=(0, 10))
             font_describe = tk.Label(font_frame, text="label text size", font=("Arial", 11))
-            font_describe.grid(row=0, column=0, padx=5, pady=5)
+            font_describe.grid(row=0, column=0, padx=5, pady=10)
             size = self.current_settings.get('label_font_size')
             self.label_font_size_entry = tk.Entry(font_frame, font=("Arial", 12))
-            self.label_font_size_entry.grid(row=0, column=1, padx=5, pady=5)
+            self.label_font_size_entry.grid(row=0, column=1, padx=5, pady=10)
             self.label_font_size_entry.insert(0, str(size))
             self.label_font_size_entry.config(fg="gray")
 
