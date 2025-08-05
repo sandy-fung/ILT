@@ -39,9 +39,9 @@ class BBoxController:
         self.min_box_height = 5
         
         
-        # Edge detection threshold
-        self.edge_threshold = 8
-        self.corner_threshold = 15
+        # Edge detection threshold (optimized for small images)
+        self.edge_threshold = 5
+        self.corner_threshold = 8
         
         # Cursor mapping for different edge types
         self.cursor_map = {
@@ -184,7 +184,7 @@ class BBoxController:
         cx, cy, w_ratio, h_ratio = yolo_coords
         return label_display_utils.LabelObject(class_id, cx, cy, w_ratio, h_ratio)
 
-    def _is_near_edge(self, x, y, x1, y1, x2, y2, threshold=8):
+    def _is_near_edge(self, x, y, x1, y1, x2, y2, threshold=5):
         """
         Check if point (x, y) is near any edge or inside the bounding box
         
@@ -337,28 +337,33 @@ class BBoxController:
             'cursor': 'arrow'
         }
         
-        # Focus mode: only check selected label
-        if self.selected_label:
-            edge_type = self.get_label_edge_type(x, y, self.selected_label)
-            if edge_type:
-                hover_info['label'] = self.selected_label
-                hover_info['edge_type'] = edge_type
-                hover_info['cursor'] = self.get_cursor_for_edge_type(edge_type)
-            else:
-                # Set default cursor when not over selected label
-                hover_info['cursor'] = 'pencil' if self.drawing_mode else 'arrow'
+        # In drawing mode: always show pencil cursor
+        if self.drawing_mode:
+            hover_info['cursor'] = 'pencil'
         else:
-            # Quick mode: check all labels (top layer first)
-            for label in reversed(labels):
-                edge_type = self.get_label_edge_type(x, y, label)
+            # Normal mode: show appropriate cursor based on hover position
+            # Focus mode: only check selected label
+            if self.selected_label:
+                edge_type = self.get_label_edge_type(x, y, self.selected_label)
                 if edge_type:
-                    hover_info['label'] = label
+                    hover_info['label'] = self.selected_label
                     hover_info['edge_type'] = edge_type
                     hover_info['cursor'] = self.get_cursor_for_edge_type(edge_type)
-                    break
+                else:
+                    # Set default cursor when not over selected label
+                    hover_info['cursor'] = 'arrow'
             else:
-                # No label under cursor
-                hover_info['cursor'] = 'pencil' if self.drawing_mode else 'arrow'
+                # Quick mode: check all labels (top layer first)
+                for label in reversed(labels):
+                    edge_type = self.get_label_edge_type(x, y, label)
+                    if edge_type:
+                        hover_info['label'] = label
+                        hover_info['edge_type'] = edge_type
+                        hover_info['cursor'] = self.get_cursor_for_edge_type(edge_type)
+                        break
+                else:
+                    # No label under cursor
+                    hover_info['cursor'] = 'arrow'
         
         # Update cursor if it changed
         if hover_info['cursor'] != self.canvas.cget('cursor'):
@@ -382,6 +387,11 @@ class BBoxController:
         Returns:
             LabelObject or None: 選中的標籤對象，未選中時返回 None
         """
+        # Prohibit selection in drawing mode
+        if self.drawing_mode:
+            DEBUG("Selection disabled in drawing mode")
+            return None
+            
         canvas_width = self.canvas.winfo_width()
         canvas_height = self.canvas.winfo_height()
         
@@ -437,6 +447,11 @@ class BBoxController:
         Returns:
             bool: 是否成功開始拖曳
         """
+        # Prohibit dragging in drawing mode
+        if self.drawing_mode:
+            DEBUG("Dragging disabled in drawing mode")
+            return False
+            
         # 檢查是否有選中的標籤且點擊在其內部
         if self.selected_label and self.selected_label.contains(x, y, 
                                                                self.canvas.winfo_width(), 
@@ -634,6 +649,11 @@ class BBoxController:
         Returns:
             str: 操作類型 ("resize", "drag", "select", "none")
         """
+        # Prohibit all operations in drawing mode
+        if self.drawing_mode:
+            DEBUG("Mouse press operations disabled in drawing mode")
+            return "none"
+            
         # Focus mode: if we have a selected label
         if self.selected_label:
             edge_type = self.get_label_edge_type(x, y, self.selected_label)
