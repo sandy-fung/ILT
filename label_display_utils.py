@@ -210,65 +210,6 @@ class LabelObject:
         # 應用邊界約束
         self.apply_boundary_constraints(canvas_width, canvas_height)
 
-    def get_handle_type_at_position(self, x, y, canvas_width, canvas_height, handle_size=10):
-        """
-        Identify which resize handle is at the given position
-        
-        Args:
-            x (float): Click X coordinate (canvas pixels)
-            y (float): Click Y coordinate (canvas pixels)
-            canvas_width (int): Canvas width
-            canvas_height (int): Canvas height
-            handle_size (int): Handle size (default: 10 pixels)
-            
-        Returns:
-            str: Handle type string ("top-left", "top", etc.) or None
-        """
-        # Get bounding box coordinates
-        x1, y1, x2, y2 = convert_label_to_canvas_coords(self, canvas_width, canvas_height)
-        
-        # Calculate midpoints
-        mid_x = (x1 + x2) / 2
-        mid_y = (y1 + y2) / 2
-        half_size = handle_size / 2
-        
-        # Check each handle position and return type
-        if (x1 - half_size <= x <= x1 + half_size and y1 - half_size <= y <= y1 + half_size):
-            return "top-left"
-        elif (mid_x - half_size <= x <= mid_x + half_size and y1 - half_size <= y <= y1 + half_size):
-            return "top"
-        elif (x2 - half_size <= x <= x2 + half_size and y1 - half_size <= y <= y1 + half_size):
-            return "top-right"
-        elif (x2 - half_size <= x <= x2 + half_size and mid_y - half_size <= y <= mid_y + half_size):
-            return "right"
-        elif (x2 - half_size <= x <= x2 + half_size and y2 - half_size <= y <= y2 + half_size):
-            return "bottom-right"
-        elif (mid_x - half_size <= x <= mid_x + half_size and y2 - half_size <= y <= y2 + half_size):
-            return "bottom"
-        elif (x1 - half_size <= x <= x1 + half_size and y2 - half_size <= y <= y2 + half_size):
-            return "bottom-left"
-        elif (x1 - half_size <= x <= x1 + half_size and mid_y - half_size <= y <= mid_y + half_size):
-            return "left"
-        
-        return None
-    
-    def is_on_resize_handle(self, x, y, canvas_width, canvas_height, handle_size=10):
-        """
-        檢測點擊是否在 resize handle 上
-        現在總是檢查所有 8 個 handles
-        
-        Args:
-            x (float): 點擊的 X 座標 (canvas 像素)
-            y (float): 點擊的 Y 座標 (canvas 像素)
-            canvas_width (int): Canvas 寬度
-            canvas_height (int): Canvas 高度
-            handle_size (int): Handle 尺寸 (default: 10 pixels)
-            
-        Returns:
-            bool: 如果在 resize handle 上返回 True，否則返回 False
-        """
-        # Simply check if any handle type exists at position
-        return self.get_handle_type_at_position(x, y, canvas_width, canvas_height, handle_size) is not None
 
     def resize_by_delta(self, dx, dy, canvas_width, canvas_height, handle_type=None):
         """

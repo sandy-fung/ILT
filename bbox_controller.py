@@ -38,8 +38,27 @@ class BBoxController:
         self.min_box_width = 5
         self.min_box_height = 5
         
-        # Handle size for resize handles
-        self.handle_size = 10
+        
+        # Edge detection threshold
+        self.edge_threshold = 8
+        self.corner_threshold = 15
+        
+        # Cursor mapping for different edge types
+        self.cursor_map = {
+            'top': 'sb_v_double_arrow',
+            'bottom': 'sb_v_double_arrow', 
+            'left': 'sb_h_double_arrow',
+            'right': 'sb_h_double_arrow',
+            'tl': 'top_left_corner',     # top-left corner: ↖
+            'tr': 'top_right_corner',    # top-right corner: ↗
+            'bl': 'bottom_left_corner',  # bottom-left corner: ↙  
+            'br': 'bottom_right_corner', # bottom-right corner: ↘
+            'inside': 'fleur'            # move cursor: ✚
+        }
+        
+        # Current hover state
+        self.current_hover_label = None
+        self.current_edge_type = None
 
     def toggle_drawing_mode(self):
         """Toggle drawing mode"""
@@ -164,6 +183,192 @@ class BBoxController:
         """Create LabelObject instance from YOLO coordinates"""
         cx, cy, w_ratio, h_ratio = yolo_coords
         return label_display_utils.LabelObject(class_id, cx, cy, w_ratio, h_ratio)
+
+    def _is_near_edge(self, x, y, x1, y1, x2, y2, threshold=8):
+        """
+        Check if point (x, y) is near any edge or inside the bounding box
+        
+        Args:
+            x, y (float): Point coordinates
+            x1, y1, x2, y2 (float): Bounding box coordinates
+            threshold (int): Distance threshold for edge detection
+            
+        Returns:
+            bool: True if point is near any edge or inside the box
+        """
+        # Check if point is within the expanded box (edge detection area)
+        expanded_x1 = x1 - threshold
+        expanded_y1 = y1 - threshold
+        expanded_x2 = x2 + threshold
+        expanded_y2 = y2 + threshold
+        
+        # Point must be within expanded area OR inside the original box
+        inside_original = x1 <= x <= x2 and y1 <= y <= y2
+        inside_expanded = expanded_x1 <= x <= expanded_x2 and expanded_y1 <= y <= expanded_y2
+        
+        if not (inside_expanded or inside_original):
+            return False
+        
+        # If inside original box, always return True (covers both edges and center)
+        if inside_original:
+            return True
+        
+        # If in expanded area but outside original box, check if near edges
+        near_left = abs(x - x1) <= threshold
+        near_right = abs(x - x2) <= threshold
+        near_top = abs(y - y1) <= threshold
+        near_bottom = abs(y - y2) <= threshold
+        
+        inside_x = x1 <= x <= x2
+        inside_y = y1 <= y <= y2
+        
+        # Near edge conditions for expanded area
+        near_vertical_edge = (near_left or near_right) and inside_y
+        near_horizontal_edge = (near_top or near_bottom) and inside_x
+        near_corner = (near_left or near_right) and (near_top or near_bottom)
+        
+        return near_vertical_edge or near_horizontal_edge or near_corner
+
+    def _get_edge_type(self, x, y, x1, y1, x2, y2):
+        """
+        Determine which edge/corner the point is near
+        
+        Args:
+            x, y (float): Point coordinates  
+            x1, y1, x2, y2 (float): Bounding box coordinates
+            
+        Returns:
+            str: Edge type ('top', 'bottom', 'left', 'right', 'tl', 'tr', 'bl', 'br', 'inside', None)
+        """
+        corner_threshold = self.corner_threshold
+        edge_threshold = self.edge_threshold
+        
+        # Check if point is within detection area
+        if not self._is_near_edge(x, y, x1, y1, x2, y2, edge_threshold):
+            return None
+        
+        # Check corners first (higher priority)
+        near_left = abs(x - x1) <= corner_threshold
+        near_right = abs(x - x2) <= corner_threshold  
+        near_top = abs(y - y1) <= corner_threshold
+        near_bottom = abs(y - y2) <= corner_threshold
+        
+        # Corner detection
+        if near_left and near_top:
+            return 'tl'  # top-left
+        elif near_right and near_top:
+            return 'tr'  # top-right
+        elif near_left and near_bottom:
+            return 'bl'  # bottom-left
+        elif near_right and near_bottom:
+            return 'br'  # bottom-right
+        
+        # Edge detection (lower priority than corners)
+        near_left_edge = abs(x - x1) <= edge_threshold
+        near_right_edge = abs(x - x2) <= edge_threshold
+        near_top_edge = abs(y - y1) <= edge_threshold
+        near_bottom_edge = abs(y - y2) <= edge_threshold
+        
+        inside_x = x1 <= x <= x2
+        inside_y = y1 <= y <= y2
+        
+        if near_left_edge and inside_y:
+            return 'left'
+        elif near_right_edge and inside_y:
+            return 'right'
+        elif near_top_edge and inside_x:
+            return 'top'
+        elif near_bottom_edge and inside_x:
+            return 'bottom'
+        
+        # Check if inside the box
+        if inside_x and inside_y:
+            return 'inside'
+        
+        return None
+
+    def get_label_edge_type(self, x, y, label):
+        """
+        Get edge type for a specific label
+        
+        Args:
+            x, y (float): Point coordinates
+            label (LabelObject): Label object to check
+            
+        Returns:
+            str: Edge type or None
+        """
+        canvas_width = self.canvas.winfo_width()
+        canvas_height = self.canvas.winfo_height()
+        
+        # Convert label to canvas coordinates
+        x1, y1, x2, y2 = label_display_utils.convert_label_to_canvas_coords(
+            label, canvas_width, canvas_height)
+        
+        return self._get_edge_type(x, y, x1, y1, x2, y2)
+
+    def get_cursor_for_edge_type(self, edge_type):
+        """
+        Get appropriate cursor for edge type
+        
+        Args:
+            edge_type (str): Edge type ('top', 'left', 'tl', etc.)
+            
+        Returns:
+            str: Cursor name
+        """
+        return self.cursor_map.get(edge_type, 'arrow')
+
+    def update_cursor_for_position(self, x, y, labels):
+        """
+        Update cursor based on mouse position and labels
+        Implements dual-mode logic: focus mode vs quick mode
+        
+        Args:
+            x, y (float): Mouse position
+            labels (list): List of LabelObject instances
+            
+        Returns:
+            dict: Information about hover state
+        """
+        hover_info = {
+            'label': None,
+            'edge_type': None,
+            'cursor': 'arrow'
+        }
+        
+        # Focus mode: only check selected label
+        if self.selected_label:
+            edge_type = self.get_label_edge_type(x, y, self.selected_label)
+            if edge_type:
+                hover_info['label'] = self.selected_label
+                hover_info['edge_type'] = edge_type
+                hover_info['cursor'] = self.get_cursor_for_edge_type(edge_type)
+            else:
+                # Set default cursor when not over selected label
+                hover_info['cursor'] = 'pencil' if self.drawing_mode else 'arrow'
+        else:
+            # Quick mode: check all labels (top layer first)
+            for label in reversed(labels):
+                edge_type = self.get_label_edge_type(x, y, label)
+                if edge_type:
+                    hover_info['label'] = label
+                    hover_info['edge_type'] = edge_type
+                    hover_info['cursor'] = self.get_cursor_for_edge_type(edge_type)
+                    break
+            else:
+                # No label under cursor
+                hover_info['cursor'] = 'pencil' if self.drawing_mode else 'arrow'
+        
+        # Update cursor if it changed
+        if hover_info['cursor'] != self.canvas.cget('cursor'):
+            self.canvas.config(cursor=hover_info['cursor'])
+        
+        # Update hover state
+        self.current_hover_label = hover_info['label']
+        self.current_edge_type = hover_info['edge_type']
+        
+        return hover_info
 
     def handle_selection(self, x, y, labels):
         """
@@ -314,79 +519,7 @@ class BBoxController:
             
         return dragged_label
 
-    def check_resize_handle_click(self, x, y, labels):
-        """
-        檢查點擊是否在 resize handle 上
-        
-        Args:
-            x (float): 點擊的 X 座標 (canvas 像素)
-            y (float): 點擊的 Y 座標 (canvas 像素)
-            labels (list): LabelObject 列表
-            
-        Returns:
-            LabelObject or None: 如果點擊在 handle 上返回標籤對象，否則返回 None
-        """
-        canvas_width = self.canvas.winfo_width()
-        canvas_height = self.canvas.winfo_height()
-        
-        # Check from top layer first
-        for label in reversed(labels):
-            if label.is_on_resize_handle(x, y, canvas_width, canvas_height, self.handle_size):
-                DEBUG("Resize handle clicked: label class_id={}", label.class_id)
-                return label
-        
-        return None
 
-    def start_resize(self, x, y, labels):
-        """
-        開始 resize 操作
-        
-        Args:
-            x (float): 點擊起始 X 座標 (canvas 像素)
-            y (float): 點擊起始 Y 座標 (canvas 像素)
-            labels (list): LabelObject 列表
-            
-        Returns:
-            bool: 是否成功開始 resize
-        """
-        # 檢查是否點擊在 resize handle 上
-        label = self.check_resize_handle_click(x, y, labels)
-        
-        if label:
-            self.is_resizing = True
-            self.resizing_label = label
-            self.resize_start_x = x
-            self.resize_start_y = y
-            
-            # 獲取被點擊的 handle 類型
-            canvas_width = self.canvas.winfo_width()
-            canvas_height = self.canvas.winfo_height()
-            self.resize_handle_type = label.get_handle_type_at_position(x, y, canvas_width, canvas_height, self.handle_size)
-            
-            # 設定該 label 為選中狀態
-            self.clear_selection(labels)
-            label.set_selected(True)
-            self.selected_label = label
-            
-            # Update cursor style based on handle type
-            cursor_map = {
-                "top-left": "top_left_corner",
-                "top": "top_side", 
-                "top-right": "top_right_corner",
-                "right": "right_side",
-                "bottom-right": "bottom_right_corner", 
-                "bottom": "bottom_side",
-                "bottom-left": "bottom_left_corner",
-                "left": "left_side"
-            }
-            cursor = cursor_map.get(self.resize_handle_type, "sizing")
-            self.canvas.config(cursor=cursor)
-            
-            DEBUG("Started resizing label: class_id={}, handle_type={}, start_pos=({}, {})", 
-                  label.class_id, self.resize_handle_type, x, y)
-            return True
-        
-        return False
 
     def update_resize(self, x, y):
         """
@@ -447,9 +580,51 @@ class BBoxController:
             
         return resized_label
 
+    def start_edge_resize(self, x, y, label, edge_type):
+        """
+        開始基於邊緣的 resize 操作
+        
+        Args:
+            x (float): 點擊起始 X 座標 (canvas 像素)
+            y (float): 點擊起始 Y 座標 (canvas 像素)
+            label (LabelObject): 要 resize 的標籤
+            edge_type (str): 邊緣類型
+            
+        Returns:
+            bool: 是否成功開始 resize
+        """
+        if not label or not edge_type or edge_type == 'inside':
+            return False
+        
+        self.is_resizing = True
+        self.resizing_label = label
+        self.resize_start_x = x
+        self.resize_start_y = y
+        
+        # Convert edge type to handle type for compatibility
+        edge_to_handle_map = {
+            'top': 'top',
+            'bottom': 'bottom', 
+            'left': 'left',
+            'right': 'right',
+            'tl': 'top-left',
+            'tr': 'top-right',
+            'bl': 'bottom-left',
+            'br': 'bottom-right'
+        }
+        self.resize_handle_type = edge_to_handle_map.get(edge_type, 'bottom-right')
+        
+        # Set cursor
+        cursor = self.get_cursor_for_edge_type(edge_type)
+        self.canvas.config(cursor=cursor)
+        
+        DEBUG("Started edge resize: label class_id={}, edge_type={}, start_pos=({}, {})", 
+              label.class_id, edge_type, x, y)
+        return True
+
     def handle_mouse_press_with_resize(self, x, y, labels):
         """
-        處理滑鼠按下事件，支援 resize handles
+        處理滑鼠按下事件，支援邊緣 resize
         
         Args:
             x (float): 點擊的 X 座標 (canvas 像素)
@@ -459,18 +634,47 @@ class BBoxController:
         Returns:
             str: 操作類型 ("resize", "drag", "select", "none")
         """
-        # Check resize handle first
-        if self.start_resize(x, y, labels):
-            return "resize"
-        
-        # Check dragging next
-        if self.start_drag(x, y, labels):
-            return "drag"
-        
-        # Check selection last
-        selected_label = self.handle_selection(x, y, labels)
-        if selected_label:
-            return "select"
+        # Focus mode: if we have a selected label
+        if self.selected_label:
+            edge_type = self.get_label_edge_type(x, y, self.selected_label)
+            if edge_type:
+                if edge_type == 'inside':
+                    # Start dragging the selected label
+                    if self.start_drag(x, y, labels):
+                        return "drag"
+                else:
+                    # Start resizing the selected label
+                    if self.start_edge_resize(x, y, self.selected_label, edge_type):
+                        return "resize"
+            else:
+                # Clicked outside selected label - check for selection change
+                selected_label = self.handle_selection(x, y, labels)
+                if selected_label:
+                    return "select"
+                else:
+                    return "none"
+        else:
+            # Quick mode: no selected label
+            # Check all labels for direct interaction
+            for label in reversed(labels):  # Top layer first
+                edge_type = self.get_label_edge_type(x, y, label)
+                if edge_type:
+                    if edge_type == 'inside':
+                        # Direct drag - start dragging and auto-select
+                        self.handle_selection(x, y, labels)  # Select the label
+                        if self.start_drag(x, y, labels):
+                            return "drag"
+                    else:
+                        # Direct resize - start resizing and auto-select  
+                        self.handle_selection(x, y, labels)  # Select the label
+                        if self.start_edge_resize(x, y, label, edge_type):
+                            return "resize"
+                    break
+            else:
+                # No label under cursor - just handle selection
+                selected_label = self.handle_selection(x, y, labels)
+                if selected_label:
+                    return "select"
         
         return "none"
 

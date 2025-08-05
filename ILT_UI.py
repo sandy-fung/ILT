@@ -47,6 +47,7 @@ class UI:
         # Initialize drawing-related states
         self.bbox_controller = None
         self.drawing_mode = False
+        self.current_labels = []  # Store current labels for cursor updates
         
         # Initialize options
         self.original_image = None
@@ -1038,10 +1039,10 @@ class UI:
 
     def draw_labels_on_canvas(self, labels):
         """Draw label bounding boxes on canvas with resize handles"""
-        # Clear all previous label-related items
-        # Clear all previous label-related items
-
-              
+        # Store current labels for access by other methods (like cursor updates)
+        self.current_labels = labels
+        
+        # Clear all previous label-related items              
         self.canvas.delete("label_box")
         self.canvas.delete("label_box_selected")
         self.canvas.delete("label_box_dragging")
@@ -1130,17 +1131,7 @@ class UI:
                 **rect_kwargs
             )
            
-            # Draw resize handles for selected labels
-            if hasattr(label, 'selected') and label.selected and self.bbox_controller:
-                # 檢查是否有任何進行中的操作
-                if ((self.bbox_controller.is_resizing and self.bbox_controller.resizing_label == label) or
-                    (self.bbox_controller.is_dragging and self.bbox_controller.dragging_label == label)):
-                    # 任何拖曳操作時（resize或drag）都隱藏所有handle
-                    # 讓用戶專注於當前操作，無視覺干擾
-                    pass  # 跳過handle繪製
-                else:
-                    # 靜態選中狀態：顯示所有 handles 供用戶選擇操作
-                    self.draw_resize_handles(label, x1, y1, x2, y2, color)
+            # Selected labels are highlighted with red border (no handles shown)
             
             # Draw class ID text
             text_x = x1
@@ -1168,46 +1159,6 @@ class UI:
                   label.class_id, x1, y1, x2, y2)
 
 
-    def draw_resize_handles(self, label, x1, y1, x2, y2, color):
-        """
-        繪製所有 resize handles
-        
-        Args:
-            label (LabelObject): 標籤對象
-            x1, y1, x2, y2 (float): bounding box 的 canvas 座標
-            color (str): 邊框顏色
-        """
-        handle_size = self.bbox_controller.handle_size if self.bbox_controller else 10
-        
-        # 計算中點
-        mid_x = (x1 + x2) / 2
-        mid_y = (y1 + y2) / 2
-        half_size = handle_size / 2
-        
-        # 8 個 handle 的位置：四個角 + 四條邊的中點
-        handle_positions = [
-            (x1, y1),              # 左上角
-            (mid_x, y1),           # 上邊中點
-            (x2, y1),              # 右上角
-            (x2, mid_y),           # 右邊中點
-            (x2, y2),              # 右下角
-            (mid_x, y2),           # 下邊中點
-            (x1, y2),              # 左下角
-            (x1, mid_y),           # 左邊中點
-        ]
-        
-        # 繪製所有 handles
-        for hx, hy in handle_positions:
-            self.canvas.create_rectangle(
-                hx - half_size,
-                hy - half_size,
-                hx + half_size,
-                hy + half_size,
-                fill="gray",
-                tags="resize_handle"
-            )
-        
-        DEBUG("Drew resize handles")
 
 # Update text and index labels
     def update_text_box(self, content):
@@ -1392,6 +1343,12 @@ class UI:
             self.bbox_controller.update_drag(event.x, event.y)
             if self.dispatch:
                 self.dispatch(UIEvent.MOUSE_DRAG, {"value": event, "x": event.x, "y": event.y, "operation": "drag"})
+
+    def on_mouse_motion(self, event):
+        """Handle mouse motion event - update cursor based on position"""
+        if self.bbox_controller and hasattr(self, 'current_labels') and self.current_labels:
+            # Update cursor based on mouse position using stored labels
+            self.bbox_controller.update_cursor_for_position(event.x, event.y, self.current_labels)
 
     # Key events
     def on_lc_press_switch_pen(self, event):
@@ -1715,6 +1672,7 @@ class UI:
         self.canvas.bind("<Button-1>", self.on_mouse_press)
         self.canvas.bind("<ButtonRelease-1>", self.on_mouse_release)
         self.canvas.bind("<B1-Motion>", self.on_mouse_drag)
+        self.canvas.bind("<Motion>", self.on_mouse_motion)
         self.canvas.bind("<Button-3>", self.on_mouse_click_right)
         self.canvas.bind("<Configure>", self.on_canvas_resize)
 
