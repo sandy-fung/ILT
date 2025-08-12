@@ -207,7 +207,7 @@ class UI:
             DEBUG("Text box is not shown as per configuration.")
             self.label_text_box = None
 
-        self.path_label = tk.Label(self.text_frame, bg = "#FAFAFA", font = ("Segoe UI", 11), fg = "#C0C00C", anchor = "w")
+        self.path_label = tk.Label(self.text_frame, bg = "#FAFAFA", font = ("Segoe UI", 11), fg = "#C0C00C", anchor = "w", justify = "left", wraplength = 700)
         self.path_label.pack(side = "bottom", fill = "x", padx = 20, pady = 10)
 
     def create_hint_area(self):
