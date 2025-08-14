@@ -115,8 +115,13 @@ class UI:
             width = 8, height = 1,
             text="Move to", font=("Segoe UI", 10), fg = "#0C0CC0",
             relief = "flat", bd = 2,
-            command = self.on_move_image_button)
+            command = self.show_move_menu)
         self.mov_button.pack(side = "left", padx = 5)
+        
+        # 建立 move to  menu
+        self.move_menu = tk.Menu(self.window, tearoff=0)
+        self.move_menu.add_command(label="special plates", command=self.move_to_special_plates)
+        self.move_menu.add_command(label="uncertain", command=self.move_to_uncertain)
         
 
         self.configuration_button = tk.Button(
@@ -136,7 +141,8 @@ class UI:
             command = self.show_info_menu)
         self.info_button.pack(side = "left", padx =0)
         
-         # 建立 version menu，但暫不顯示
+        
+         # 建立 version menu
         self.info_menu = tk.Menu(self.window, tearoff=0)
         self.info_menu.add_command(label="version-"+VERSION_NUM)
 
@@ -1258,6 +1264,12 @@ class UI:
         y = self.info_button.winfo_rooty() + self.info_button.winfo_height()
         self.info_menu.tk_popup(x, y)
         
+    def show_move_menu(self):
+        # 取得按鈕在畫面中的位置
+        x = self.mov_button.winfo_rootx()
+        y = self.mov_button.winfo_rooty() + self.mov_button.winfo_height()
+        self.move_menu.tk_popup(x, y)
+        
     def on_bt_click_reselect(self):
         DEBUG("on_bt_click_reselect")
         if self.dispatch:
@@ -1410,10 +1422,18 @@ class UI:
         if self.dispatch:
             self.dispatch(UIEvent.DELETE_IMAGE,  None)
             
-    def on_move_image_button(self):
-        DEBUG("on_move_image_button")
+
+            
+    def move_to_special_plates(self):
+        print("Move to special plates")
         if self.dispatch:
             self.dispatch(UIEvent.MOVE_IMAGE,  None)
+   
+
+    def move_to_uncertain(self):
+        print(" Move to uncertain")      
+        if self.dispatch:
+            self.dispatch(UIEvent.MOVE_IMAGE,  None)      
 
     def on_configuration_click(self):
         """Handle configuration button click"""
