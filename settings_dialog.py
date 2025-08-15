@@ -26,6 +26,7 @@ class SettingsDialog:
         self.show_text_box_var = tk.BooleanVar()
         self.show_preview_var = tk.BooleanVar()
         self.show_input_box_var = tk.BooleanVar()
+        self.show_classify_frame_var = tk.BooleanVar()
         self.label_font_size_current = str(DEFAULT_LABEL_FONT_SIZE)  # Default font size
 
         self.create_dialog()
@@ -109,6 +110,7 @@ class SettingsDialog:
             self.show_text_box_var.set(self.current_settings.get('show_text_box', True))
             self.show_preview_var.set(self.current_settings.get('show_preview', True))
             self.show_input_box_var.set(self.current_settings.get('show_input_box', True))
+            self.show_classify_frame_var.set(self.current_settings.get('show_classify_frame', True))
             self.label_font_size_current = self.current_settings.get('label_font_size')
 
 
@@ -165,7 +167,14 @@ class SettingsDialog:
                 variable=self.show_input_box_var
             )
             checkbox4.pack(anchor=tk.W, pady=2)
-
+            
+            checkbox5 = ttk.Checkbutton(
+                settings_frame,
+                text="Show classification panel",
+                variable=self.show_classify_frame_var
+            )
+            checkbox5.pack(anchor=tk.W, pady=2)
+            
             # font size for label ascci
             font_frame = ttk.LabelFrame(main_frame, text="", padding="10")
             font_frame.pack(fill=tk.X, pady=(0, 10))
@@ -216,6 +225,7 @@ class SettingsDialog:
             'show_text_box': self.show_text_box_var.get(),
             'show_preview': self.show_preview_var.get(),
             'show_input_box': self.show_input_box_var.get(),
+            'show_classify_frame': self.show_classify_frame_var.get(),
             'label_font_size': int(self.label_font_size_entry.get())
         }
 
@@ -286,6 +296,7 @@ if __name__ == "__main__":
         'show_text_box': True,
         'show_preview': True,
         'show_input_box': True,
+        'show_classify_frame': True,
         'label_font_size_entry': 12
     }
 

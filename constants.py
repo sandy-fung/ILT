@@ -1,4 +1,4 @@
-VERSION_NUM = "1.6.0"
+VERSION_NUM = "1.6.1"
 
 CLASS_ID_COLOR_MAP = {
     # Numbers
@@ -41,4 +41,19 @@ CLASS_ID_COLOR_MAP = {
     34: "maroon", # y
     35: "black", # z
     36: "black", # plate
+}
+
+
+
+classification_label_map = {
+    "白天良好": "DayGood",
+    "夜晚良好": "NightGood",
+    "昏暗": "Dim",
+    "模糊": "Blurry",
+    "破損": "Damaged",
+    "遮蔽": "Occluded",
+    "有色": "Tinted",
+    "歪斜": "Tilted",
+    "特殊光源": "Lighting",
+    "其它": "Other"
 }

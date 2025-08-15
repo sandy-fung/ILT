@@ -18,6 +18,7 @@ class UIEvent(Enum):
     DELETE_KEY = auto()
     DELETE_IMAGE = auto()
     MOVE_IMAGE = auto()
+    MOVE_IMAGE_CLASSIFIED = auto()
 
     RESELECT_BT_CLICK = auto()
     CROP_BT_CLICK = auto()

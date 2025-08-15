@@ -14,6 +14,8 @@ from constants import CLASS_ID_COLOR_MAP
 
 DEFAULT_W = 1920
 DEFAULT_H = 1080
+
+
 class UI:
     def __init__(self):
         self.dispatch = None
@@ -57,6 +59,7 @@ class UI:
         self.SHOW_TEXT_BOX = config_utils.get_show_text_box()
         self.SHOW_PREVIEW = config_utils.get_show_preview()
         self.SHOW_INPUT_BOX = config_utils.get_show_input_box()
+        self.SHOW_CLASSIFY_FRAME= config_utils.get_show_classify_frame()
         self.LABEL_FONT_SIZE = config_utils.get_ui_label_font_size_in_config()
 
         self.setup_ui()
@@ -69,6 +72,7 @@ class UI:
     def setup_ui(self):
         self.create_top_area()
         self.create_middle_area()
+        self.create_classification_area()
         self.create_bottom_area()
 
     def create_top_area(self):
@@ -115,8 +119,13 @@ class UI:
             width = 8, height = 1,
             text="Move to", font=("Segoe UI", 10), fg = "#0C0CC0",
             relief = "flat", bd = 2,
-            command = self.on_move_image_button)
+            command = self.show_move_menu)
         self.mov_button.pack(side = "left", padx = 5)
+        
+        # 建立 move to  menu
+        self.move_menu = tk.Menu(self.window, tearoff=0)
+        self.move_menu.add_command(label="special plates", command=self.move_to_special_plates)
+        self.move_menu.add_command(label="uncertain", command=self.move_to_uncertain)
         
 
         self.configuration_button = tk.Button(
@@ -136,7 +145,8 @@ class UI:
             command = self.show_info_menu)
         self.info_button.pack(side = "left", padx =0)
         
-         # 建立 version menu，但暫不顯示
+        
+         # 建立 version menu
         self.info_menu = tk.Menu(self.window, tearoff=0)
         self.info_menu.add_command(label="version-"+VERSION_NUM)
 
@@ -157,19 +167,94 @@ class UI:
         self.canvas_frame = tk.Frame(self.middle_frame)
         self.canvas_frame.pack(side = "left", fill = "both", expand = True)
         self.canvas = tk.Canvas(self.canvas_frame, highlightthickness = 0)
-        self.canvas.pack(fill = "both", expand = True)
+        self.canvas.pack(fill = "both", expand = True)  
 
 
     def create_bottom_area(self):
         self.bottom_frame = tk.Frame(self.window, relief = "ridge", bd = 2, bg = "#FAFAFA")
         self.bottom_frame.pack(side = "bottom", fill = "x")
 
-
+        
+    
         self.create_text_area()
-
+    
         self.create_hint_area()
         self.create_preview_area()
+            
+  
+    def create_classification_area(self):
+        """Main function to create the classification area."""
+        self.create_classification_frame()
+        self.create_classify_cbts()
+        self.create_submit_button()
 
+    def create_classification_frame(self):
+        """Create the classification frame."""
+        self.classification_frame = tk.Frame(self.window, relief = "ridge", bd = 2, bg = "#FAFAFA")
+        # self.classification_frame.pack(side = "top", fill = "x")
+        self.classification_frame.pack(side="top", anchor="center")
+    
+    
+                
+    def create_classify_cbts(self):
+        """Create classify_cbts dynamically for each classification label."""
+        from constants import classification_label_map
+    
+        # Dictionary to store the state of each Checkbutton
+        # self.selected_plate_types = {label: tk.BooleanVar() for label in classification_labels}
+        self.selected_plate_types = {key: tk.BooleanVar() for key in classification_label_map.values()}
+        
+        # self.classify_cbts = {}
+        
+        # Create classify_cbts dynamically for each label
+        for index, (key, value) in enumerate(classification_label_map.items()):
+            checkbutton = tk.Checkbutton(
+                self.classification_frame,
+                text=key,
+                variable=self.selected_plate_types[value],
+                onvalue=True,
+                offvalue=False,
+                bg="lightgray",
+                fg="black",
+                font=("Segoe UI", 12),  # Increased font size
+                anchor="w"  # Align text to the left
+            )
+  
+            if self.SHOW_CLASSIFY_FRAME:
+                checkbutton.grid(row=0, column=index, padx=5, pady=5)
+           
+            # Store the Checkbutton in the dictionary with the label as the key
+            # self.classify_cbts[label] = checkbutton
+            
+            
+    def create_submit_button(self):
+        """Create the submit button."""
+        from constants import classification_label_map
+
+        def submit_callback():
+            selected_types = [label for label, var in self.selected_plate_types.items() if var.get()]
+            DEBUG(f"Selected plate types: {selected_types}")
+            if not selected_types:
+                INFO("No plate types selected for classification.")
+                self.show_warning("classify types is not selected")
+                return
+            if self.dispatch:
+                self.dispatch(UIEvent.MOVE_IMAGE_CLASSIFIED, {"plate_types": selected_types})
+
+        self.submit_button = tk.Button(
+            self.classification_frame,
+            text="Submit",
+            command=submit_callback,
+            width=20,
+            height=2,
+            bg="green",
+            fg="white",
+            font=("Segoe UI", 12, "bold")
+        )
+        if self.SHOW_CLASSIFY_FRAME:
+            self.submit_button.grid(row=1, column=0, columnspan=len(classification_label_map), pady=10)         
+  
+        
     def create_text_area(self):
         self.text_frame = tk.Frame(self.bottom_frame, bg = "#FAFAFA")
         self.text_frame.pack(side = "left", fill = "both", expand = True)
@@ -1018,9 +1103,12 @@ class UI:
         if self.dispatch:
             self.dispatch(UIEvent.CANVAS_RESIZE, {})
 
-    def update_image_canvas(self, image):
+    def update_image_canvas(self, image= None):
         DEBUG("update_image_canvas")
         self.canvas.delete("all")
+        if not image:
+            DEBUG("No image provided to update canvas")
+            return
         self.canvas.image = image
         self.canvas.create_image(self.canvas_width//2, self.canvas_height//2, anchor = "center", image = image)
         DEBUG("Image updated on canvas with height: {}, width: {}", self.canvas_height, self.canvas_width)
@@ -1161,7 +1249,7 @@ class UI:
 
 
 # Update text and index labels
-    def update_text_box(self, content):
+    def update_text_box(self, content=None):
         if not self.SHOW_TEXT_BOX or self.label_text_box is None:
             DEBUG("Text box is not shown or not initialized.")
             return
@@ -1173,6 +1261,8 @@ class UI:
             return
         self.label_text_box.config(state = "normal")
         self.label_text_box.delete("1.0", tk.END) # Clear the text box
+        if content is None:
+            content = ""
         self.label_text_box.insert(tk.END, content)
 
         self.label_text_box.edit_modified(False)
@@ -1257,6 +1347,12 @@ class UI:
         x = self.info_button.winfo_rootx()
         y = self.info_button.winfo_rooty() + self.info_button.winfo_height()
         self.info_menu.tk_popup(x, y)
+        
+    def show_move_menu(self):
+        # 取得按鈕在畫面中的位置
+        x = self.mov_button.winfo_rootx()
+        y = self.mov_button.winfo_rooty() + self.mov_button.winfo_height()
+        self.move_menu.tk_popup(x, y)
         
     def on_bt_click_reselect(self):
         DEBUG("on_bt_click_reselect")
@@ -1396,7 +1492,6 @@ class UI:
 
     def on_win_configure(self, event):
         """Handle window resize or move event"""
-        # print("on_win_configure triggered")
         if self.dispatch:
             self.dispatch(UIEvent.WINDOW_POSITION, {})
 
@@ -1410,10 +1505,18 @@ class UI:
         if self.dispatch:
             self.dispatch(UIEvent.DELETE_IMAGE,  None)
             
-    def on_move_image_button(self):
-        DEBUG("on_move_image_button")
+
+            
+    def move_to_special_plates(self):
+        DEBUG("Move to special plates")
         if self.dispatch:
-            self.dispatch(UIEvent.MOVE_IMAGE,  None)
+            self.dispatch(UIEvent.MOVE_IMAGE,  {"plate_types": "SpecialPlates"})
+   
+
+    def move_to_uncertain(self):
+        DEBUG(" Move to uncertain")      
+        if self.dispatch:
+            self.dispatch(UIEvent.MOVE_IMAGE,  {"plate_types": "UncertainPlates"})      
 
     def on_configuration_click(self):
         """Handle configuration button click"""
@@ -1446,8 +1549,12 @@ class UI:
             self.SHOW_TEXT_BOX = settings.get('show_text_box', True)
             self.SHOW_PREVIEW = settings.get('show_preview', True)
             self.SHOW_INPUT_BOX = settings.get('show_input_box', True)
+            self.SHOW_CLASSIFY_FRAME = settings.get('show_classify_frame', False)
             self.LABEL_FONT_SIZE = settings.get('label_font_size', 12)
 
+            # Apply classification frame visibility
+            self.toggle_classification_frame(self.SHOW_CLASSIFY_FRAME)
+            
             # Apply input box visibility (should be first, like in original creation)
             self.toggle_input_box(self.SHOW_INPUT_BOX)
             
@@ -1459,6 +1566,8 @@ class UI:
             
             # Apply preview panel visibility
             self.toggle_preview(self.SHOW_PREVIEW)
+            
+            
             
             DEBUG("UI settings applied successfully")
             
@@ -1633,6 +1742,35 @@ class UI:
         except Exception as e:
             ERROR("Error toggling input box: {}", e)
 
+    def toggle_classification_frame(self, show):
+        """Toggle classification frame visibility"""
+        try:
+            if show is True:
+                # If we want to show but classification_frame doesn't exist, create it
+                if not hasattr(self, 'classification_frame') or self.classification_frame is None:
+                    DEBUG("Creating classification frame for show operation")
+
+                    # Add classification checkboxes or buttons here if needed
+                    self.create_classification_area()
+                else:
+                    try:
+                        # Check if already packed by trying to get pack_info
+                        self.classification_frame.pack_info()
+                    except tk.TclError:
+                        # Not packed, so pack it
+                        self.classification_frame.pack(before=self.bottom_frame, side="top", anchor="center")
+                        DEBUG("classification_frame   shown")
+                    
+            else:
+                # If we want to hide the classification_frame
+                if hasattr(self, 'classification_frame') and self.classification_frame is not None:
+                    # Check if packed by trying to get pack_info
+                    self.classification_frame.pack_info()
+                    self.classification_frame.pack_forget()
+        except Exception as e:
+            ERROR("Error toggling classification frame: {}", e)
+            
+            
     def next_image(self, event):
         if self.input_box and self.window.focus_get() is self.input_box:
             return
@@ -1680,6 +1818,9 @@ class UI:
         folder_path = filedialog.askdirectory(parent = self.window, title = title)
         return folder_path
 
+    def show_warning(self, msg):
+        messagebox.showwarning("Error", str(msg))
+        
     def show_error(self, msg):
         messagebox.showerror("Error", str(msg))
 
