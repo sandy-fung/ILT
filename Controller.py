@@ -11,6 +11,7 @@ from log_levels import DEBUG, INFO, ERROR
 DELETE_FILE_TMP_PATH ="delete_tmp"
 MOVE_FILE_TMP_PATH ="issue_tmp"
 MOVE_FILE_CLASSIFY_PATH ="classified"
+CUT_IMAGE_PATH ="cut_tmp"
 class Controller:
     def __init__(self, view):
         self.view = view
@@ -218,8 +219,12 @@ class Controller:
         
     def next_image(self):
         DEBUG("Current image index:", self.image_index)
+      
         if self.image_index < len(self.images) - 1:
             self.image_index += 1
+        else:
+            self.view.show_warning(f"Reach the End")
+            return
         config_utils.save_image_index(self.image_index)
 
         self.on_fresh_image_label()
@@ -340,7 +345,6 @@ class Controller:
         elif event_type == UIEvent.MOVE_IMAGE:
             DEBUG("Controller: Move image button pressed.")
             plate_type = event_data.get("plate_types", "")
-            
             self.move_selected_image_and_label(MOVE_FILE_TMP_PATH, plate_type)
             
         elif event_type == UIEvent.MOVE_IMAGE_CLASSIFIED:
@@ -348,6 +352,14 @@ class Controller:
             plate_type = event_data.get("plate_types", "")
             self.move_selected_image_and_label(MOVE_FILE_CLASSIFY_PATH, plate_type)
             
+        
+        elif event_type == UIEvent.CUT_IMAGE:
+            DEBUG("Controller: Cut image button pressed.")
+            x_position = event_data.get("position", "")
+            # Move the image and label to the cut folder
+            self.cut_image_into_two_parts(x_position)
+            self.next_image()
+           
             
 
         elif event_type == UIEvent.INPUT_ENTER:
@@ -742,8 +754,7 @@ class Controller:
                     new_image_path = os.path.join(dest_folder_path, os.path.basename(image_path))
                     new_label_path = os.path.join(dest_folder_path, os.path.basename(label_path))
                 # Move and rename the files
-                folder_utils.move_file(image_path, new_image_path)
-                folder_utils.move_file(label_path, new_label_path)
+                self.on_fresh_image_label()
             except Exception as e:
                 ERROR("Error deleting image or label file: {}", e)
                
@@ -756,7 +767,9 @@ class Controller:
             if self.image_index >= len(self.images_path):
                 self.image_index = max(0, len(self.images_path) - 1)
             config_utils.save_image_index(self.image_index)
-            # Reload image and labels
+            
+
+            # # Reload image and labels
             try:
                 if len(self.images_path) == 0:
                     self.view.show_warning(f"Folder of images is empty now")
@@ -765,8 +778,9 @@ class Controller:
                     self.view.update_image_canvas()
                     self.view.update_text_box()
                     return
-                self.load_image(self.images_path)
-                self.load_label(self.labels_path)
+                # self.load_image(self.images_path)
+                # self.load_label(self.labels_path)
+                self.next_image()
             except Exception as e:
                 ERROR("Error reloading image or label after deletion: {}", e)
                 self.view.show_error(f"Error reloading image or label: {e}")
@@ -775,6 +789,20 @@ class Controller:
         else:
                 ERROR("No image to delete at index: {}", self.image_index)
 
+    def cut_image_into_two_parts(self, x_position):
+        from cut_image_util import split_image_and_labels
+        print (f"image: {self.images_path[self.image_index]}")
+        print (f"labe:  {self.labels_path[self.image_index]}")
+        canvas_height, canvas_width = self.view.get_canvas_size()
+        dest_folder_path = os.path.join(self.image_folder_path, CUT_IMAGE_PATH)
+        split_image_and_labels(
+            self.images_path[self.image_index],
+            self.labels_path[self.image_index],
+            x_position,
+            canvas_width,
+            dest_folder_path
+        )
+        
     def handle_configuration_button(self):
         """Handle configuration button click"""
         try:

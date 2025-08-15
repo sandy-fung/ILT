@@ -238,7 +238,6 @@ def get_show_classify_frame():
     """Get whether to show classfication buttons panel"""
     try:
         ret =  config.getboolean("UISettings", "show_classify_frame")
-        print(f"get_show_classify_frame: {ret}")
         return ret
     except:
         return False  # Default to False (current setting)
@@ -267,7 +266,6 @@ def save_ui_settings(show_class_id_buttons=None, show_text_box=None,
     if label_font_size is not None:
         config.set("UISettings", "label_font_size", str(label_font_size))
     if show_classify_frame is not None:
-        print(f"Saving show_classify_frame: {show_classify_frame}")
         config.set("UISettings", "show_classify_frame", str(show_classify_frame).lower())
     with open(DEFAULT_CONFI_PATH, "w") as f:
         config.write(f)

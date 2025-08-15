@@ -11,10 +11,11 @@ import Words_Label_mapping as wlm
 from outline_font import draw_outlined_text
 from constants import VERSION_NUM
 from constants import CLASS_ID_COLOR_MAP
+from DragableVerticalLine import DraggableVerticalLine
 
 DEFAULT_W = 1920
 DEFAULT_H = 1080
-
+CUT_IMAGE_ENABLE = True
 
 class UI:
     def __init__(self):
@@ -64,15 +65,18 @@ class UI:
 
         self.setup_ui()
         self.setup_events()
-
+       
     def set_dispatcher(self, event_dispatcher):
         self.dispatch = event_dispatcher
-
+        
 # Define UI components
     def setup_ui(self):
         self.create_top_area()
         self.create_middle_area()
         self.create_classification_area()
+                
+        if CUT_IMAGE_ENABLE:
+            self.create_cut_image_bt()
         self.create_bottom_area()
 
     def create_top_area(self):
@@ -174,8 +178,7 @@ class UI:
         self.bottom_frame = tk.Frame(self.window, relief = "ridge", bd = 2, bg = "#FAFAFA")
         self.bottom_frame.pack(side = "bottom", fill = "x")
 
-        
-    
+
         self.create_text_area()
     
         self.create_hint_area()
@@ -197,7 +200,7 @@ class UI:
         self.classification_frame.pack(side="top", anchor="center")
     
     
-                
+        
     def create_classify_cbts(self):
         """Create classify_cbts dynamically for each classification label."""
         from constants import classification_label_map
@@ -257,6 +260,22 @@ class UI:
    
         self.submit_button.grid(row=1, column=0, columnspan=len(classification_label_map), pady=10)         
   
+    def create_cut_image_bt(self):
+        """Create the cut image button and its functionality."""
+        self.cut_frame = tk.Frame(self.window, relief = "ridge", bd = 2, bg = "#FAFAFA")
+        # self.classification_frame.pack(side = "top", fill = "x")
+        self.cut_frame.pack(side="top", anchor="center")
+        self.cut_image_button = tk.Button(
+            self.cut_frame,
+            text="CUT",
+            font=("Segoe UI", 12),
+            width=20,
+            height=2,
+            bg="green",
+            fg="white",
+            command=self.on_cut_image_button_click
+        )
+        self.cut_image_button.pack(side="left", padx=10, pady=10)
         
     def create_text_area(self):
         self.text_frame = tk.Frame(self.bottom_frame, bg = "#FAFAFA")
@@ -421,6 +440,8 @@ class UI:
         
         # Load magnifier configuration
         self.load_magnifier_config()
+    
+    
     
     def _add_preview_placeholder(self):
         """Add placeholder text to preview canvas after it has been rendered"""
@@ -1078,7 +1099,30 @@ class UI:
 
         else:
             return
+        
+        
+        
+# Add an adjustable vertival Line to cut image
 
+    # def on_line_move(self, _line: DraggableVerticalLine, _x: int):
+            # print(f"Line moved to: {_x}")
+        # status.set(f"L1: {line1.get_x()}, L2: {line2.get_x()}")
+        
+    def create_vertical_line(self):
+      
+        # Create two draggable lines with different styles
+        self.cut_line = DraggableVerticalLine(
+        self.canvas,
+            x=800,
+            foreground="#cccccc",# 淺線     
+            background="#333333",# 深線     
+            width_fg=6,
+            width_bg=10,
+            bounds= None,
+            snap=1,
+            # on_move=self.on_line_move,
+            on_move=None,
+         )
 # About canvas
 
     def get_UI_window_size(self):
@@ -1105,7 +1149,21 @@ class UI:
     def on_canvas_resize(self, event):
         if self.dispatch:
             self.dispatch(UIEvent.CANVAS_RESIZE, {})
+            
 
+    def on_cut_image(self, event):
+        print("Cut image event triggered")
+        # Check if self.cut_line exists
+        if hasattr(self, 'cut_line') and self.cut_line is not None:
+            # Get the position of the cut line
+            position = self.cut_line.get_x()
+            print(f"Cut line position: {position}")
+            self.dispatch(UIEvent.CUT_IMAGE, {"position": position})
+            
+            # Add your logic here to handle the cut line position
+        else:
+            print("Cut line does not exist.")
+        
     def update_image_canvas(self, image= None):
         DEBUG("update_image_canvas")
         self.canvas.delete("all")
@@ -1115,6 +1173,7 @@ class UI:
         self.canvas.image = image
         self.canvas.create_image(self.canvas_width//2, self.canvas_height//2, anchor = "center", image = image)
         DEBUG("Image updated on canvas with height: {}, width: {}", self.canvas_height, self.canvas_width)
+        self.create_vertical_line()
 
     def clear_all_labels_canvas(self):
         """Clear all items on the canvas"""
@@ -1372,6 +1431,10 @@ class UI:
         if self.dispatch:
             self.dispatch(UIEvent.ADD_BT_CLICK, {})        
 
+    def on_cut_image_button_click(self):
+        DEBUG("on_cut_image_button_click")
+        self.on_cut_image(None)
+            
     # Mouse events
     def on_mouse_click_right(self, event):
         DEBUG("on_mouse_click_right at ({}, {})", event.x, event.y)
@@ -1808,6 +1871,9 @@ class UI:
 
         self.window.bind("<Button-1>", self._clear_focus)
 
+        if CUT_IMAGE_ENABLE:
+            self.window.bind("<Shift-C>", self.on_cut_image)
+        
         # Mouse event binding (support drawing functionality)
         self.canvas.bind("<Button-1>", self.on_mouse_press)
         self.canvas.bind("<ButtonRelease-1>", self.on_mouse_release)
@@ -1815,6 +1881,7 @@ class UI:
         self.canvas.bind("<Motion>", self.on_mouse_motion)
         self.canvas.bind("<Button-3>", self.on_mouse_click_right)
         self.canvas.bind("<Configure>", self.on_canvas_resize)
+        
 
     def select_folder(self, title):
         folder_path = filedialog.askdirectory(parent = self.window, title = title)
