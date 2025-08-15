@@ -338,7 +338,9 @@ class Controller:
             
         elif event_type == UIEvent.MOVE_IMAGE:
             DEBUG("Controller: Move image button pressed.")
-            self.move_selected_image_and_label(MOVE_FILE_TMP_PATH)
+            plate_type = event_data.get("plate_types", "")
+            
+            self.move_selected_image_and_label(MOVE_FILE_TMP_PATH, plate_type)
 
         elif event_type == UIEvent.INPUT_ENTER:
             DEBUG("Controller: Input enter pressed.")
@@ -705,39 +707,61 @@ class Controller:
         self.save_current_labels()
         self.update_label_display()
 
-    def move_selected_image_and_label(self, destination):
+    def move_selected_image_and_label(self, destination, plate_type=None): 
         if self.image_index < len(self.images_path):
-                image_path = self.images_path[self.image_index]
-                label_path = self.labels_path[self.image_index]
-
-                # Remove image and label files
-                dest_folder_path = os.path.join(self.image_folder_path, destination)
-                DEBUG(f"move to folder:{dest_folder_path}")
-                if not os.path.exists(dest_folder_path):
-                    os.makedirs(dest_folder_path)
-                try:
-                    INFO("Deleted image: {} and label: {}", image_path, label_path)
-                    folder_utils.move_file(image_path,dest_folder_path)
-                    folder_utils.move_file(label_path,dest_folder_path)
-                except Exception as e:
-                    ERROR("Error deleting image or label file: {}", e)
-                   
-
-                # Remove from lists
-                del self.images_path[self.image_index]
-                del self.labels_path[self.image_index]
-                del self.images[self.image_index]
-                del self.labels[self.image_index]
-
-                # Adjust index
-                if self.image_index >= len(self.images_path):
-                    self.image_index = max(0, len(self.images_path) - 1)
-
-                config_utils.save_image_index(self.image_index)
-
-                # Reload image and labels
+            image_path = self.images_path[self.image_index]
+            label_path = self.labels_path[self.image_index]
+            # Remove image and label files
+            dest_folder_path = os.path.join(self.image_folder_path, destination)
+            DEBUG(f"move to folder:{dest_folder_path}")
+            if not os.path.exists(dest_folder_path):
+                os.makedirs(dest_folder_path)
+            
+            try:
+                INFO("Deleted image: {} and label: {}", image_path, label_path)
+                if plate_type is not None:
+                    if isinstance(plate_type, list):
+                        plate_type_str = "_".join(plate_type)
+                    else:
+                        plate_type_str = plate_type  # 原本就是字串
+                    # plate_type_str = "_".join(plate_type)
+                    base_name, ext = os.path.splitext(os.path.basename(image_path))
+                    new_image_name = f"{plate_type_str}_{base_name}{ext}"
+                    new_label_name = f"{plate_type_str}_{os.path.basename(label_path)}"
+                    new_image_path = os.path.join(dest_folder_path, new_image_name)
+                    new_label_path = os.path.join(dest_folder_path, new_label_name)
+                else:
+                    new_image_path = os.path.join(dest_folder_path, os.path.basename(image_path))
+                    new_label_path = os.path.join(dest_folder_path, os.path.basename(label_path))
+                # Move and rename the files
+                folder_utils.move_file(image_path, new_image_path)
+                folder_utils.move_file(label_path, new_label_path)
+            except Exception as e:
+                ERROR("Error deleting image or label file: {}", e)
+               
+            # Remove from lists
+            del self.images_path[self.image_index]
+            del self.labels_path[self.image_index]
+            del self.images[self.image_index]
+            del self.labels[self.image_index]
+            # Adjust index
+            if self.image_index >= len(self.images_path):
+                self.image_index = max(0, len(self.images_path) - 1)
+            config_utils.save_image_index(self.image_index)
+            # Reload image and labels
+            try:
+                if len(self.images_path) == 0:
+                    self.view.show_warning(f"Folder of images is empty now")
+                    # clear everything on canvas and text_view
+                    self.view.clear_all_labels_canvas()
+                    self.view.update_image_canvas()
+                    self.view.update_text_box()
+                    return
                 self.load_image(self.images_path)
                 self.load_label(self.labels_path)
+            except Exception as e:
+                ERROR("Error reloading image or label after deletion: {}", e)
+                self.view.show_error(f"Error reloading image or label: {e}")
 
                
         else:
