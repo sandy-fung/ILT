@@ -266,7 +266,6 @@ def save_ui_settings(show_class_id_buttons=None, show_text_box=None,
         config.set("UISettings", "show_input_box", str(show_input_box).lower())
     if label_font_size is not None:
         config.set("UISettings", "label_font_size", str(label_font_size))
-        print(f"Saving label_font_size: {label_font_size}")
     if show_classify_frame is not None:
         print(f"Saving show_classify_frame: {show_classify_frame}")
         config.set("UISettings", "show_classify_frame", str(show_classify_frame).lower())

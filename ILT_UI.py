@@ -187,6 +187,8 @@ class UI:
         self.create_classification_frame()
         self.create_classify_cbts()
         self.create_submit_button()
+        if self.SHOW_CLASSIFY_FRAME is False:
+            self.classification_frame.pack_forget()
 
     def create_classification_frame(self):
         """Create the classification frame."""
@@ -220,8 +222,9 @@ class UI:
                 anchor="w"  # Align text to the left
             )
   
-            if self.SHOW_CLASSIFY_FRAME:
-                checkbutton.grid(row=0, column=index, padx=5, pady=5)
+            
+            checkbutton.grid(row=0, column=index, padx=5, pady=5)
+        
            
             # Store the Checkbutton in the dictionary with the label as the key
             # self.classify_cbts[label] = checkbutton
@@ -251,8 +254,8 @@ class UI:
             fg="white",
             font=("Segoe UI", 12, "bold")
         )
-        if self.SHOW_CLASSIFY_FRAME:
-            self.submit_button.grid(row=1, column=0, columnspan=len(classification_label_map), pady=10)         
+   
+        self.submit_button.grid(row=1, column=0, columnspan=len(classification_label_map), pady=10)         
   
         
     def create_text_area(self):
@@ -1551,7 +1554,6 @@ class UI:
             self.SHOW_INPUT_BOX = settings.get('show_input_box', True)
             self.SHOW_CLASSIFY_FRAME = settings.get('show_classify_frame', False)
             self.LABEL_FONT_SIZE = settings.get('label_font_size', 12)
-
             # Apply classification frame visibility
             self.toggle_classification_frame(self.SHOW_CLASSIFY_FRAME)
             
