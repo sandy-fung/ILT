@@ -239,7 +239,7 @@ class UI:
                 self.show_warning("classify types is not selected")
                 return
             if self.dispatch:
-                self.dispatch(UIEvent.MOVE_IMAGE, {"plate_types": selected_types})
+                self.dispatch(UIEvent.MOVE_IMAGE_CLASSIFIED, {"plate_types": selected_types})
 
         self.submit_button = tk.Button(
             self.classification_frame,

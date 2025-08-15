@@ -10,6 +10,7 @@ from log_levels import DEBUG, INFO, ERROR
 
 DELETE_FILE_TMP_PATH ="delete_tmp"
 MOVE_FILE_TMP_PATH ="issue_tmp"
+MOVE_FILE_CLASSIFY_PATH ="classified"
 class Controller:
     def __init__(self, view):
         self.view = view
@@ -341,6 +342,13 @@ class Controller:
             plate_type = event_data.get("plate_types", "")
             
             self.move_selected_image_and_label(MOVE_FILE_TMP_PATH, plate_type)
+            
+        elif event_type == UIEvent.MOVE_IMAGE_CLASSIFIED:
+            DEBUG("Controller: Move image button pressed.")
+            plate_type = event_data.get("plate_types", "")
+            self.move_selected_image_and_label(MOVE_FILE_CLASSIFY_PATH, plate_type)
+            
+            
 
         elif event_type == UIEvent.INPUT_ENTER:
             DEBUG("Controller: Input enter pressed.")
@@ -818,3 +826,4 @@ class Controller:
     def on_settings_confirm(self, settings):
         """Callback for settings confirmation"""
         self.handle_event(UIEvent.SETTINGS_DIALOG_CONFIRM, {"settings": settings})
+        
