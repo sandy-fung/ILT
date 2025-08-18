@@ -76,7 +76,6 @@ class UI:
         self.create_classification_area()
                 
         if CUT_IMAGE_ENABLE == True:
-            print("Cut image feature is enabled.")
             self.create_cut_image_bt()
         self.create_bottom_area()
 
