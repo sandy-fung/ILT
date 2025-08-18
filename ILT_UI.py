@@ -75,7 +75,8 @@ class UI:
         self.create_middle_area()
         self.create_classification_area()
                 
-        if CUT_IMAGE_ENABLE:
+        if CUT_IMAGE_ENABLE == True:
+            print("Cut image feature is enabled.")
             self.create_cut_image_bt()
         self.create_bottom_area()
 
@@ -1104,9 +1105,7 @@ class UI:
         
 # Add an adjustable vertival Line to cut image
 
-    # def on_line_move(self, _line: DraggableVerticalLine, _x: int):
-            # print(f"Line moved to: {_x}")
-        # status.set(f"L1: {line1.get_x()}, L2: {line2.get_x()}")
+
         
     def create_vertical_line(self):
       
@@ -1173,7 +1172,8 @@ class UI:
         self.canvas.image = image
         self.canvas.create_image(self.canvas_width//2, self.canvas_height//2, anchor = "center", image = image)
         DEBUG("Image updated on canvas with height: {}, width: {}", self.canvas_height, self.canvas_width)
-        self.create_vertical_line()
+        if  CUT_IMAGE_ENABLE == True:
+            self.create_vertical_line()
 
     def clear_all_labels_canvas(self):
         """Clear all items on the canvas"""
