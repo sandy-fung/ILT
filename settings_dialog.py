@@ -3,8 +3,8 @@ from tkinter import ttk
 from log_levels import DEBUG, INFO, ERROR
 
 DEFAULT_LABEL_FONT_SIZE = 10
-DIALOG_WIDTH = 400
-DIALOG_HEIGHT = 360
+DIALOG_WIDTH = 450
+DIALOG_HEIGHT = 400
 class SettingsDialog:
     def __init__(self, parent, current_settings, on_confirm_callback):
         """
@@ -27,6 +27,7 @@ class SettingsDialog:
         self.show_preview_var = tk.BooleanVar()
         self.show_input_box_var = tk.BooleanVar()
         self.show_classify_frame_var = tk.BooleanVar()
+        self.show_cut_image_var = tk.BooleanVar()
         self.label_font_size_current = str(DEFAULT_LABEL_FONT_SIZE)  # Default font size
 
         self.create_dialog()
@@ -37,7 +38,7 @@ class SettingsDialog:
             # Create toplevel window with fixed size
             self.dialog = tk.Toplevel(self.parent)
             self.dialog.title("Configuration")
-            self.dialog.geometry("400x300")
+            self.dialog.geometry(f"{DIALOG_WIDTH}x{DIALOG_HEIGHT}")
             self.dialog.resizable(False, False)
 
             # Make dialog modal
@@ -111,6 +112,7 @@ class SettingsDialog:
             self.show_preview_var.set(self.current_settings.get('show_preview', True))
             self.show_input_box_var.set(self.current_settings.get('show_input_box', True))
             self.show_classify_frame_var.set(self.current_settings.get('show_classify_frame', True))
+            self.show_cut_image_var.set(self.current_settings.get('show_cut_image', True))
             self.label_font_size_current = self.current_settings.get('label_font_size')
 
 
@@ -175,6 +177,13 @@ class SettingsDialog:
             )
             checkbox5.pack(anchor=tk.W, pady=2)
             
+            checkbox6 = ttk.Checkbutton(
+                settings_frame,
+                text="Show Cut Image Button",
+                variable=self.show_cut_image_var
+            )
+            checkbox6.pack(anchor=tk.W, pady=2)
+            
             # font size for label ascci
             font_frame = ttk.LabelFrame(main_frame, text="", padding="10")
             font_frame.pack(fill=tk.X, pady=(0, 10))
@@ -226,6 +235,7 @@ class SettingsDialog:
             'show_preview': self.show_preview_var.get(),
             'show_input_box': self.show_input_box_var.get(),
             'show_classify_frame': self.show_classify_frame_var.get(),
+            'show_cut_image': self.show_cut_image_var.get(),
             'label_font_size': int(self.label_font_size_entry.get())
         }
 
@@ -297,6 +307,7 @@ if __name__ == "__main__":
         'show_preview': True,
         'show_input_box': True,
         'show_classify_frame': True,
+        'show_cut_image': True,
         'label_font_size_entry': 12
     }
 

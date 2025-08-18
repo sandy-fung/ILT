@@ -15,7 +15,6 @@ from DragableVerticalLine import DraggableVerticalLine
 
 DEFAULT_W = 1920
 DEFAULT_H = 1080
-CUT_IMAGE_ENABLE = True
 
 class UI:
     def __init__(self):
@@ -61,6 +60,7 @@ class UI:
         self.SHOW_PREVIEW = config_utils.get_show_preview()
         self.SHOW_INPUT_BOX = config_utils.get_show_input_box()
         self.SHOW_CLASSIFY_FRAME= config_utils.get_show_classify_frame()
+        self.SHOW_CUT_IMAGE = config_utils.get_show_cut_image()
         self.LABEL_FONT_SIZE = config_utils.get_ui_label_font_size_in_config()
 
         self.setup_ui()
@@ -75,8 +75,7 @@ class UI:
         self.create_middle_area()
         self.create_classification_area()
                 
-        if CUT_IMAGE_ENABLE:
-            self.create_cut_image_bt()
+        self.create_cut_image_bt()
         self.create_bottom_area()
 
     def create_top_area(self):
@@ -263,7 +262,6 @@ class UI:
     def create_cut_image_bt(self):
         """Create the cut image button and its functionality."""
         self.cut_frame = tk.Frame(self.window, relief = "ridge", bd = 2, bg = "#FAFAFA")
-        # self.classification_frame.pack(side = "top", fill = "x")
         self.cut_frame.pack(side="top", anchor="center")
         self.cut_image_button = tk.Button(
             self.cut_frame,
@@ -276,6 +274,9 @@ class UI:
             command=self.on_cut_image_button_click
         )
         self.cut_image_button.pack(side="left", padx=10, pady=10)
+        
+        if self.SHOW_CUT_IMAGE is False:
+            self.cut_frame.pack_forget()
         
     def create_text_area(self):
         self.text_frame = tk.Frame(self.bottom_frame, bg = "#FAFAFA")
@@ -1109,6 +1110,13 @@ class UI:
         # status.set(f"L1: {line1.get_x()}, L2: {line2.get_x()}")
         
     def create_vertical_line(self):
+        if not self.SHOW_CUT_IMAGE:
+            return
+        
+        def on_vertical_line_press(line, event):
+            if self.dispatch:
+                self.dispatch(UIEvent.VERTICAL_LINE_PRESS, None)
+                DEBUG("Vertical line pressed, event dispatched")
       
         # Create two draggable lines with different styles
         self.cut_line = DraggableVerticalLine(
@@ -1122,6 +1130,7 @@ class UI:
             snap=1,
             # on_move=self.on_line_move,
             on_move=None,
+            on_press=on_vertical_line_press
          )
 # About canvas
 
@@ -1152,6 +1161,9 @@ class UI:
             
 
     def on_cut_image(self, event):
+        if not self.SHOW_CUT_IMAGE:
+            return
+            
         print("Cut image event triggered")
         # Check if self.cut_line exists
         if hasattr(self, 'cut_line') and self.cut_line is not None:
@@ -1508,6 +1520,18 @@ class UI:
 
     def on_mouse_motion(self, event):
         """Handle mouse motion event - update cursor based on position"""
+        # Check if mouse is near the vertical cut line or dragging it
+        if self.SHOW_CUT_IMAGE and hasattr(self, 'cut_line') and self.cut_line is not None:
+            # Check if currently dragging the cut line
+            if getattr(self.cut_line, '_dragging', False):
+                # Don't update cursor when dragging cut line
+                return
+            # Check if mouse is near the cut line (using same logic as DraggableVerticalLine)
+            grab_px = getattr(self.cut_line, 'grab_px', 6)
+            if abs(event.x - self.cut_line.get_x()) <= grab_px:
+                # Don't update cursor when near cut line
+                return
+        
         if self.bbox_controller and hasattr(self, 'current_labels') and self.current_labels:
             # Update cursor based on mouse position using stored labels
             self.bbox_controller.update_cursor_for_position(event.x, event.y, self.current_labels)
@@ -1616,9 +1640,13 @@ class UI:
             self.SHOW_PREVIEW = settings.get('show_preview', True)
             self.SHOW_INPUT_BOX = settings.get('show_input_box', True)
             self.SHOW_CLASSIFY_FRAME = settings.get('show_classify_frame', False)
+            self.SHOW_CUT_IMAGE = settings.get('show_cut_image', True)
             self.LABEL_FONT_SIZE = settings.get('label_font_size', 12)
             # Apply classification frame visibility
             self.toggle_classification_frame(self.SHOW_CLASSIFY_FRAME)
+            
+            # Apply cut image visibility
+            self.toggle_cut_image(self.SHOW_CUT_IMAGE)
             
             # Apply input box visibility (should be first, like in original creation)
             self.toggle_input_box(self.SHOW_INPUT_BOX)
@@ -1834,6 +1862,65 @@ class UI:
                     self.classification_frame.pack_forget()
         except Exception as e:
             ERROR("Error toggling classification frame: {}", e)
+
+    def toggle_cut_image(self, show):
+        """Toggle cut image feature visibility"""
+        try:
+            if show is True:
+                # If we want to show but cut_frame doesn't exist, create it
+                if not hasattr(self, 'cut_frame') or self.cut_frame is None:
+                    DEBUG("Creating cut image frame for show operation")
+                    self.create_cut_image_bt()
+                else:
+                    try:
+                        # Check if already packed by trying to get pack_info
+                        self.cut_frame.pack_info()
+                    except tk.TclError:
+                        # Not packed, so pack it
+                        self.cut_frame.pack(side="top", anchor="center")
+                        DEBUG("cut_frame shown")
+                
+                # Create vertical line if there's an image on canvas
+                if hasattr(self, 'canvas') and self.canvas is not None:
+                    self.create_vertical_line()
+                
+                # Bind keyboard shortcut if not already bound
+                if not hasattr(self, '_cut_image_bound') or not self._cut_image_bound:
+                    self.window.bind("<Shift-C>", self.on_cut_image)
+                    self._cut_image_bound = True
+                        
+            else:
+                # If we want to hide the cut_frame
+                if hasattr(self, 'cut_frame') and self.cut_frame is not None:
+                    try:
+                        # Check if packed by trying to get pack_info
+                        self.cut_frame.pack_info()
+                        self.cut_frame.pack_forget()
+                        DEBUG("cut_frame hidden")
+                    except tk.TclError:
+                        # Already not packed
+                        pass
+                
+                # Hide vertical line by removing it
+                if hasattr(self, 'cut_line') and self.cut_line is not None:
+                    # Remove the line elements from canvas
+                    try:
+                        if hasattr(self.cut_line, 'bg_line'):
+                            self.canvas.delete(self.cut_line.bg_line)
+                        if hasattr(self.cut_line, 'fg_line'):
+                            self.canvas.delete(self.cut_line.fg_line)
+                        self.cut_line = None
+                        DEBUG("Vertical cut line removed")
+                    except Exception as line_error:
+                        ERROR("Error removing vertical line: {}", line_error)
+                
+                # Unbind keyboard shortcut
+                if hasattr(self, '_cut_image_bound') and self._cut_image_bound:
+                    self.window.unbind("<Shift-C>")
+                    self._cut_image_bound = False
+                    
+        except Exception as e:
+            ERROR("Error toggling cut image feature: {}", e)
             
             
     def next_image(self, event):
@@ -1871,8 +1958,7 @@ class UI:
 
         self.window.bind("<Button-1>", self._clear_focus)
 
-        if CUT_IMAGE_ENABLE:
-            self.window.bind("<Shift-C>", self.on_cut_image)
+        self.window.bind("<Shift-C>", self.on_cut_image)
         
         # Mouse event binding (support drawing functionality)
         self.canvas.bind("<Button-1>", self.on_mouse_press)

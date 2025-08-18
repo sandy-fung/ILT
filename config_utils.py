@@ -241,6 +241,13 @@ def get_show_classify_frame():
         return ret
     except:
         return False  # Default to False (current setting)
+
+def get_show_cut_image():
+    """Get whether to show cut image feature"""
+    try:
+        return config.getboolean("UISettings", "show_cut_image")
+    except:
+        return True  # Default to True (current setting)
     
 def get_ui_label_font_size_in_config():
     """Get the font size for UI labels"""
@@ -250,7 +257,8 @@ def get_ui_label_font_size_in_config():
         return 12  # Default font size
 
 def save_ui_settings(show_class_id_buttons=None, show_text_box=None,
-                    show_preview=None, show_input_box=None, show_classify_frame=None,label_font_size=10):
+                    show_preview=None, show_input_box=None, show_classify_frame=None, 
+                    show_cut_image=None, label_font_size=10):
     """Save UI settings to config file"""
     if not config.has_section("UISettings"):
         config.add_section("UISettings")
@@ -267,6 +275,8 @@ def save_ui_settings(show_class_id_buttons=None, show_text_box=None,
         config.set("UISettings", "label_font_size", str(label_font_size))
     if show_classify_frame is not None:
         config.set("UISettings", "show_classify_frame", str(show_classify_frame).lower())
+    if show_cut_image is not None:
+        config.set("UISettings", "show_cut_image", str(show_cut_image).lower())
     with open(DEFAULT_CONFI_PATH, "w") as f:
         config.write(f)
 
@@ -278,6 +288,7 @@ def get_all_ui_settings():
         'show_preview': get_show_preview(),
         'show_input_box': get_show_input_box(),
         'show_classify_frame': get_show_classify_frame(),
+        'show_cut_image': get_show_cut_image(),
         'label_font_size': get_ui_label_font_size_in_config()
     }
 

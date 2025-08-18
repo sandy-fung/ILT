@@ -360,6 +360,14 @@ class Controller:
             self.cut_image_into_two_parts(x_position)
             self.next_image()
            
+        elif event_type == UIEvent.VERTICAL_LINE_PRESS:
+            DEBUG("Controller: Vertical line pressed")
+            # 檢查是否在繪框模式
+            if self.view.bbox_controller and self.view.bbox_controller.is_in_drawing_mode():
+                # 退出繪框模式
+                self.view.bbox_controller.toggle_drawing_mode()
+                self.view.update_drawing_mode_display()
+                DEBUG("Exited drawing mode due to vertical line press")
             
 
         elif event_type == UIEvent.INPUT_ENTER:

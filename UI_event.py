@@ -20,6 +20,7 @@ class UIEvent(Enum):
     MOVE_IMAGE = auto()
     MOVE_IMAGE_CLASSIFIED = auto()
     CUT_IMAGE = auto()
+    VERTICAL_LINE_PRESS = auto()
 
     RESELECT_BT_CLICK = auto()
     CROP_BT_CLICK = auto()
