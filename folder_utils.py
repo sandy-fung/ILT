@@ -45,3 +45,55 @@ def move_file(src, dst):
     except OSError as e:
         ERROR("Error moving file from {} to {}: {}", src, dst, e)
         raise e
+
+def get_original_filename_from_crop(crop_stem: str) -> str:
+    """
+    從crop檔案名稱推導原始檔案名稱
+    
+    Args:
+        crop_stem: crop檔案的stem (無副檔名)
+        例如: "video1_f000123_crop_00" -> "video1_f000123"
+    
+    Returns:
+        str: 原始檔案名稱
+    """
+    if '_crop_' in crop_stem:
+        return crop_stem.split('_crop_')[0]
+    
+    parts = crop_stem.rsplit('_', 1)
+    if len(parts) > 1 and parts[1].isdigit():
+        return parts[0]
+    
+    return crop_stem
+
+def find_original_image_path(crop_image_path: str) -> str:
+    """
+    從crop圖片路徑找到對應的原始圖片路徑
+    
+    Args:
+        crop_image_path: crop圖片的完整路徑
+    
+    Returns:
+        str: 原始圖片的完整路徑，如果找不到則返回空字串
+    """
+    crop_dir = os.path.dirname(crop_image_path)
+    crop_filename = os.path.basename(crop_image_path)
+    crop_stem = os.path.splitext(crop_filename)[0]
+    crop_ext = os.path.splitext(crop_filename)[1]
+    
+    # 推導原始檔案名
+    original_stem = get_original_filename_from_crop(crop_stem)
+    original_filename = original_stem + crop_ext
+    
+    # 找到原始圖片目錄（從crop目錄往上一層，然後進入images目錄）
+    parent_dir = os.path.dirname(crop_dir)
+    original_dir = os.path.join(parent_dir, "images")
+    original_path = os.path.join(original_dir, original_filename)
+    
+    # 檢查檔案是否存在
+    if os.path.exists(original_path):
+        DEBUG("Found original image for crop: {} -> {}", crop_image_path, original_path)
+        return original_path
+    else:
+        DEBUG("Original image not found for crop: {}, expected: {}", crop_image_path, original_path)
+        return ""

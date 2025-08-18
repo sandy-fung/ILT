@@ -26,6 +26,7 @@ class Controller:
         self.image_index = 0
         self.image_width = 0
         self.image_height = 0
+        self.original_image_for_preview = None
 
         # initial state
         self.drawing_mode = False
@@ -99,6 +100,18 @@ class Controller:
         image_path = imgs_path[index]
 
         self.original_image = image_utils.load_image(image_path)
+        
+        # Try to load original image for preview if this is a crop
+        original_image_path = folder_utils.find_original_image_path(image_path)
+        if original_image_path:
+            try:
+                self.original_image_for_preview = image_utils.load_image(original_image_path)
+                DEBUG("Loaded original image for crop preview: {}", original_image_path)
+            except Exception as e:
+                ERROR("Failed to load original image for preview: {}", str(e))
+                self.original_image_for_preview = None
+        else:
+            self.original_image_for_preview = None
 
         if hasattr(self.view, "bbox_controller"):
             self.view.bbox_controller.clear_selection(self.current_labels)
@@ -130,6 +143,10 @@ class Controller:
             # Update preview with the full image
             if hasattr(self.view, 'update_preview'):
                 self.view.update_preview(self.original_image)
+        
+        # Set original image for preview if available
+        if hasattr(self.view, 'set_original_image_for_preview'):
+            self.view.set_original_image_for_preview(self.original_image_for_preview)
         
         DEBUG("Controller.load_image() completed")
         self.view.update_index_label(self.image_index, self.images_path)

@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import filedialog
+from tkinter import ttk
 from UI_event import UIEvent
 from log_levels import DEBUG, INFO, ERROR
 from tkinter import messagebox
@@ -381,62 +382,126 @@ class UI:
         )
         self.preview_title.pack(side = "top", pady = 5)
         
-        # Create preview canvas container
-        self.preview_canvas_frame = tk.Frame(self.preview_frame, bg = "#FAFAFA")
-        self.preview_canvas_frame.pack(side = "top", fill = "both", expand = True, padx = 10, pady = (0, 10))
+        # Create notebook for tabs
+        self.preview_notebook = ttk.Notebook(self.preview_frame)
+        self.preview_notebook.pack(side = "top", fill = "both", expand = True, padx = 10, pady = (0, 10))
         
-        # Create scrollbars
-        self.preview_v_scrollbar = tk.Scrollbar(self.preview_canvas_frame, orient = "vertical")
-        self.preview_h_scrollbar = tk.Scrollbar(self.preview_canvas_frame, orient = "horizontal")
+        # Create crop preview tab
+        self.crop_tab_frame = tk.Frame(self.preview_notebook, bg = "#FAFAFA")
+        self.preview_notebook.add(self.crop_tab_frame, text = "Crop")
         
-        # Create preview canvas with dynamic size
-        self.preview_canvas = tk.Canvas(
-            self.preview_canvas_frame,
-            bg = "white",
-            highlightthickness = 1,
-            highlightbackground = "#8E8E79",
-            yscrollcommand = self.preview_v_scrollbar.set,
-            xscrollcommand = self.preview_h_scrollbar.set
-        )
+        # Create original preview tab
+        self.original_tab_frame = tk.Frame(self.preview_notebook, bg = "#FAFAFA")
+        self.preview_notebook.add(self.original_tab_frame, text = "原圖")
         
-        # Configure scrollbars
-        self.preview_v_scrollbar.config(command = self.preview_canvas.yview)
-        self.preview_h_scrollbar.config(command = self.preview_canvas.xview)
+        # Create crop preview canvas and scrollbars
+        self._create_canvas_with_scrollbars("crop")
         
-        # Pack canvas and scrollbars
-        self.preview_canvas.grid(row = 0, column = 0, sticky = "nsew")
-        self.preview_v_scrollbar.grid(row = 0, column = 1, sticky = "ns")
-        self.preview_h_scrollbar.grid(row = 1, column = 0, sticky = "ew")
-        
-        # Configure grid weights
-        self.preview_canvas_frame.grid_rowconfigure(0, weight = 1)
-        self.preview_canvas_frame.grid_columnconfigure(0, weight = 1)
+        # Create original preview canvas and scrollbars  
+        self._create_canvas_with_scrollbars("original")
         
         # Initialize preview state
         self.preview_image = None
         self.preview_photo_image = None
+        self.original_image_for_preview = None
+        self.original_photo_image = None
+        self.pending_original_image = None
         
         # Schedule placeholder text after window is rendered
         if self.preview_canvas:
             self.preview_canvas.after_idle(self._add_preview_placeholder)
+        if self.original_canvas:
+            self.original_canvas.after_idle(lambda: self._add_placeholder_to_canvas(self.original_canvas, "無原圖"))
 
-        # Bind magnifier events to preview canvas
-        if self.preview_canvas:
-            self.preview_canvas.bind("<Enter>", self.on_preview_enter)
-            self.preview_canvas.bind("<Leave>", self.on_preview_leave)
-            self.preview_canvas.bind("<Button-1>", self.on_preview_left_click)
-            self.preview_canvas.bind("<Button-3>", self.on_preview_right_drag_start)
-            self.preview_canvas.bind("<B3-Motion>", self.on_preview_right_drag)
-            self.preview_canvas.bind("<ButtonRelease-3>", self.on_preview_right_drag_end)
+        # Bind magnifier events to both canvases
+        self._bind_canvas_events(self.preview_canvas, "crop")
+        self._bind_canvas_events(self.original_canvas, "original")
+        
+        # Bind tab change event
+        self.preview_notebook.bind("<<NotebookTabChanged>>", self.on_preview_tab_changed)
         
         # Initialize magnifier state
         self.magnifier_tooltip = None
         self.is_dragging_preview = False
+        self.is_dragging_original = False
         self.drag_start_x = 0
         self.drag_start_y = 0
         
         # Initialize magnifier cache (LRU cache for magnified regions) 
         self.magnifier_cache = {}
+    
+    def on_preview_tab_changed(self, event):
+        """Handle tab change in preview notebook"""
+        try:
+            selected_tab = self.preview_notebook.index(self.preview_notebook.select())
+            DEBUG("Preview tab changed to index: {}", selected_tab)
+            
+            # If switched to original tab (index 1) and we have a pending image
+            if selected_tab == 1 and self.pending_original_image:
+                DEBUG("Switched to original tab, updating preview with pending image")
+                self.update_original_preview(self.pending_original_image)
+        except Exception as e:
+            ERROR("Error handling tab change: {}", str(e))
+    
+    def _create_canvas_with_scrollbars(self, canvas_type):
+        """Create a canvas with scrollbars for the specified type (crop or original)"""
+        if canvas_type == "crop":
+            parent_frame = self.crop_tab_frame
+            canvas_name = "preview_canvas"
+            v_scrollbar_name = "preview_v_scrollbar"
+            h_scrollbar_name = "preview_h_scrollbar"
+            canvas_frame_name = "preview_canvas_frame"
+        else:  # original
+            parent_frame = self.original_tab_frame
+            canvas_name = "original_canvas"
+            v_scrollbar_name = "original_v_scrollbar"
+            h_scrollbar_name = "original_h_scrollbar"
+            canvas_frame_name = "original_canvas_frame"
+        
+        # Create canvas container
+        canvas_frame = tk.Frame(parent_frame, bg = "#FAFAFA")
+        canvas_frame.pack(fill = "both", expand = True)
+        setattr(self, canvas_frame_name, canvas_frame)
+        
+        # Create scrollbars
+        v_scrollbar = tk.Scrollbar(canvas_frame, orient = "vertical")
+        h_scrollbar = tk.Scrollbar(canvas_frame, orient = "horizontal")
+        setattr(self, v_scrollbar_name, v_scrollbar)
+        setattr(self, h_scrollbar_name, h_scrollbar)
+        
+        # Create canvas with dynamic size
+        canvas = tk.Canvas(
+            canvas_frame,
+            bg = "white",
+            highlightthickness = 1,
+            highlightbackground = "#8E8E79",
+            yscrollcommand = v_scrollbar.set,
+            xscrollcommand = h_scrollbar.set
+        )
+        setattr(self, canvas_name, canvas)
+        
+        # Configure scrollbars
+        v_scrollbar.config(command = canvas.yview)
+        h_scrollbar.config(command = canvas.xview)
+        
+        # Pack canvas and scrollbars
+        canvas.grid(row = 0, column = 0, sticky = "nsew")
+        v_scrollbar.grid(row = 0, column = 1, sticky = "ns")
+        h_scrollbar.grid(row = 1, column = 0, sticky = "ew")
+        
+        # Configure grid weights
+        canvas_frame.grid_rowconfigure(0, weight = 1)
+        canvas_frame.grid_columnconfigure(0, weight = 1)
+    
+    def _bind_canvas_events(self, canvas, canvas_type):
+        """Bind events to the specified canvas"""
+        if canvas:
+            canvas.bind("<Enter>", lambda event: self.on_preview_enter(event, canvas_type))
+            canvas.bind("<Leave>", lambda event: self.on_preview_leave(event, canvas_type))
+            canvas.bind("<Button-1>", lambda event: self.on_preview_left_click(event, canvas_type))
+            canvas.bind("<Button-3>", lambda event: self.on_preview_right_drag_start(event, canvas_type))
+            canvas.bind("<B3-Motion>", lambda event: self.on_preview_right_drag(event, canvas_type))
+            canvas.bind("<ButtonRelease-3>", lambda event: self.on_preview_right_drag_end(event, canvas_type))
         self.cache_access_order = []
         
         # Load magnifier configuration
@@ -446,18 +511,22 @@ class UI:
     
     def _add_preview_placeholder(self):
         """Add placeholder text to preview canvas after it has been rendered"""
-        if not self.preview_canvas:
+        self._add_placeholder_to_canvas(self.preview_canvas, "尚未載入圖片")
+    
+    def _add_placeholder_to_canvas(self, canvas, text):
+        """Add placeholder text to specified canvas after it has been rendered"""
+        if not canvas:
             return
             
         # Get actual canvas dimensions
-        self.preview_canvas.update_idletasks()
-        canvas_width = self.preview_canvas.winfo_width()
-        canvas_height = self.preview_canvas.winfo_height()
+        canvas.update_idletasks()
+        canvas_width = canvas.winfo_width()
+        canvas_height = canvas.winfo_height()
         
         # Add placeholder text at center
-        self.preview_canvas.create_text(
+        canvas.create_text(
             canvas_width // 2, canvas_height // 2,
-            text = "尚未載入圖片",
+            text = text,
             fill = "#8E8E79",
             font = ("Segoe UI", 12),
             tags = "placeholder"
@@ -538,6 +607,31 @@ class UI:
         # Clear magnifier cache when image changes
         self.clear_magnifier_cache()
         DEBUG("Original image reference updated for preview")
+    
+    def set_original_image_for_preview(self, original_image_for_preview):
+        """Set the original image for preview functionality (for crop images)
+        
+        Args:
+            original_image_for_preview: PIL.Image object of the original image for preview
+        """
+        self.original_image_for_preview = original_image_for_preview
+        self.pending_original_image = original_image_for_preview
+        
+        if original_image_for_preview:
+            DEBUG("Original image for preview set, will update when tab is selected")
+            # Only update if original tab is currently selected
+            try:
+                if hasattr(self, 'preview_notebook') and self.preview_notebook:
+                    selected_tab = self.preview_notebook.index(self.preview_notebook.select())
+                    if selected_tab == 1:  # Original tab is selected
+                        self.update_original_preview(original_image_for_preview)
+            except:
+                pass  # Tab not ready yet, will update on tab change
+        else:
+            DEBUG("No original image for preview available")
+            # Clear the original preview tab
+            if hasattr(self, 'original_canvas') and self.original_canvas:
+                self.clear_original_preview()
 
     def update_preview(self, original_image):
         """Update preview with the full original image
@@ -585,6 +679,113 @@ class UI:
         )
         
         DEBUG("Preview updated with original size image: {}×{}", img_width, img_height)
+    
+    def update_original_preview(self, original_image):
+        """Update original preview tab with auto-scaled original image
+        
+        Args:
+            original_image: PIL Image object
+        """
+        if not self.SHOW_PREVIEW or not hasattr(self, 'original_canvas') or self.original_canvas is None:
+            return
+            
+        from PIL import Image, ImageTk
+        import image_utils
+        
+        # Clear previous preview
+        self.original_canvas.delete("all")
+        
+        # Get original image dimensions
+        img_width, img_height = original_image.size
+        
+        # Get canvas dimensions
+        self.original_canvas.update_idletasks()
+        canvas_width = self.original_canvas.winfo_width()
+        canvas_height = self.original_canvas.winfo_height()
+        
+        # Check if canvas has valid dimensions
+        if canvas_width <= 0 or canvas_height <= 0:
+            DEBUG("Canvas not ready for original preview: {}x{}", canvas_width, canvas_height)
+            # Store image for later update when tab is selected
+            self.pending_original_image = original_image
+            return
+        
+        # Calculate scale to fit canvas while maintaining aspect ratio
+        scale_x = canvas_width / img_width
+        scale_y = canvas_height / img_height
+        scale = min(scale_x, scale_y)  # Use smaller scale to ensure image fits
+        
+        # Calculate scaled dimensions with minimum size protection
+        scaled_width = max(1, int(img_width * scale))
+        scaled_height = max(1, int(img_height * scale))
+        
+        # Resize image to fit canvas
+        scaled_image = image_utils.resize_image(original_image, (scaled_width, scaled_height))
+        self.original_photo_image = ImageTk.PhotoImage(scaled_image)
+        
+        # Center the scaled image on canvas
+        x_offset = (canvas_width - scaled_width) // 2
+        y_offset = (canvas_height - scaled_height) // 2
+        
+        # Display scaled image centered on canvas
+        self.original_canvas.create_image(x_offset, y_offset, anchor = "nw", image = self.original_photo_image, tags = "original_image")
+        
+        # No need for scroll region since image is scaled to fit
+        self.original_canvas.config(scrollregion = (0, 0, canvas_width, canvas_height))
+        
+        # Add info text showing original size and scale
+        scale_percent = int(scale * 100)
+        info_text = f"原圖: {img_width}×{img_height} ({scale_percent}%)"
+        self.original_canvas.create_text(
+            10, canvas_height - 5,
+            text = info_text,
+            fill = "#8E8E79",
+            font = ("Segoe UI", 9),
+            anchor = "sw",
+            tags = ("info_text", "overlay")
+        )
+        
+        # Store scale for coordinate conversion
+        self.original_preview_scale = scale
+        self.original_preview_offset = (x_offset, y_offset)
+        
+        DEBUG("Original preview updated with scaled image: {}×{} -> {}×{} ({}%)", 
+              img_width, img_height, scaled_width, scaled_height, scale_percent)
+        
+        # Clear pending image since we've successfully updated
+        self.pending_original_image = None
+    
+    def clear_original_preview(self):
+        """Clear the original preview canvas"""
+        if not self.SHOW_PREVIEW or not hasattr(self, 'original_canvas') or self.original_canvas is None:
+            return
+            
+        DEBUG("Clearing original preview canvas")
+        
+        # Clear image display
+        self.original_canvas.delete("all")
+        
+        # Add placeholder text
+        self.original_canvas.update_idletasks()
+        canvas_width = self.original_canvas.winfo_width()
+        canvas_height = self.original_canvas.winfo_height()
+        
+        self.original_canvas.create_text(
+            canvas_width // 2, canvas_height // 2,
+            text = "無原圖",
+            fill = "#8E8E79",
+            font = ("Segoe UI", 12),
+            tags = "placeholder"
+        )
+        
+        # Reset scroll region
+        self.original_canvas.config(scrollregion = (0, 0, canvas_width, canvas_height))
+        
+        # Clear photo image reference
+        self.original_photo_image = None
+        
+        # Clear pending image
+        self.pending_original_image = None
 
     def clear_preview(self):
         """Clear the preview canvas"""
@@ -622,53 +823,60 @@ class UI:
     
 
     # Magnifier functionality for preview panel
-    def on_preview_enter(self, event):
+    def on_preview_enter(self, event, canvas_type="crop"):
         """Handle mouse enter event on preview canvas - change cursor to magnifier"""
-        if not self.SHOW_PREVIEW or self.preview_canvas is None or not self.magnifier_enabled:
+        canvas = self.preview_canvas if canvas_type == "crop" else self.original_canvas
+        if not self.SHOW_PREVIEW or canvas is None or not self.magnifier_enabled:
             return
             
-        DEBUG("Mouse entered preview canvas")
-        self.preview_canvas.config(cursor=self.magnifier_cursor)
+        DEBUG("Mouse entered {} canvas", canvas_type)
+        canvas.config(cursor=self.magnifier_cursor)
         
-    def on_preview_leave(self, event):
+    def on_preview_leave(self, event, canvas_type="crop"):
         """Handle mouse leave event on preview canvas - restore normal cursor"""
-        if not self.SHOW_PREVIEW or self.preview_canvas is None:
+        canvas = self.preview_canvas if canvas_type == "crop" else self.original_canvas
+        if not self.SHOW_PREVIEW or canvas is None:
             return
             
-        DEBUG("Mouse left preview canvas")
-        self.preview_canvas.config(cursor="")
+        DEBUG("Mouse left {} canvas", canvas_type)
+        canvas.config(cursor="")
         
         # Hide magnifier tooltip if visible
         self.hide_magnifier_tooltip()
         
-    def on_preview_left_click(self, event):
+    def on_preview_left_click(self, event, canvas_type="crop"):
         """Handle left click on preview canvas - show magnified tooltip"""
-        if not self.SHOW_PREVIEW or self.preview_canvas is None or self.original_image is None or not self.magnifier_enabled:
+        canvas = self.preview_canvas if canvas_type == "crop" else self.original_canvas
+        image = self.original_image if canvas_type == "crop" else self.original_image_for_preview
+        
+        if not self.SHOW_PREVIEW or canvas is None or image is None or not self.magnifier_enabled:
             return
             
-        DEBUG("Left click on preview canvas at ({}, {})", event.x, event.y)
+        DEBUG("Left click on {} canvas at ({}, {})", canvas_type, event.x, event.y)
         
         # Hide existing tooltip first
         self.hide_magnifier_tooltip()
         
         # Show magnifier tooltip at clicked position
-        self.show_magnifier_tooltip(event.x, event.y)
+        self.show_magnifier_tooltip(event.x, event.y, canvas_type)
         
-    def show_magnifier_tooltip(self, canvas_x, canvas_y):
+    def show_magnifier_tooltip(self, canvas_x, canvas_y, canvas_type="crop"):
         """Create and show magnifier tooltip with 3x zoomed region
         
         Args:
             canvas_x, canvas_y: Click position on preview canvas
+            canvas_type: Either "crop" or "original"
         """
-        if not self.original_image:
-            DEBUG("No original image available for magnification")
+        image = self.original_image if canvas_type == "crop" else self.original_image_for_preview
+        if not image:
+            DEBUG("No {} image available for magnification", canvas_type)
             return
             
         try:
             from PIL import Image, ImageTk
             
             # Convert canvas coordinates to original image coordinates
-            img_x, img_y = self.canvas_to_image_coords(canvas_x, canvas_y)
+            img_x, img_y = self.canvas_to_image_coords(canvas_x, canvas_y, canvas_type)
             if img_x is None or img_y is None:
                 DEBUG("Invalid coordinates for magnification")
                 return
@@ -677,7 +885,8 @@ class UI:
             magnified_image = self.extract_magnified_region(
                 img_x, img_y, 
                 zoom_factor=self.magnifier_zoom_factor,
-                region_size=self.magnifier_region_size
+                region_size=self.magnifier_region_size,
+                canvas_type=canvas_type
             )
             if magnified_image is None:
                 DEBUG("Failed to extract magnified region")
@@ -728,30 +937,49 @@ class UI:
             except:
                 pass
                 
-    def canvas_to_image_coords(self, canvas_x, canvas_y):
+    def canvas_to_image_coords(self, canvas_x, canvas_y, canvas_type="crop"):
         """Convert preview canvas coordinates to original image coordinates
         
         Args:
             canvas_x, canvas_y: Coordinates on preview canvas
+            canvas_type: Either "crop" or "original"
             
         Returns:
             tuple: (img_x, img_y) in original image coordinates, or (None, None) if invalid
         """
-        if not self.original_image or not self.preview_photo_image:
+        canvas = self.preview_canvas if canvas_type == "crop" else self.original_canvas
+        image = self.original_image if canvas_type == "crop" else self.original_image_for_preview
+        photo_image = self.preview_photo_image if canvas_type == "crop" else self.original_photo_image
+        
+        if not image or not photo_image:
             return None, None
             
         try:
             # Get original image dimensions
-            img_width, img_height = self.original_image.size
+            img_width, img_height = image.size
             
-            # Since image is displayed at original size, we need to account for scrolling
-            # Convert canvas coordinates to window coordinates
-            canvas_x_scroll = self.preview_canvas.canvasx(canvas_x)
-            canvas_y_scroll = self.preview_canvas.canvasy(canvas_y)
-            
-            # Direct mapping since no scaling
-            img_x = int(canvas_x_scroll)
-            img_y = int(canvas_y_scroll)
+            if canvas_type == "crop":
+                # Crop canvas: image is displayed at original size, account for scrolling
+                canvas_x_scroll = canvas.canvasx(canvas_x)
+                canvas_y_scroll = canvas.canvasy(canvas_y)
+                # Direct mapping since no scaling
+                img_x = int(canvas_x_scroll)
+                img_y = int(canvas_y_scroll)
+            else:
+                # Original canvas: image is scaled and centered
+                if hasattr(self, 'original_preview_scale') and hasattr(self, 'original_preview_offset'):
+                    x_offset, y_offset = self.original_preview_offset
+                    scale = self.original_preview_scale
+                    
+                    # Convert canvas coordinates to scaled image coordinates
+                    scaled_x = canvas_x - x_offset
+                    scaled_y = canvas_y - y_offset
+                    
+                    # Convert scaled coordinates to original image coordinates
+                    img_x = int(scaled_x / scale)
+                    img_y = int(scaled_y / scale)
+                else:
+                    return None, None
             
             # Check if coordinates are within image bounds
             if img_x < 0 or img_y < 0 or img_x >= img_width or img_y >= img_height:
@@ -767,22 +995,24 @@ class UI:
             ERROR("Failed to convert canvas coordinates to image coordinates: {}", str(e))
             return None, None
             
-    def extract_magnified_region(self, center_x, center_y, zoom_factor=3.0, region_size=50):
+    def extract_magnified_region(self, center_x, center_y, zoom_factor=3.0, region_size=50, canvas_type="crop"):
         """Extract and magnify a region from original image with caching
         
         Args:
             center_x, center_y: Center point in original image coordinates
             zoom_factor: Magnification factor (default 3x)
             region_size: Size of region to extract in pixels
+            canvas_type: Either "crop" or "original"
             
         Returns:
             ImageTk.PhotoImage: Magnified region image, or None if failed
         """
-        if not self.original_image:
+        image = self.original_image if canvas_type == "crop" else self.original_image_for_preview
+        if not image:
             return None
             
         # Generate cache key based on position and parameters
-        cache_key = f"{center_x}_{center_y}_{zoom_factor}_{region_size}_{id(self.original_image)}"
+        cache_key = f"{center_x}_{center_y}_{zoom_factor}_{region_size}_{id(image)}_{canvas_type}"
         
         # Check cache first
         cached_result = self.get_from_magnifier_cache(cache_key)
@@ -793,7 +1023,7 @@ class UI:
         try:
             from PIL import Image, ImageTk
             
-            img_width, img_height = self.original_image.size
+            img_width, img_height = image.size
             half_region = region_size // 2
             
             # Calculate extraction bounds with boundary checks
@@ -808,7 +1038,7 @@ class UI:
                 return None
             
             # Extract region efficiently
-            region = self.original_image.crop((left, top, right, bottom))
+            region = image.crop((left, top, right, bottom))
             
             # Calculate magnified size
             region_width = right - left
@@ -938,39 +1168,45 @@ class UI:
         
         return tooltip_x, tooltip_y
         
-    def on_preview_right_drag_start(self, event):
+    def on_preview_right_drag_start(self, event, canvas_type="crop"):
         """Handle right mouse button press - start dragging if image is larger than canvas"""
-        if not self.SHOW_PREVIEW or self.preview_canvas is None or not self.is_image_draggable():
+        canvas = self.preview_canvas if canvas_type == "crop" else self.original_canvas
+        if not self.SHOW_PREVIEW or canvas is None or not self.is_image_draggable(canvas_type):
             return
             
-        DEBUG("Right drag start on preview canvas at ({}, {})", event.x, event.y)
-        self.is_dragging_preview = True
+        DEBUG("Right drag start on {} canvas at ({}, {})", canvas_type, event.x, event.y)
+        if canvas_type == "crop":
+            self.is_dragging_preview = True
+        else:
+            self.is_dragging_original = True
         self.drag_start_x = event.x
         self.drag_start_y = event.y
         
         # Change cursor to indicate dragging mode
-        self.preview_canvas.config(cursor="fleur")
+        canvas.config(cursor="fleur")
         
         # Dispatch preview drag start event
         if self.dispatch:
             self.dispatch(UIEvent.PREVIEW_DRAG_START, {
                 "x": event.x,
-                "y": event.y
+                "y": event.y,
+                "canvas_type": canvas_type
             })
         
-    def on_preview_right_drag(self, event):
+    def on_preview_right_drag(self, event, canvas_type="crop"):
         """Handle right mouse drag - update image position"""
-        if not self.is_dragging_preview or not self.SHOW_PREVIEW:
+        is_dragging = self.is_dragging_preview if canvas_type == "crop" else self.is_dragging_original
+        if not is_dragging or not self.SHOW_PREVIEW:
             return
             
         # Calculate drag offset
         dx = event.x - self.drag_start_x
         dy = event.y - self.drag_start_y
         
-        DEBUG("Right drag on preview canvas: dx={}, dy={}", dx, dy)
+        DEBUG("Right drag on {} canvas: dx={}, dy={}", canvas_type, dx, dy)
         
         # Update preview view position
-        self.update_preview_view(dx, dy)
+        self.update_preview_view(dx, dy, canvas_type)
         
         # Update drag start position for next iteration
         self.drag_start_x = event.x
@@ -982,50 +1218,69 @@ class UI:
                 "x": event.x,
                 "y": event.y,
                 "dx": dx,
-                "dy": dy
+                "dy": dy,
+                "canvas_type": canvas_type
             })
         
-    def on_preview_right_drag_end(self, event):
+    def on_preview_right_drag_end(self, event, canvas_type="crop"):
         """Handle right mouse button release - end dragging"""
-        if not self.is_dragging_preview:
+        is_dragging = self.is_dragging_preview if canvas_type == "crop" else self.is_dragging_original
+        canvas = self.preview_canvas if canvas_type == "crop" else self.original_canvas
+        
+        if not is_dragging:
             return
             
-        DEBUG("Right drag end on preview canvas")
-        self.is_dragging_preview = False
+        DEBUG("Right drag end on {} canvas", canvas_type)
+        if canvas_type == "crop":
+            self.is_dragging_preview = False
+        else:
+            self.is_dragging_original = False
         
         # Restore magnifier cursor
-        self.preview_canvas.config(cursor=self.magnifier_cursor)
+        canvas.config(cursor=self.magnifier_cursor)
         
         # Dispatch preview drag end event
         if self.dispatch:
             self.dispatch(UIEvent.PREVIEW_DRAG_END, {
                 "x": event.x,
-                "y": event.y
+                "y": event.y,
+                "canvas_type": canvas_type
             })
         
-    def is_image_draggable(self):
+    def is_image_draggable(self, canvas_type="crop"):
         """Check if current image is large enough to support dragging
         
+        Args:
+            canvas_type: Either "crop" or "original"
+            
         Returns:
             bool: True if image can be dragged, False otherwise
         """
-        if not self.original_image or not self.preview_photo_image or not self.preview_canvas:
+        # Original canvas images are always scaled to fit, so never draggable
+        if canvas_type == "original":
+            return False
+            
+        canvas = self.preview_canvas
+        image = self.original_image
+        photo_image = self.preview_photo_image
+        
+        if not image or not photo_image or not canvas:
             return False
             
         try:
             # Get original image dimensions
-            img_width, img_height = self.original_image.size
+            img_width, img_height = image.size
             
             # Get actual preview canvas dimensions
-            self.preview_canvas.update_idletasks()
-            canvas_width = self.preview_canvas.winfo_width()
-            canvas_height = self.preview_canvas.winfo_height()
+            canvas.update_idletasks()
+            canvas_width = canvas.winfo_width()
+            canvas_height = canvas.winfo_height()
             
             # Image is draggable if it's larger than canvas in either dimension
             draggable = img_width > canvas_width or img_height > canvas_height
             
-            DEBUG("Image draggable check: {}x{} vs canvas {}x{} -> {}", 
-                  img_width, img_height, canvas_width, canvas_height, draggable)
+            DEBUG("Image draggable check ({}): {}x{} vs canvas {}x{} -> {}", 
+                  canvas_type, img_width, img_height, canvas_width, canvas_height, draggable)
                   
             return draggable
             
@@ -1033,22 +1288,28 @@ class UI:
             ERROR("Failed to check if image is draggable: {}", str(e))
             return False
             
-    def update_preview_view(self, dx, dy):
+    def update_preview_view(self, dx, dy, canvas_type="crop"):
         """Update preview canvas view position based on drag offset
         
         Args:
             dx, dy: Drag offset in pixels
+            canvas_type: Either "crop" or "original"
         """
-        if not self.SHOW_PREVIEW or self.preview_canvas is None:
+        # Original canvas doesn't support dragging as images are scaled to fit
+        if canvas_type == "original":
+            return
+            
+        canvas = self.preview_canvas
+        if not self.SHOW_PREVIEW or canvas is None:
             return
             
         try:
             # Get current scroll position (0.0 to 1.0)
-            current_x_top, current_x_bottom = self.preview_canvas.xview()
-            current_y_top, current_y_bottom = self.preview_canvas.yview()
+            current_x_top, current_x_bottom = canvas.xview()
+            current_y_top, current_y_bottom = canvas.yview()
             
             # Calculate scroll region dimensions
-            scroll_region = self.preview_canvas.cget("scrollregion").split()
+            scroll_region = canvas.cget("scrollregion").split()
             if len(scroll_region) != 4:
                 return
                 
@@ -1056,8 +1317,8 @@ class UI:
             total_height = float(scroll_region[3]) - float(scroll_region[1])
             
             # Calculate canvas dimensions
-            canvas_width = self.preview_canvas.winfo_width()
-            canvas_height = self.preview_canvas.winfo_height()
+            canvas_width = canvas.winfo_width()
+            canvas_height = canvas.winfo_height()
             
             if total_width <= canvas_width and total_height <= canvas_height:
                 return  # No scrolling needed
@@ -1072,11 +1333,11 @@ class UI:
             
             # Apply new scroll positions
             if total_width > canvas_width:
-                self.preview_canvas.xview_moveto(new_x_top)
+                canvas.xview_moveto(new_x_top)
             if total_height > canvas_height:
-                self.preview_canvas.yview_moveto(new_y_top)
+                canvas.yview_moveto(new_y_top)
                 
-            DEBUG("Updated preview view: x={:.3f}, y={:.3f}", new_x_top, new_y_top)
+            DEBUG("Updated {} view: x={:.3f}, y={:.3f}", canvas_type, new_x_top, new_y_top)
             
         except Exception as e:
             ERROR("Failed to update preview view: {}", str(e))
