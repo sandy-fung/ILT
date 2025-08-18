@@ -48,8 +48,8 @@ CLASS_ID_COLOR_MAP = {
 classification_label_map = {
     "白天良好": "DayGood",
     "夜晚良好": "NightGood",
+    "糟糕": "VeryBad",
     "昏暗": "Dim",
-    "模糊": "Blurry",
     "破損": "Damaged",
     "遮蔽": "Occluded",
     "有色": "Tinted",
