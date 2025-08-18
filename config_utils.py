@@ -238,7 +238,6 @@ def get_show_classify_frame():
     """Get whether to show classfication buttons panel"""
     try:
         ret =  config.getboolean("UISettings", "show_classify_frame")
-        print(f"get_show_classify_frame: {ret}")
         return ret
     except:
         return False  # Default to False (current setting)

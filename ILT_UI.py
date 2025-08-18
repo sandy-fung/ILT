@@ -197,7 +197,10 @@ class UI:
         self.classification_frame.pack(side="top", anchor="center")
     
     
-                
+    def clear_all_classify_checkbuttons(self):
+        for var in self.selected_plate_types.values():
+            var.set(0)      
+               
     def create_classify_cbts(self):
         """Create classify_cbts dynamically for each classification label."""
         from constants import classification_label_map

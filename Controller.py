@@ -347,6 +347,7 @@ class Controller:
             DEBUG("Controller: Move image button pressed.")
             plate_type = event_data.get("plate_types", "")
             self.move_selected_image_and_label(MOVE_FILE_CLASSIFY_PATH, plate_type)
+            self.view.clear_all_classify_checkbuttons()
             
             
 
