@@ -26,6 +26,8 @@ class Controller:
         self.image_index = 0
         self.image_width = 0
         self.image_height = 0
+        self.original_image_for_preview = None
+        self.original_image_labels = []  # List of LabelObject instances for original image
 
         # initial state
         self.drawing_mode = False
@@ -99,6 +101,34 @@ class Controller:
         image_path = imgs_path[index]
 
         self.original_image = image_utils.load_image(image_path)
+        
+        # Try to load original image for preview if this is a crop
+        original_image_path = folder_utils.find_original_image_path(image_path)
+        if original_image_path:
+            try:
+                self.original_image_for_preview = image_utils.load_image(original_image_path)
+                DEBUG("Loaded original image for crop preview: {}", original_image_path)
+                
+                # Try to load original image labels
+                original_label_path = folder_utils.find_original_label_path(original_image_path)
+                if original_label_path:
+                    try:
+                        import label_display_utils
+                        self.original_image_labels = label_display_utils.parse_label_file(original_label_path)
+                        DEBUG("Loaded {} original image labels from: {}", len(self.original_image_labels), original_label_path)
+                    except Exception as e:
+                        ERROR("Failed to load original image labels: {}", str(e))
+                        self.original_image_labels = []
+                else:
+                    self.original_image_labels = []
+                    
+            except Exception as e:
+                ERROR("Failed to load original image for preview: {}", str(e))
+                self.original_image_for_preview = None
+                self.original_image_labels = []
+        else:
+            self.original_image_for_preview = None
+            self.original_image_labels = []
 
         if hasattr(self.view, "bbox_controller"):
             self.view.bbox_controller.clear_selection(self.current_labels)
@@ -130,6 +160,14 @@ class Controller:
             # Update preview with the full image
             if hasattr(self.view, 'update_preview'):
                 self.view.update_preview(self.original_image)
+        
+        # Set original image labels for preview first
+        if hasattr(self.view, 'set_original_image_labels'):
+            self.view.set_original_image_labels(self.original_image_labels)
+        
+        # Set original image for preview if available
+        if hasattr(self.view, 'set_original_image_for_preview'):
+            self.view.set_original_image_for_preview(self.original_image_for_preview)
         
         DEBUG("Controller.load_image() completed")
         self.view.update_index_label(self.image_index, self.images_path)
@@ -363,6 +401,14 @@ class Controller:
             self.cut_image_into_two_parts(x_position)
             self.next_image()
            
+        elif event_type == UIEvent.VERTICAL_LINE_PRESS:
+            DEBUG("Controller: Vertical line pressed")
+            # 檢查是否在繪框模式
+            if self.view.bbox_controller and self.view.bbox_controller.is_in_drawing_mode():
+                # 退出繪框模式
+                self.view.bbox_controller.toggle_drawing_mode()
+                self.view.update_drawing_mode_display()
+                DEBUG("Exited drawing mode due to vertical line press")
             
 
         elif event_type == UIEvent.INPUT_ENTER:

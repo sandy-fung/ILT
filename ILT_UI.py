@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import filedialog
+from tkinter import ttk
 from UI_event import UIEvent
 from log_levels import DEBUG, INFO, ERROR
 from tkinter import messagebox
@@ -15,7 +16,6 @@ from DragableVerticalLine import DraggableVerticalLine
 
 DEFAULT_W = 1920
 DEFAULT_H = 1080
-CUT_IMAGE_ENABLE = True
 
 class UI:
     def __init__(self):
@@ -61,6 +61,7 @@ class UI:
         self.SHOW_PREVIEW = config_utils.get_show_preview()
         self.SHOW_INPUT_BOX = config_utils.get_show_input_box()
         self.SHOW_CLASSIFY_FRAME= config_utils.get_show_classify_frame()
+        self.SHOW_CUT_IMAGE = config_utils.get_show_cut_image()
         self.LABEL_FONT_SIZE = config_utils.get_ui_label_font_size_in_config()
 
         self.setup_ui()
@@ -75,8 +76,7 @@ class UI:
         self.create_middle_area()
         self.create_classification_area()
                 
-        if CUT_IMAGE_ENABLE == True:
-            self.create_cut_image_bt()
+        self.create_cut_image_bt()
         self.create_bottom_area()
 
     def create_top_area(self):
@@ -263,7 +263,6 @@ class UI:
     def create_cut_image_bt(self):
         """Create the cut image button and its functionality."""
         self.cut_frame = tk.Frame(self.window, relief = "ridge", bd = 2, bg = "#FAFAFA")
-        # self.classification_frame.pack(side = "top", fill = "x")
         self.cut_frame.pack(side="top", anchor="center")
         self.cut_image_button = tk.Button(
             self.cut_frame,
@@ -276,6 +275,9 @@ class UI:
             command=self.on_cut_image_button_click
         )
         self.cut_image_button.pack(side="left", padx=10, pady=10)
+        
+        if self.SHOW_CUT_IMAGE is False:
+            self.cut_frame.pack_forget()
         
     def create_text_area(self):
         self.text_frame = tk.Frame(self.bottom_frame, bg = "#FAFAFA")
@@ -380,62 +382,139 @@ class UI:
         )
         self.preview_title.pack(side = "top", pady = 5)
         
-        # Create preview canvas container
-        self.preview_canvas_frame = tk.Frame(self.preview_frame, bg = "#FAFAFA")
-        self.preview_canvas_frame.pack(side = "top", fill = "both", expand = True, padx = 10, pady = (0, 10))
+        # Create notebook for tabs
+        self.preview_notebook = ttk.Notebook(self.preview_frame)
+        self.preview_notebook.pack(side = "top", fill = "both", expand = True, padx = 10, pady = (0, 10))
         
-        # Create scrollbars
-        self.preview_v_scrollbar = tk.Scrollbar(self.preview_canvas_frame, orient = "vertical")
-        self.preview_h_scrollbar = tk.Scrollbar(self.preview_canvas_frame, orient = "horizontal")
+        # Create crop preview tab
+        self.crop_tab_frame = tk.Frame(self.preview_notebook, bg = "#FAFAFA")
+        self.preview_notebook.add(self.crop_tab_frame, text = "Crop")
         
-        # Create preview canvas with dynamic size
-        self.preview_canvas = tk.Canvas(
-            self.preview_canvas_frame,
-            bg = "white",
-            highlightthickness = 1,
-            highlightbackground = "#8E8E79",
-            yscrollcommand = self.preview_v_scrollbar.set,
-            xscrollcommand = self.preview_h_scrollbar.set
-        )
+        # Create original preview tab
+        self.original_tab_frame = tk.Frame(self.preview_notebook, bg = "#FAFAFA")
+        self.preview_notebook.add(self.original_tab_frame, text = "原圖")
         
-        # Configure scrollbars
-        self.preview_v_scrollbar.config(command = self.preview_canvas.yview)
-        self.preview_h_scrollbar.config(command = self.preview_canvas.xview)
+        # Create crop preview canvas and scrollbars
+        self._create_canvas_with_scrollbars("crop")
         
-        # Pack canvas and scrollbars
-        self.preview_canvas.grid(row = 0, column = 0, sticky = "nsew")
-        self.preview_v_scrollbar.grid(row = 0, column = 1, sticky = "ns")
-        self.preview_h_scrollbar.grid(row = 1, column = 0, sticky = "ew")
-        
-        # Configure grid weights
-        self.preview_canvas_frame.grid_rowconfigure(0, weight = 1)
-        self.preview_canvas_frame.grid_columnconfigure(0, weight = 1)
+        # Create original preview canvas and scrollbars  
+        self._create_canvas_with_scrollbars("original")
         
         # Initialize preview state
         self.preview_image = None
         self.preview_photo_image = None
+        self.original_image_for_preview = None
+        self.original_photo_image = None
+        self.pending_original_image = None
+        self.original_image_labels = []  # List of LabelObject instances for original image
         
         # Schedule placeholder text after window is rendered
         if self.preview_canvas:
             self.preview_canvas.after_idle(self._add_preview_placeholder)
+        if self.original_canvas:
+            self.original_canvas.after_idle(lambda: self._add_placeholder_to_canvas(self.original_canvas, "無原圖"))
 
-        # Bind magnifier events to preview canvas
-        if self.preview_canvas:
-            self.preview_canvas.bind("<Enter>", self.on_preview_enter)
-            self.preview_canvas.bind("<Leave>", self.on_preview_leave)
-            self.preview_canvas.bind("<Button-1>", self.on_preview_left_click)
-            self.preview_canvas.bind("<Button-3>", self.on_preview_right_drag_start)
-            self.preview_canvas.bind("<B3-Motion>", self.on_preview_right_drag)
-            self.preview_canvas.bind("<ButtonRelease-3>", self.on_preview_right_drag_end)
+        # Bind magnifier events to both canvases
+        self._bind_canvas_events(self.preview_canvas, "crop")
+        self._bind_canvas_events(self.original_canvas, "original")
+        
+        # Bind tab change event
+        self.preview_notebook.bind("<<NotebookTabChanged>>", self.on_preview_tab_changed)
         
         # Initialize magnifier state
         self.magnifier_tooltip = None
         self.is_dragging_preview = False
+        self.is_dragging_original = False
         self.drag_start_x = 0
         self.drag_start_y = 0
         
         # Initialize magnifier cache (LRU cache for magnified regions) 
         self.magnifier_cache = {}
+        
+        # Initialize preview magnifier drag state (separate from main canvas bbox selection)
+        self.preview_magnifier_dragging = False
+        self.preview_magnifier_drag_start_x = 0
+        self.preview_magnifier_drag_start_y = 0
+        self.preview_magnifier_selection_rect = None
+    
+    def on_preview_tab_changed(self, event):
+        """Handle tab change in preview notebook"""
+        try:
+            selected_tab = self.preview_notebook.index(self.preview_notebook.select())
+            DEBUG("Preview tab changed to index: {}", selected_tab)
+            
+            # If switched to original tab (index 1) and we have a pending image
+            if selected_tab == 1 and self.pending_original_image:
+                DEBUG("Switched to original tab, updating preview with pending image")
+                self.update_original_preview(self.pending_original_image)
+        except Exception as e:
+            ERROR("Error handling tab change: {}", str(e))
+    
+    def _create_canvas_with_scrollbars(self, canvas_type):
+        """Create a canvas with scrollbars for the specified type (crop or original)"""
+        if canvas_type == "crop":
+            parent_frame = self.crop_tab_frame
+            canvas_name = "preview_canvas"
+            v_scrollbar_name = "preview_v_scrollbar"
+            h_scrollbar_name = "preview_h_scrollbar"
+            canvas_frame_name = "preview_canvas_frame"
+        else:  # original
+            parent_frame = self.original_tab_frame
+            canvas_name = "original_canvas"
+            v_scrollbar_name = "original_v_scrollbar"
+            h_scrollbar_name = "original_h_scrollbar"
+            canvas_frame_name = "original_canvas_frame"
+        
+        # Create canvas container
+        canvas_frame = tk.Frame(parent_frame, bg = "#FAFAFA")
+        canvas_frame.pack(fill = "both", expand = True)
+        setattr(self, canvas_frame_name, canvas_frame)
+        
+        # Create scrollbars
+        v_scrollbar = tk.Scrollbar(canvas_frame, orient = "vertical")
+        h_scrollbar = tk.Scrollbar(canvas_frame, orient = "horizontal")
+        setattr(self, v_scrollbar_name, v_scrollbar)
+        setattr(self, h_scrollbar_name, h_scrollbar)
+        
+        # Create canvas with dynamic size
+        canvas = tk.Canvas(
+            canvas_frame,
+            bg = "white",
+            highlightthickness = 1,
+            highlightbackground = "#8E8E79",
+            yscrollcommand = v_scrollbar.set,
+            xscrollcommand = h_scrollbar.set
+        )
+        setattr(self, canvas_name, canvas)
+        
+        # Configure scrollbars
+        v_scrollbar.config(command = canvas.yview)
+        h_scrollbar.config(command = canvas.xview)
+        
+        # Pack canvas and scrollbars
+        canvas.grid(row = 0, column = 0, sticky = "nsew")
+        v_scrollbar.grid(row = 0, column = 1, sticky = "ns")
+        h_scrollbar.grid(row = 1, column = 0, sticky = "ew")
+        
+        # Configure grid weights
+        canvas_frame.grid_rowconfigure(0, weight = 1)
+        canvas_frame.grid_columnconfigure(0, weight = 1)
+    
+    def _bind_canvas_events(self, canvas, canvas_type):
+        """Bind events to the specified canvas"""
+        if canvas:
+            canvas.bind("<Enter>", lambda event: self.on_preview_enter(event, canvas_type))
+            canvas.bind("<Leave>", lambda event: self.on_preview_leave(event, canvas_type))
+            
+            # Left mouse events for magnifier drag selection
+            canvas.bind("<Button-1>", lambda event: self.on_preview_left_press(event, canvas_type))
+            canvas.bind("<B1-Motion>", lambda event: self.on_preview_left_drag(event, canvas_type))
+            canvas.bind("<ButtonRelease-1>", lambda event: self.on_preview_left_release(event, canvas_type))
+            
+            # Right mouse events for canvas dragging
+            canvas.bind("<Button-3>", lambda event: self.on_preview_right_drag_start(event, canvas_type))
+            canvas.bind("<B3-Motion>", lambda event: self.on_preview_right_drag(event, canvas_type))
+            canvas.bind("<ButtonRelease-3>", lambda event: self.on_preview_right_drag_end(event, canvas_type))
         self.cache_access_order = []
         
         # Load magnifier configuration
@@ -445,18 +524,22 @@ class UI:
     
     def _add_preview_placeholder(self):
         """Add placeholder text to preview canvas after it has been rendered"""
-        if not self.preview_canvas:
+        self._add_placeholder_to_canvas(self.preview_canvas, "尚未載入圖片")
+    
+    def _add_placeholder_to_canvas(self, canvas, text):
+        """Add placeholder text to specified canvas after it has been rendered"""
+        if not canvas:
             return
             
         # Get actual canvas dimensions
-        self.preview_canvas.update_idletasks()
-        canvas_width = self.preview_canvas.winfo_width()
-        canvas_height = self.preview_canvas.winfo_height()
+        canvas.update_idletasks()
+        canvas_width = canvas.winfo_width()
+        canvas_height = canvas.winfo_height()
         
         # Add placeholder text at center
-        self.preview_canvas.create_text(
+        canvas.create_text(
             canvas_width // 2, canvas_height // 2,
-            text = "尚未載入圖片",
+            text = text,
             fill = "#8E8E79",
             font = ("Segoe UI", 12),
             tags = "placeholder"
@@ -537,6 +620,40 @@ class UI:
         # Clear magnifier cache when image changes
         self.clear_magnifier_cache()
         DEBUG("Original image reference updated for preview")
+    
+    def set_original_image_for_preview(self, original_image_for_preview):
+        """Set the original image for preview functionality (for crop images)
+        
+        Args:
+            original_image_for_preview: PIL.Image object of the original image for preview
+        """
+        self.original_image_for_preview = original_image_for_preview
+        self.pending_original_image = original_image_for_preview
+        
+        if original_image_for_preview:
+            DEBUG("Original image for preview set, will update when tab is selected")
+            # Only update if original tab is currently selected
+            try:
+                if hasattr(self, 'preview_notebook') and self.preview_notebook:
+                    selected_tab = self.preview_notebook.index(self.preview_notebook.select())
+                    if selected_tab == 1:  # Original tab is selected
+                        self.update_original_preview(original_image_for_preview)
+            except:
+                pass  # Tab not ready yet, will update on tab change
+        else:
+            DEBUG("No original image for preview available")
+            # Clear the original preview tab
+            if hasattr(self, 'original_canvas') and self.original_canvas:
+                self.clear_original_preview()
+
+    def set_original_image_labels(self, original_image_labels):
+        """Set the labels for original image preview
+        
+        Args:
+            original_image_labels: List of LabelObject instances for original image
+        """
+        self.original_image_labels = original_image_labels if original_image_labels else []
+        DEBUG("Set {} original image labels for preview", len(self.original_image_labels))
 
     def update_preview(self, original_image):
         """Update preview with the full original image
@@ -584,6 +701,117 @@ class UI:
         )
         
         DEBUG("Preview updated with original size image: {}×{}", img_width, img_height)
+    
+    def update_original_preview(self, original_image):
+        """Update original preview tab with auto-scaled original image
+        
+        Args:
+            original_image: PIL Image object
+        """
+        if not self.SHOW_PREVIEW or not hasattr(self, 'original_canvas') or self.original_canvas is None:
+            return
+            
+        from PIL import Image, ImageTk
+        import image_utils
+        
+        # Clear previous preview
+        self.original_canvas.delete("all")
+        
+        # Get original image dimensions
+        img_width, img_height = original_image.size
+        
+        # Get canvas dimensions
+        self.original_canvas.update_idletasks()
+        canvas_width = self.original_canvas.winfo_width()
+        canvas_height = self.original_canvas.winfo_height()
+        
+        # Check if canvas has valid dimensions
+        if canvas_width <= 0 or canvas_height <= 0:
+            DEBUG("Canvas not ready for original preview: {}x{}", canvas_width, canvas_height)
+            # Store image for later update when tab is selected
+            self.pending_original_image = original_image
+            return
+        
+        # Calculate scale to fit canvas while maintaining aspect ratio
+        scale_x = canvas_width / img_width
+        scale_y = canvas_height / img_height
+        scale = min(scale_x, scale_y)  # Use smaller scale to ensure image fits
+        
+        # Calculate scaled dimensions with minimum size protection
+        scaled_width = max(1, int(img_width * scale))
+        scaled_height = max(1, int(img_height * scale))
+        
+        # Resize image to fit canvas
+        scaled_image = image_utils.resize_image(original_image, (scaled_width, scaled_height))
+        self.original_photo_image = ImageTk.PhotoImage(scaled_image)
+        
+        # Center the scaled image on canvas
+        x_offset = (canvas_width - scaled_width) // 2
+        y_offset = (canvas_height - scaled_height) // 2
+        
+        # Display scaled image centered on canvas
+        self.original_canvas.create_image(x_offset, y_offset, anchor = "nw", image = self.original_photo_image, tags = "original_image")
+        
+        # No need for scroll region since image is scaled to fit
+        self.original_canvas.config(scrollregion = (0, 0, canvas_width, canvas_height))
+        
+        # Add info text showing original size and scale
+        scale_percent = int(scale * 100)
+        info_text = f"原圖: {img_width}×{img_height} ({scale_percent}%)"
+        self.original_canvas.create_text(
+            10, canvas_height - 5,
+            text = info_text,
+            fill = "#8E8E79",
+            font = ("Segoe UI", 9),
+            anchor = "sw",
+            tags = ("info_text", "overlay")
+        )
+        
+        # Store scale for coordinate conversion
+        self.original_preview_scale = scale
+        self.original_preview_offset = (x_offset, y_offset)
+        
+        DEBUG("Original preview updated with scaled image: {}×{} -> {}×{} ({}%)", 
+              img_width, img_height, scaled_width, scaled_height, scale_percent)
+        
+        # Draw labels on original canvas if available
+        if hasattr(self, 'original_image_labels') and self.original_image_labels:
+            self.draw_labels_on_original_canvas(self.original_image_labels)
+        
+        # Clear pending image since we've successfully updated
+        self.pending_original_image = None
+    
+    def clear_original_preview(self):
+        """Clear the original preview canvas"""
+        if not self.SHOW_PREVIEW or not hasattr(self, 'original_canvas') or self.original_canvas is None:
+            return
+            
+        DEBUG("Clearing original preview canvas")
+        
+        # Clear image display
+        self.original_canvas.delete("all")
+        
+        # Add placeholder text
+        self.original_canvas.update_idletasks()
+        canvas_width = self.original_canvas.winfo_width()
+        canvas_height = self.original_canvas.winfo_height()
+        
+        self.original_canvas.create_text(
+            canvas_width // 2, canvas_height // 2,
+            text = "無原圖",
+            fill = "#8E8E79",
+            font = ("Segoe UI", 12),
+            tags = "placeholder"
+        )
+        
+        # Reset scroll region
+        self.original_canvas.config(scrollregion = (0, 0, canvas_width, canvas_height))
+        
+        # Clear photo image reference
+        self.original_photo_image = None
+        
+        # Clear pending image
+        self.pending_original_image = None
 
     def clear_preview(self):
         """Clear the preview canvas"""
@@ -621,53 +849,121 @@ class UI:
     
 
     # Magnifier functionality for preview panel
-    def on_preview_enter(self, event):
+    def on_preview_enter(self, event, canvas_type="crop"):
         """Handle mouse enter event on preview canvas - change cursor to magnifier"""
-        if not self.SHOW_PREVIEW or self.preview_canvas is None or not self.magnifier_enabled:
+        canvas = self.preview_canvas if canvas_type == "crop" else self.original_canvas
+        if not self.SHOW_PREVIEW or canvas is None or not self.magnifier_enabled:
             return
             
-        DEBUG("Mouse entered preview canvas")
-        self.preview_canvas.config(cursor=self.magnifier_cursor)
+        DEBUG("Mouse entered {} canvas", canvas_type)
+        canvas.config(cursor=self.magnifier_cursor)
         
-    def on_preview_leave(self, event):
+    def on_preview_leave(self, event, canvas_type="crop"):
         """Handle mouse leave event on preview canvas - restore normal cursor"""
-        if not self.SHOW_PREVIEW or self.preview_canvas is None:
+        canvas = self.preview_canvas if canvas_type == "crop" else self.original_canvas
+        if not self.SHOW_PREVIEW or canvas is None:
             return
             
-        DEBUG("Mouse left preview canvas")
-        self.preview_canvas.config(cursor="")
+        DEBUG("Mouse left {} canvas", canvas_type)
+        canvas.config(cursor="")
         
         # Hide magnifier tooltip if visible
         self.hide_magnifier_tooltip()
         
-    def on_preview_left_click(self, event):
-        """Handle left click on preview canvas - show magnified tooltip"""
-        if not self.SHOW_PREVIEW or self.preview_canvas is None or self.original_image is None or not self.magnifier_enabled:
+    def on_preview_left_press(self, event, canvas_type="crop"):
+        """Handle left mouse press on preview canvas - start drag selection for magnifier"""
+        if not self.SHOW_PREVIEW or not self.magnifier_enabled:
+            return
+        
+        canvas = self.preview_canvas if canvas_type == "crop" else self.original_canvas
+        image = self.original_image if canvas_type == "crop" else self.original_image_for_preview
+        
+        if canvas is None or image is None:
             return
             
-        DEBUG("Left click on preview canvas at ({}, {})", event.x, event.y)
+        DEBUG("Left press on {} canvas at ({}, {})", canvas_type, event.x, event.y)
         
-        # Hide existing tooltip first
+        # Start magnifier drag selection
+        self.preview_magnifier_dragging = True
+        self.preview_magnifier_drag_start_x = event.x
+        self.preview_magnifier_drag_start_y = event.y
+        
+        # Hide existing tooltip
         self.hide_magnifier_tooltip()
         
-        # Show magnifier tooltip at clicked position
-        self.show_magnifier_tooltip(event.x, event.y)
+    def on_preview_left_drag(self, event, canvas_type="crop"):
+        """Handle left mouse drag on preview canvas - show selection rectangle"""
+        if not self.preview_magnifier_dragging:
+            return
         
-    def show_magnifier_tooltip(self, canvas_x, canvas_y):
+        canvas = self.preview_canvas if canvas_type == "crop" else self.original_canvas
+        if canvas is None:
+            return
+        
+        # Clear previous selection rectangle
+        if self.preview_magnifier_selection_rect:
+            canvas.delete(self.preview_magnifier_selection_rect)
+        
+        # Draw selection rectangle with dashed line
+        self.preview_magnifier_selection_rect = canvas.create_rectangle(
+            self.preview_magnifier_drag_start_x, 
+            self.preview_magnifier_drag_start_y,
+            event.x, event.y,
+            outline="cyan", width=2, dash=(5, 5), tags="magnifier_selection"
+        )
+        
+    def on_preview_left_release(self, event, canvas_type="crop"):
+        """Handle left mouse release on preview canvas - decide magnification mode"""
+        if not self.preview_magnifier_dragging:
+            return
+        
+        canvas = self.preview_canvas if canvas_type == "crop" else self.original_canvas
+        if canvas is None:
+            return
+        
+        # Clear selection rectangle
+        if self.preview_magnifier_selection_rect:
+            canvas.delete(self.preview_magnifier_selection_rect)
+            self.preview_magnifier_selection_rect = None
+        
+        # Calculate drag distance
+        width = abs(event.x - self.preview_magnifier_drag_start_x)
+        height = abs(event.y - self.preview_magnifier_drag_start_y)
+        
+        DEBUG("Left release on {} canvas: drag size {}x{}", canvas_type, width, height)
+        
+        # Determine if this was a click or a drag
+        if width < 5 and height < 5:
+            # Small movement - treat as click, use original magnifier logic
+            self.show_magnifier_tooltip(event.x, event.y, canvas_type)
+        else:
+            # Any drag - always use the actual dragged region size
+            self.show_magnifier_for_region(
+                self.preview_magnifier_drag_start_x, 
+                self.preview_magnifier_drag_start_y,
+                event.x, event.y, canvas_type
+            )
+        
+        # Reset drag state
+        self.preview_magnifier_dragging = False
+        
+    def show_magnifier_tooltip(self, canvas_x, canvas_y, canvas_type="crop"):
         """Create and show magnifier tooltip with 3x zoomed region
         
         Args:
             canvas_x, canvas_y: Click position on preview canvas
+            canvas_type: Either "crop" or "original"
         """
-        if not self.original_image:
-            DEBUG("No original image available for magnification")
+        image = self.original_image if canvas_type == "crop" else self.original_image_for_preview
+        if not image:
+            DEBUG("No {} image available for magnification", canvas_type)
             return
             
         try:
             from PIL import Image, ImageTk
             
             # Convert canvas coordinates to original image coordinates
-            img_x, img_y = self.canvas_to_image_coords(canvas_x, canvas_y)
+            img_x, img_y = self.canvas_to_image_coords(canvas_x, canvas_y, canvas_type)
             if img_x is None or img_y is None:
                 DEBUG("Invalid coordinates for magnification")
                 return
@@ -676,7 +972,8 @@ class UI:
             magnified_image = self.extract_magnified_region(
                 img_x, img_y, 
                 zoom_factor=self.magnifier_zoom_factor,
-                region_size=self.magnifier_region_size
+                region_size=self.magnifier_region_size,
+                canvas_type=canvas_type
             )
             if magnified_image is None:
                 DEBUG("Failed to extract magnified region")
@@ -692,7 +989,7 @@ class UI:
             tooltip_label.pack()
             
             # Calculate tooltip position to avoid screen edges
-            tooltip_x, tooltip_y = self.calculate_tooltip_position(canvas_x, canvas_y)
+            tooltip_x, tooltip_y = self.calculate_tooltip_position(canvas_x, canvas_y, canvas_type)
             self.magnifier_tooltip.geometry(f"+{tooltip_x}+{tooltip_y}")
             
             # Store image reference to prevent garbage collection
@@ -727,30 +1024,49 @@ class UI:
             except:
                 pass
                 
-    def canvas_to_image_coords(self, canvas_x, canvas_y):
+    def canvas_to_image_coords(self, canvas_x, canvas_y, canvas_type="crop"):
         """Convert preview canvas coordinates to original image coordinates
         
         Args:
             canvas_x, canvas_y: Coordinates on preview canvas
+            canvas_type: Either "crop" or "original"
             
         Returns:
             tuple: (img_x, img_y) in original image coordinates, or (None, None) if invalid
         """
-        if not self.original_image or not self.preview_photo_image:
+        canvas = self.preview_canvas if canvas_type == "crop" else self.original_canvas
+        image = self.original_image if canvas_type == "crop" else self.original_image_for_preview
+        photo_image = self.preview_photo_image if canvas_type == "crop" else self.original_photo_image
+        
+        if not image or not photo_image:
             return None, None
             
         try:
             # Get original image dimensions
-            img_width, img_height = self.original_image.size
+            img_width, img_height = image.size
             
-            # Since image is displayed at original size, we need to account for scrolling
-            # Convert canvas coordinates to window coordinates
-            canvas_x_scroll = self.preview_canvas.canvasx(canvas_x)
-            canvas_y_scroll = self.preview_canvas.canvasy(canvas_y)
-            
-            # Direct mapping since no scaling
-            img_x = int(canvas_x_scroll)
-            img_y = int(canvas_y_scroll)
+            if canvas_type == "crop":
+                # Crop canvas: image is displayed at original size, account for scrolling
+                canvas_x_scroll = canvas.canvasx(canvas_x)
+                canvas_y_scroll = canvas.canvasy(canvas_y)
+                # Direct mapping since no scaling
+                img_x = int(canvas_x_scroll)
+                img_y = int(canvas_y_scroll)
+            else:
+                # Original canvas: image is scaled and centered
+                if hasattr(self, 'original_preview_scale') and hasattr(self, 'original_preview_offset'):
+                    x_offset, y_offset = self.original_preview_offset
+                    scale = self.original_preview_scale
+                    
+                    # Convert canvas coordinates to scaled image coordinates
+                    scaled_x = canvas_x - x_offset
+                    scaled_y = canvas_y - y_offset
+                    
+                    # Convert scaled coordinates to original image coordinates
+                    img_x = int(scaled_x / scale)
+                    img_y = int(scaled_y / scale)
+                else:
+                    return None, None
             
             # Check if coordinates are within image bounds
             if img_x < 0 or img_y < 0 or img_x >= img_width or img_y >= img_height:
@@ -766,22 +1082,24 @@ class UI:
             ERROR("Failed to convert canvas coordinates to image coordinates: {}", str(e))
             return None, None
             
-    def extract_magnified_region(self, center_x, center_y, zoom_factor=3.0, region_size=50):
+    def extract_magnified_region(self, center_x, center_y, zoom_factor=3.0, region_size=50, canvas_type="crop"):
         """Extract and magnify a region from original image with caching
         
         Args:
             center_x, center_y: Center point in original image coordinates
             zoom_factor: Magnification factor (default 3x)
             region_size: Size of region to extract in pixels
+            canvas_type: Either "crop" or "original"
             
         Returns:
             ImageTk.PhotoImage: Magnified region image, or None if failed
         """
-        if not self.original_image:
+        image = self.original_image if canvas_type == "crop" else self.original_image_for_preview
+        if not image:
             return None
             
         # Generate cache key based on position and parameters
-        cache_key = f"{center_x}_{center_y}_{zoom_factor}_{region_size}_{id(self.original_image)}"
+        cache_key = f"{center_x}_{center_y}_{zoom_factor}_{region_size}_{id(image)}_{canvas_type}"
         
         # Check cache first
         cached_result = self.get_from_magnifier_cache(cache_key)
@@ -792,7 +1110,7 @@ class UI:
         try:
             from PIL import Image, ImageTk
             
-            img_width, img_height = self.original_image.size
+            img_width, img_height = image.size
             half_region = region_size // 2
             
             # Calculate extraction bounds with boundary checks
@@ -807,7 +1125,7 @@ class UI:
                 return None
             
             # Extract region efficiently
-            region = self.original_image.crop((left, top, right, bottom))
+            region = image.crop((left, top, right, bottom))
             
             # Calculate magnified size
             region_width = right - left
@@ -899,77 +1217,436 @@ class UI:
         self.cache_access_order.clear()
         DEBUG("Magnifier cache cleared")
             
-    def calculate_tooltip_position(self, canvas_x, canvas_y):
-        """Calculate optimal tooltip position to avoid screen edges
+    def calculate_tooltip_position(self, canvas_x, canvas_y, canvas_type="crop"):
+        """Calculate optimal tooltip position for multi-monitor setup
         
         Args:
             canvas_x, canvas_y: Click position on canvas
+            canvas_type: Either "crop" or "original"
             
         Returns:
             tuple: (x, y) screen coordinates for tooltip
         """
-        # Get canvas position on screen
-        canvas_abs_x = self.preview_canvas.winfo_rootx()
-        canvas_abs_y = self.preview_canvas.winfo_rooty()
-        
-        # Calculate initial tooltip position (offset from click)
-        tooltip_x = canvas_abs_x + canvas_x + 20
-        tooltip_y = canvas_abs_y + canvas_y + 20
-        
-        # Get screen dimensions
-        screen_width = self.window.winfo_screenwidth()
-        screen_height = self.window.winfo_screenheight()
-        
-        # Estimate tooltip size (will be adjusted based on magnified region)
-        tooltip_width = 150  # Approximate
-        tooltip_height = 150
-        
-        # Adjust position to avoid screen edges
-        if tooltip_x + tooltip_width > screen_width:
-            tooltip_x = canvas_abs_x + canvas_x - tooltip_width - 20
+        try:
+            # Get the correct canvas based on canvas_type
+            canvas = self.preview_canvas if canvas_type == "crop" else self.original_canvas
+            if not canvas:
+                # Fallback to main canvas if preview canvas not available
+                canvas = self.canvas if hasattr(self, 'canvas') else None
             
-        if tooltip_y + tooltip_height > screen_height:
-            tooltip_y = canvas_abs_y + canvas_y - tooltip_height - 20
+            # Get canvas absolute position on screen (SAME FIX AS calculate_tooltip_position_for_region)
+            try:
+                if canvas:
+                    # Use rootx/rooty to get absolute screen position
+                    canvas_screen_x = canvas.winfo_rootx()
+                    canvas_screen_y = canvas.winfo_rooty()
+                else:
+                    # Fallback to window position if canvas not available
+                    canvas_screen_x = self.window.winfo_rootx()
+                    canvas_screen_y = self.window.winfo_rooty()
+            except Exception as e:
+                DEBUG("Failed to get canvas screen position: {}", str(e))
+                # Ultimate fallback
+                canvas_screen_x = 100
+                canvas_screen_y = 100
             
-        # Ensure tooltip is not off-screen
-        tooltip_x = max(0, tooltip_x)
-        tooltip_y = max(0, tooltip_y)
+            # Calculate tooltip position using screen coordinates (simplified)
+            tooltip_x = canvas_screen_x + canvas_x + 20
+            tooltip_y = canvas_screen_y + canvas_y + 20
+            
+            # Get window bounds for boundary checking
+            window_x = self.window.winfo_x()
+            window_y = self.window.winfo_y()
+            window_width = self.window.winfo_width()
+            window_height = self.window.winfo_height()
+            
+            # Estimate tooltip size (smaller for click magnification)
+            estimated_width = 200  # Smaller default for click magnification
+            estimated_height = 200
+            
+            # Keep tooltip within window bounds
+            window_right = window_x + window_width
+            window_bottom = window_y + window_height
+            
+            # Adjust horizontally if tooltip goes beyond window right edge
+            if tooltip_x + estimated_width > window_right:
+                # Try placing on the left side of cursor
+                alt_x = canvas_screen_x + canvas_x - estimated_width - 20
+                if alt_x >= window_x:
+                    tooltip_x = alt_x
+                else:
+                    # If still not enough space, center within window
+                    tooltip_x = window_x + (window_width - estimated_width) // 2
+            
+            # Adjust vertically if tooltip goes beyond window bottom edge
+            if tooltip_y + estimated_height > window_bottom:
+                # Try placing above cursor
+                alt_y = canvas_screen_y + canvas_y - estimated_height - 20
+                if alt_y >= window_y:
+                    tooltip_y = alt_y
+                else:
+                    # If still not enough space, center within window
+                    tooltip_y = window_y + (window_height - estimated_height) // 2
+            
+            # Final bounds check - ensure tooltip stays within window
+            tooltip_x = max(window_x, min(tooltip_x, window_right - estimated_width))
+            tooltip_y = max(window_y, min(tooltip_y, window_bottom - estimated_height))
+            
+            DEBUG("Tooltip position calculated: window=({},{},{},{}), tooltip=({},{})", 
+                  window_x, window_y, window_width, window_height, tooltip_x, tooltip_y)
+            
+            return tooltip_x, tooltip_y
+            
+        except Exception as e:
+            ERROR("Failed to calculate tooltip position: {}, using fallback", str(e))
+            # Fallback to simple offset using screen coordinates
+            try:
+                canvas = self.preview_canvas if canvas_type == "crop" else self.original_canvas
+                if not canvas:
+                    canvas = self.canvas if hasattr(self, 'canvas') else None
+                
+                if canvas:
+                    # Use screen coordinates for fallback too
+                    canvas_abs_x = canvas.winfo_rootx()
+                    canvas_abs_y = canvas.winfo_rooty()
+                    return canvas_abs_x + canvas_x + 20, canvas_abs_y + canvas_y + 20
+                else:
+                    return 100, 100
+            except:
+                return 100, 100  # Ultimate fallback
+    
+    def calculate_tooltip_position_for_region(self, x1, y1, x2, y2, tooltip_width, tooltip_height, canvas_type="crop"):
+        """Calculate tooltip position for region selection that doesn't cover the selection
         
-        return tooltip_x, tooltip_y
+        Args:
+            x1, y1: Start point of selection (drag start - click origin)
+            x2, y2: End point of selection  
+            tooltip_width, tooltip_height: Actual size of tooltip
+            canvas_type: Either "crop" or "original"
+            
+        Returns:
+            tuple: (x, y) position for tooltip that doesn't cover selection
+        """
+        try:
+            # Get canvas based on type
+            canvas = self.preview_canvas if canvas_type == "crop" else self.original_canvas
+            if not canvas:
+                canvas = self.canvas if hasattr(self, 'canvas') else None
+            
+            # Get canvas absolute position on screen (CRITICAL FIX!)
+            try:
+                if canvas:
+                    # Use rootx/rooty to get absolute screen position
+                    canvas_screen_x = canvas.winfo_rootx()
+                    canvas_screen_y = canvas.winfo_rooty()
+                else:
+                    # Fallback to window position if canvas not available
+                    canvas_screen_x = self.window.winfo_rootx()
+                    canvas_screen_y = self.window.winfo_rooty()
+            except Exception as e:
+                DEBUG("Failed to get canvas screen position: {}", str(e))
+                # Ultimate fallback
+                canvas_screen_x = 100
+                canvas_screen_y = 100
+            
+            # Calculate selection bounds in screen coordinates
+            sel_left = canvas_screen_x + min(x1, x2)
+            sel_top = canvas_screen_y + min(y1, y2)
+            sel_right = canvas_screen_x + max(x1, x2)
+            sel_bottom = canvas_screen_y + max(y1, y2)
+            
+            # Start position in screen coordinates (click origin point)
+            start_x = canvas_screen_x + x1
+            start_y = canvas_screen_y + y1
+            
+            # Get window bounds for boundary checking
+            window_x = self.window.winfo_x()
+            window_y = self.window.winfo_y()
+            window_width = self.window.winfo_width()
+            window_height = self.window.winfo_height()
+            
+            # Try different positions in priority order - prioritize positions near start point
+            positions = []
+            
+            # 1. HIGHEST PRIORITY: Positions near the start point (small offset)
+            positions.extend([
+                (start_x + 20, start_y + 20),  # Bottom-right of start (most common)
+                (start_x - tooltip_width - 20, start_y + 20),  # Bottom-left of start
+                (start_x + 20, start_y - tooltip_height - 20),  # Top-right of start
+                (start_x - tooltip_width - 20, start_y - tooltip_height - 20)  # Top-left of start
+            ])
+            
+            # 2. MEDIUM PRIORITY: Diagonal positions based on drag direction (avoid selection)
+            if x2 >= x1 and y2 >= y1:  # Dragged to bottom-right
+                # Place tooltip top-left of start to avoid bottom-right selection
+                positions.append((start_x - tooltip_width - 30, start_y - tooltip_height - 30))
+            elif x2 < x1 and y2 >= y1:  # Dragged to bottom-left
+                # Place tooltip top-right of start to avoid bottom-left selection
+                positions.append((start_x + 30, start_y - tooltip_height - 30))
+            elif x2 >= x1 and y2 < y1:  # Dragged to top-right
+                # Place tooltip bottom-left of start to avoid top-right selection
+                positions.append((start_x - tooltip_width - 30, start_y + 30))
+            else:  # Dragged to top-left
+                # Place tooltip bottom-right of start to avoid top-left selection
+                positions.append((start_x + 30, start_y + 30))
+            
+            # 3. FALLBACK: If start point area is blocked, use selection edges (keeping start point alignment)
+            positions.extend([
+                (sel_right + 10, start_y),  # Right of selection, start point level
+                (sel_left - tooltip_width - 10, start_y),  # Left of selection, start point level
+                (start_x, sel_bottom + 10),  # Below selection, start point column
+                (start_x, sel_top - tooltip_height - 10),  # Above selection, start point column
+            ])
+            
+            # 4. LAST RESORT: Selection corners (furthest from start point)
+            positions.extend([
+                (sel_right + 10, sel_top),  # Top-right corner of selection
+                (sel_right + 10, sel_bottom - tooltip_height),  # Bottom-right corner
+                (sel_left - tooltip_width - 10, sel_top),  # Top-left corner
+                (sel_left - tooltip_width - 10, sel_bottom - tooltip_height)  # Bottom-left corner
+            ])
+            
+            # Window bounds
+            window_right = window_x + window_width
+            window_bottom = window_y + window_height
+            
+            # Find the first position that fits within window bounds
+            for i, (pos_x, pos_y) in enumerate(positions):
+                # Check if position is within window bounds
+                if not (pos_x >= window_x and 
+                       pos_y >= window_y and 
+                       pos_x + tooltip_width <= window_right and 
+                       pos_y + tooltip_height <= window_bottom):
+                    continue
+                
+                # For positions near start point (first 4 positions), check overlap with selection
+                if i < 4:  # High priority positions near start point
+                    # Calculate tooltip bounds (all in screen coordinates now)
+                    tooltip_left = pos_x
+                    tooltip_right = pos_x + tooltip_width
+                    tooltip_top = pos_y
+                    tooltip_bottom = pos_y + tooltip_height
+                    
+                    # Selection bounds already in screen coordinates (sel_left, sel_top, sel_right, sel_bottom)
+                    # Check overlap directly
+                    overlap_x = max(0, min(tooltip_right, sel_right) - max(tooltip_left, sel_left))
+                    overlap_y = max(0, min(tooltip_bottom, sel_bottom) - max(tooltip_top, sel_top))
+                    overlap_area = overlap_x * overlap_y
+                    
+                    # Calculate areas for comparison
+                    selection_width = abs(x2 - x1)
+                    selection_height = abs(y2 - y1)
+                    selection_area = selection_width * selection_height
+                    tooltip_area = tooltip_width * tooltip_height
+                    
+                    # Allow position if overlap is small (< 15% of smaller area)
+                    smaller_area = min(selection_area, tooltip_area)
+                    if smaller_area > 0 and overlap_area < smaller_area * 0.15:
+                        DEBUG("Tooltip positioned near start point ({}, {}) with minimal overlap for selection ({},{}) to ({},{})", 
+                              pos_x, pos_y, x1, y1, x2, y2)
+                        return pos_x, pos_y
+                    else:
+                        DEBUG("Position ({}, {}) rejected due to significant overlap: {}px² vs threshold {}px²", 
+                              pos_x, pos_y, overlap_area, smaller_area * 0.15 if smaller_area > 0 else 0)
+                        continue
+                else:
+                    # For positions away from start point, no overlap check needed (they're designed to avoid selection)
+                    DEBUG("Tooltip positioned away from start point ({}, {}) for selection ({},{}) to ({},{})", 
+                          pos_x, pos_y, x1, y1, x2, y2)
+                    return pos_x, pos_y
+            
+            # Ultimate fallback: center in window
+            fallback_x = window_x + max(0, (window_width - tooltip_width) // 2)
+            fallback_y = window_y + max(0, (window_height - tooltip_height) // 2)
+            
+            DEBUG("Using fallback position ({}, {}) for tooltip", fallback_x, fallback_y)
+            return fallback_x, fallback_y
+            
+        except Exception as e:
+            ERROR("Failed to calculate tooltip position for region: {}, using simple fallback", str(e))
+            # Simple fallback to original calculation
+            return self.calculate_tooltip_position(x1, y1, canvas_type)
         
-    def on_preview_right_drag_start(self, event):
-        """Handle right mouse button press - start dragging if image is larger than canvas"""
-        if not self.SHOW_PREVIEW or self.preview_canvas is None or not self.is_image_draggable():
+    def show_magnifier_for_region(self, x1, y1, x2, y2, canvas_type="crop"):
+        """Show magnifier for a selected region (drag area)
+        
+        Args:
+            x1, y1: Start coordinates of selection on canvas
+            x2, y2: End coordinates of selection on canvas
+            canvas_type: Either "crop" or "original"
+        """
+        image = self.original_image if canvas_type == "crop" else self.original_image_for_preview
+        if not image:
+            DEBUG("No {} image available for region magnification", canvas_type)
             return
             
-        DEBUG("Right drag start on preview canvas at ({}, {})", event.x, event.y)
-        self.is_dragging_preview = True
+        try:
+            from PIL import Image, ImageTk
+            
+            # Ensure coordinates are in correct order
+            left = min(x1, x2)
+            top = min(y1, y2)
+            right = max(x1, x2)
+            bottom = max(y1, y2)
+            
+            # Convert canvas coordinates to image coordinates
+            img_left, img_top = self.canvas_to_image_coords(left, top, canvas_type)
+            img_right, img_bottom = self.canvas_to_image_coords(right, bottom, canvas_type)
+            
+            if img_left is None or img_top is None or img_right is None or img_bottom is None:
+                DEBUG("Invalid coordinates for region magnification")
+                return
+            
+            # Ensure image coordinates are in bounds
+            img_width, img_height = image.size
+            img_left = max(0, min(img_width, img_left))
+            img_top = max(0, min(img_height, img_top))
+            img_right = max(0, min(img_width, img_right))
+            img_bottom = max(0, min(img_height, img_bottom))
+            
+            # Extract the selected region from original image
+            region_width = abs(img_right - img_left)
+            region_height = abs(img_bottom - img_top)
+            
+            if region_width < 1 or region_height < 1:
+                DEBUG("Region too small for magnification: {}x{}", region_width, region_height)
+                return
+            
+            # Crop the region from the original image
+            region = image.crop((img_left, img_top, img_right, img_bottom))
+            
+            # Calculate appropriate zoom factor based on screen size instead of fixed tooltip size
+            try:
+                # Get screen dimensions (with fallback)
+                screen_width = self.window.winfo_screenwidth() if hasattr(self.window, 'winfo_screenwidth') else 1920
+                screen_height = self.window.winfo_screenheight() if hasattr(self.window, 'winfo_screenheight') else 1080
+            except:
+                # Fallback to common screen resolution
+                screen_width, screen_height = 1920, 1080
+            
+            # Use 80% of screen size as maximum window size
+            max_window_width = int(screen_width * 0.8)
+            max_window_height = int(screen_height * 0.8)
+            
+            # Calculate scaling factors based on screen limits
+            width_scale = max_window_width / region_width
+            height_scale = max_window_height / region_height
+            
+            # Use the configured zoom factor as the preferred scaling, but don't exceed screen limits
+            preferred_zoom = self.magnifier_zoom_factor
+            zoom_factor = min(preferred_zoom, width_scale, height_scale)
+            
+            # Ensure minimum zoom (don't make images smaller than original)
+            zoom_factor = max(1.0, zoom_factor)
+            
+            # Calculate magnified size
+            magnified_width = max(1, int(region_width * zoom_factor))
+            magnified_height = max(1, int(region_height * zoom_factor))
+            
+            # Resize the region with high quality
+            magnified_region = region.resize(
+                (magnified_width, magnified_height), 
+                Image.Resampling.LANCZOS
+            )
+            
+            # Convert to PhotoImage
+            photo_image = ImageTk.PhotoImage(magnified_region)
+            
+            # Create magnifier tooltip window
+            self.magnifier_tooltip = tk.Toplevel(self.window)
+            self.magnifier_tooltip.wm_overrideredirect(True)  # Remove window decorations
+            self.magnifier_tooltip.configure(bg="black", bd=2, relief="solid")
+            
+            # Create label for magnified region
+            tooltip_label = tk.Label(self.magnifier_tooltip, image=photo_image, bg="black")
+            tooltip_label.pack()
+            
+            # Update to get actual window size after packing
+            self.magnifier_tooltip.update_idletasks()
+            
+            # Get actual tooltip dimensions
+            try:
+                actual_width = self.magnifier_tooltip.winfo_width()
+                actual_height = self.magnifier_tooltip.winfo_height()
+                
+                # Ensure we have valid dimensions
+                if actual_width <= 1 or actual_height <= 1:
+                    # Fallback to photo dimensions if window size not available yet
+                    actual_width = magnified_width + 4  # Account for border
+                    actual_height = magnified_height + 4
+            except:
+                # Final fallback
+                actual_width = magnified_width + 4
+                actual_height = magnified_height + 4
+            
+            # Calculate tooltip position that doesn't cover the selection area
+            tooltip_x, tooltip_y = self.calculate_tooltip_position_for_region(
+                x1, y1, x2, y2, 
+                actual_width, actual_height, 
+                canvas_type
+            )
+            
+            self.magnifier_tooltip.geometry(f"+{tooltip_x}+{tooltip_y}")
+            
+            # Store image reference to prevent garbage collection
+            self.magnifier_tooltip.image = photo_image
+            
+            DEBUG("Region magnifier shown: region {}x{} -> magnified {}x{} (zoom: {:.2f})", 
+                  region_width, region_height, magnified_width, magnified_height, zoom_factor)
+                  
+            # Dispatch magnifier show event
+            if self.dispatch:
+                self.dispatch(UIEvent.MAGNIFIER_SHOW, {
+                    "canvas_x": (x1 + x2) // 2,
+                    "canvas_y": (y1 + y2) // 2,
+                    "image_x": (img_left + img_right) // 2,
+                    "image_y": (img_top + img_bottom) // 2,
+                    "region_size": (region_width, region_height),
+                    "zoom_factor": zoom_factor
+                })
+                  
+        except Exception as e:
+            ERROR("Failed to show region magnifier: {}", str(e))
+        
+    def on_preview_right_drag_start(self, event, canvas_type="crop"):
+        """Handle right mouse button press - start dragging if image is larger than canvas"""
+        canvas = self.preview_canvas if canvas_type == "crop" else self.original_canvas
+        if not self.SHOW_PREVIEW or canvas is None or not self.is_image_draggable(canvas_type):
+            return
+            
+        DEBUG("Right drag start on {} canvas at ({}, {})", canvas_type, event.x, event.y)
+        if canvas_type == "crop":
+            self.is_dragging_preview = True
+        else:
+            self.is_dragging_original = True
         self.drag_start_x = event.x
         self.drag_start_y = event.y
         
         # Change cursor to indicate dragging mode
-        self.preview_canvas.config(cursor="fleur")
+        canvas.config(cursor="fleur")
         
         # Dispatch preview drag start event
         if self.dispatch:
             self.dispatch(UIEvent.PREVIEW_DRAG_START, {
                 "x": event.x,
-                "y": event.y
+                "y": event.y,
+                "canvas_type": canvas_type
             })
         
-    def on_preview_right_drag(self, event):
+    def on_preview_right_drag(self, event, canvas_type="crop"):
         """Handle right mouse drag - update image position"""
-        if not self.is_dragging_preview or not self.SHOW_PREVIEW:
+        is_dragging = self.is_dragging_preview if canvas_type == "crop" else self.is_dragging_original
+        if not is_dragging or not self.SHOW_PREVIEW:
             return
             
         # Calculate drag offset
         dx = event.x - self.drag_start_x
         dy = event.y - self.drag_start_y
         
-        DEBUG("Right drag on preview canvas: dx={}, dy={}", dx, dy)
+        DEBUG("Right drag on {} canvas: dx={}, dy={}", canvas_type, dx, dy)
         
         # Update preview view position
-        self.update_preview_view(dx, dy)
+        self.update_preview_view(dx, dy, canvas_type)
         
         # Update drag start position for next iteration
         self.drag_start_x = event.x
@@ -981,50 +1658,69 @@ class UI:
                 "x": event.x,
                 "y": event.y,
                 "dx": dx,
-                "dy": dy
+                "dy": dy,
+                "canvas_type": canvas_type
             })
         
-    def on_preview_right_drag_end(self, event):
+    def on_preview_right_drag_end(self, event, canvas_type="crop"):
         """Handle right mouse button release - end dragging"""
-        if not self.is_dragging_preview:
+        is_dragging = self.is_dragging_preview if canvas_type == "crop" else self.is_dragging_original
+        canvas = self.preview_canvas if canvas_type == "crop" else self.original_canvas
+        
+        if not is_dragging:
             return
             
-        DEBUG("Right drag end on preview canvas")
-        self.is_dragging_preview = False
+        DEBUG("Right drag end on {} canvas", canvas_type)
+        if canvas_type == "crop":
+            self.is_dragging_preview = False
+        else:
+            self.is_dragging_original = False
         
         # Restore magnifier cursor
-        self.preview_canvas.config(cursor=self.magnifier_cursor)
+        canvas.config(cursor=self.magnifier_cursor)
         
         # Dispatch preview drag end event
         if self.dispatch:
             self.dispatch(UIEvent.PREVIEW_DRAG_END, {
                 "x": event.x,
-                "y": event.y
+                "y": event.y,
+                "canvas_type": canvas_type
             })
         
-    def is_image_draggable(self):
+    def is_image_draggable(self, canvas_type="crop"):
         """Check if current image is large enough to support dragging
         
+        Args:
+            canvas_type: Either "crop" or "original"
+            
         Returns:
             bool: True if image can be dragged, False otherwise
         """
-        if not self.original_image or not self.preview_photo_image or not self.preview_canvas:
+        # Original canvas images are always scaled to fit, so never draggable
+        if canvas_type == "original":
+            return False
+            
+        canvas = self.preview_canvas
+        image = self.original_image
+        photo_image = self.preview_photo_image
+        
+        if not image or not photo_image or not canvas:
             return False
             
         try:
             # Get original image dimensions
-            img_width, img_height = self.original_image.size
+            img_width, img_height = image.size
             
             # Get actual preview canvas dimensions
-            self.preview_canvas.update_idletasks()
-            canvas_width = self.preview_canvas.winfo_width()
-            canvas_height = self.preview_canvas.winfo_height()
+            canvas.update_idletasks()
+            canvas_width = canvas.winfo_width()
+            canvas_height = canvas.winfo_height()
             
             # Image is draggable if it's larger than canvas in either dimension
             draggable = img_width > canvas_width or img_height > canvas_height
             
-            DEBUG("Image draggable check: {}x{} vs canvas {}x{} -> {}", 
-                  img_width, img_height, canvas_width, canvas_height, draggable)
+            DEBUG("Image draggable check ({}): {}x{} vs canvas {}x{} -> {}", 
+                  canvas_type, img_width, img_height, canvas_width, canvas_height, draggable)
                   
             return draggable
             
@@ -1032,22 +1728,28 @@ class UI:
             ERROR("Failed to check if image is draggable: {}", str(e))
             return False
             
-    def update_preview_view(self, dx, dy):
+    def update_preview_view(self, dx, dy, canvas_type="crop"):
         """Update preview canvas view position based on drag offset
         
         Args:
             dx, dy: Drag offset in pixels
+            canvas_type: Either "crop" or "original"
         """
-        if not self.SHOW_PREVIEW or self.preview_canvas is None:
+        # Original canvas doesn't support dragging as images are scaled to fit
+        if canvas_type == "original":
+            return
+            
+        canvas = self.preview_canvas
+        if not self.SHOW_PREVIEW or canvas is None:
             return
             
         try:
             # Get current scroll position (0.0 to 1.0)
-            current_x_top, current_x_bottom = self.preview_canvas.xview()
-            current_y_top, current_y_bottom = self.preview_canvas.yview()
+            current_x_top, current_x_bottom = canvas.xview()
+            current_y_top, current_y_bottom = canvas.yview()
             
             # Calculate scroll region dimensions
-            scroll_region = self.preview_canvas.cget("scrollregion").split()
+            scroll_region = canvas.cget("scrollregion").split()
             if len(scroll_region) != 4:
                 return
                 
@@ -1055,8 +1757,8 @@ class UI:
             total_height = float(scroll_region[3]) - float(scroll_region[1])
             
             # Calculate canvas dimensions
-            canvas_width = self.preview_canvas.winfo_width()
-            canvas_height = self.preview_canvas.winfo_height()
+            canvas_width = canvas.winfo_width()
+            canvas_height = canvas.winfo_height()
             
             if total_width <= canvas_width and total_height <= canvas_height:
                 return  # No scrolling needed
@@ -1071,11 +1773,11 @@ class UI:
             
             # Apply new scroll positions
             if total_width > canvas_width:
-                self.preview_canvas.xview_moveto(new_x_top)
+                canvas.xview_moveto(new_x_top)
             if total_height > canvas_height:
-                self.preview_canvas.yview_moveto(new_y_top)
+                canvas.yview_moveto(new_y_top)
                 
-            DEBUG("Updated preview view: x={:.3f}, y={:.3f}", new_x_top, new_y_top)
+            DEBUG("Updated {} view: x={:.3f}, y={:.3f}", canvas_type, new_x_top, new_y_top)
             
         except Exception as e:
             ERROR("Failed to update preview view: {}", str(e))
@@ -1107,6 +1809,13 @@ class UI:
 
         
     def create_vertical_line(self):
+        if not self.SHOW_CUT_IMAGE:
+            return
+        
+        def on_vertical_line_press(line, event):
+            if self.dispatch:
+                self.dispatch(UIEvent.VERTICAL_LINE_PRESS, None)
+                DEBUG("Vertical line pressed, event dispatched")
       
         # Create two draggable lines with different styles
         self.cut_line = DraggableVerticalLine(
@@ -1120,6 +1829,7 @@ class UI:
             snap=1,
             # on_move=self.on_line_move,
             on_move=None,
+            on_press=on_vertical_line_press
          )
 # About canvas
 
@@ -1150,6 +1860,10 @@ class UI:
             
 
     def on_cut_image(self, event):
+        if not self.SHOW_CUT_IMAGE:
+            return
+            
+        print("Cut image event triggered")
         # Check if self.cut_line exists
         if hasattr(self, 'cut_line') and self.cut_line is not None:
             # Get the position of the cut line
@@ -1169,8 +1883,7 @@ class UI:
         self.canvas.image = image
         self.canvas.create_image(self.canvas_width//2, self.canvas_height//2, anchor = "center", image = image)
         DEBUG("Image updated on canvas with height: {}, width: {}", self.canvas_height, self.canvas_width)
-        if  CUT_IMAGE_ENABLE == True:
-            self.create_vertical_line()
+        self.create_vertical_line()
 
     def clear_all_labels_canvas(self):
         """Clear all items on the canvas"""
@@ -1334,6 +2047,71 @@ class UI:
 
     def update_path_label(self, path):
         self.path_label.config(text = f"{path}")
+
+    def draw_labels_on_original_canvas(self, labels):
+        """Draw label bounding boxes on original preview canvas (read-only view)"""
+        if not self.original_canvas or not labels:
+            return
+            
+        import label_display_utils
+        
+        DEBUG("Drawing {} labels on original canvas", len(labels))
+        
+        # Clear previous label items on original canvas
+        self.original_canvas.delete("original_label_box")
+        self.original_canvas.delete("original_label_text")
+        
+        # Get canvas and image dimensions for coordinate conversion
+        if not hasattr(self, 'original_preview_scale') or not hasattr(self, 'original_preview_offset'):
+            DEBUG("Original preview scale/offset not available, skipping label drawing")
+            return
+            
+        scale = self.original_preview_scale
+        x_offset, y_offset = self.original_preview_offset
+        
+        # Get original image size
+        if not self.original_image_for_preview:
+            return
+        original_width, original_height = self.original_image_for_preview.size
+        
+        # Define color for original image labels (different from crop labels)
+        original_label_color = "#00FFFF"  # Cyan color for original image labels
+        
+        for label in labels:
+            # Convert YOLO coordinates to original image pixel coordinates
+            center_x = label.cx_ratio * original_width
+            center_y = label.cy_ratio * original_height
+            box_width = label.w_ratio * original_width
+            box_height = label.h_ratio * original_height
+            
+            # Convert to canvas coordinates (top-left, bottom-right)
+            x1 = (center_x - box_width / 2) * scale + x_offset
+            y1 = (center_y - box_height / 2) * scale + y_offset
+            x2 = (center_x + box_width / 2) * scale + x_offset
+            y2 = (center_y + box_height / 2) * scale + y_offset
+            
+            # Draw bounding box
+            self.original_canvas.create_rectangle(
+                x1, y1, x2, y2,
+                outline=original_label_color,
+                width=2,
+                tags="original_label_box"
+            )
+            
+            ## Draw class ID text
+            #text_x = x1
+            #text_y = y1 - 5 if y1 > 15 else y2 + 5
+            #
+            #self.original_canvas.create_text(
+            #    text_x, text_y,
+            #    text=str(label.class_id),
+            #    fill=original_label_color,
+            #    font=("Arial", 10, "bold"),
+            #    anchor="nw",
+            #    tags="original_label_text"
+            #)
+        
+        DEBUG("Drew {} labels on original canvas", len(labels))
 
     def highlight_yolo_line_for_label(self, selected_label):
         if not self.label_text_box:
@@ -1505,6 +2283,18 @@ class UI:
 
     def on_mouse_motion(self, event):
         """Handle mouse motion event - update cursor based on position"""
+        # Check if mouse is near the vertical cut line or dragging it
+        if self.SHOW_CUT_IMAGE and hasattr(self, 'cut_line') and self.cut_line is not None:
+            # Check if currently dragging the cut line
+            if getattr(self.cut_line, '_dragging', False):
+                # Don't update cursor when dragging cut line
+                return
+            # Check if mouse is near the cut line (using same logic as DraggableVerticalLine)
+            grab_px = getattr(self.cut_line, 'grab_px', 6)
+            if abs(event.x - self.cut_line.get_x()) <= grab_px:
+                # Don't update cursor when near cut line
+                return
+        
         if self.bbox_controller and hasattr(self, 'current_labels') and self.current_labels:
             # Update cursor based on mouse position using stored labels
             self.bbox_controller.update_cursor_for_position(event.x, event.y, self.current_labels)
@@ -1613,9 +2403,13 @@ class UI:
             self.SHOW_PREVIEW = settings.get('show_preview', True)
             self.SHOW_INPUT_BOX = settings.get('show_input_box', True)
             self.SHOW_CLASSIFY_FRAME = settings.get('show_classify_frame', False)
+            self.SHOW_CUT_IMAGE = settings.get('show_cut_image', True)
             self.LABEL_FONT_SIZE = settings.get('label_font_size', 12)
             # Apply classification frame visibility
             self.toggle_classification_frame(self.SHOW_CLASSIFY_FRAME)
+            
+            # Apply cut image visibility
+            self.toggle_cut_image(self.SHOW_CUT_IMAGE)
             
             # Apply input box visibility (should be first, like in original creation)
             self.toggle_input_box(self.SHOW_INPUT_BOX)
@@ -1831,6 +2625,65 @@ class UI:
                     self.classification_frame.pack_forget()
         except Exception as e:
             ERROR("Error toggling classification frame: {}", e)
+
+    def toggle_cut_image(self, show):
+        """Toggle cut image feature visibility"""
+        try:
+            if show is True:
+                # If we want to show but cut_frame doesn't exist, create it
+                if not hasattr(self, 'cut_frame') or self.cut_frame is None:
+                    DEBUG("Creating cut image frame for show operation")
+                    self.create_cut_image_bt()
+                else:
+                    try:
+                        # Check if already packed by trying to get pack_info
+                        self.cut_frame.pack_info()
+                    except tk.TclError:
+                        # Not packed, so pack it
+                        self.cut_frame.pack(side="top", anchor="center")
+                        DEBUG("cut_frame shown")
+                
+                # Create vertical line if there's an image on canvas
+                if hasattr(self, 'canvas') and self.canvas is not None:
+                    self.create_vertical_line()
+                
+                # Bind keyboard shortcut if not already bound
+                if not hasattr(self, '_cut_image_bound') or not self._cut_image_bound:
+                    self.window.bind("<Shift-C>", self.on_cut_image)
+                    self._cut_image_bound = True
+                        
+            else:
+                # If we want to hide the cut_frame
+                if hasattr(self, 'cut_frame') and self.cut_frame is not None:
+                    try:
+                        # Check if packed by trying to get pack_info
+                        self.cut_frame.pack_info()
+                        self.cut_frame.pack_forget()
+                        DEBUG("cut_frame hidden")
+                    except tk.TclError:
+                        # Already not packed
+                        pass
+                
+                # Hide vertical line by removing it
+                if hasattr(self, 'cut_line') and self.cut_line is not None:
+                    # Remove the line elements from canvas
+                    try:
+                        if hasattr(self.cut_line, 'bg_line'):
+                            self.canvas.delete(self.cut_line.bg_line)
+                        if hasattr(self.cut_line, 'fg_line'):
+                            self.canvas.delete(self.cut_line.fg_line)
+                        self.cut_line = None
+                        DEBUG("Vertical cut line removed")
+                    except Exception as line_error:
+                        ERROR("Error removing vertical line: {}", line_error)
+                
+                # Unbind keyboard shortcut
+                if hasattr(self, '_cut_image_bound') and self._cut_image_bound:
+                    self.window.unbind("<Shift-C>")
+                    self._cut_image_bound = False
+                    
+        except Exception as e:
+            ERROR("Error toggling cut image feature: {}", e)
             
             
     def next_image(self, event):
@@ -1868,8 +2721,7 @@ class UI:
 
         self.window.bind("<Button-1>", self._clear_focus)
 
-        if CUT_IMAGE_ENABLE:
-            self.window.bind("<Shift-C>", self.on_cut_image)
+        self.window.bind("<Shift-C>", self.on_cut_image)
         
         # Mouse event binding (support drawing functionality)
         self.canvas.bind("<Button-1>", self.on_mouse_press)

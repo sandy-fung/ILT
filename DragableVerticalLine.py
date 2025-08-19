@@ -14,6 +14,7 @@ class DraggableVerticalLine:
         snap: int | None = None,
         cursor: str = "sb_h_double_arrow",
         on_move=None,
+        on_press=None,
     ):
         self.canvas = canvas
         self.x = int(x)
@@ -26,9 +27,11 @@ class DraggableVerticalLine:
         self.snap = snap
         self.cursor = cursor
         self.on_move = on_move
+        self.on_press = on_press
 
         self._dragging = False
         self._cursor_set = False
+        self._original_cursor = canvas.cget('cursor') or 'arrow'
 
         height = canvas.winfo_height() or int(canvas.cget("height") or 300)
 
@@ -46,6 +49,8 @@ class DraggableVerticalLine:
 
     def _on_press(self, event):
         if self._near_line(event.x, event.y):
+            if callable(self.on_press):
+                self.on_press(self, event)
             self._dragging = True
             self.canvas.configure(cursor=self.cursor)
 
@@ -71,6 +76,7 @@ class DraggableVerticalLine:
     def _on_motion(self, event):
         if not self._dragging and self._near_line(event.x, event.y):
             if not self._cursor_set:
+                self._original_cursor = self.canvas.cget('cursor')
                 self.canvas.configure(cursor=self.cursor)
                 self._cursor_set = True
         else:
@@ -91,7 +97,7 @@ class DraggableVerticalLine:
 
     def _maybe_reset_cursor(self):
         if self._cursor_set and not self._dragging:
-            self.canvas.configure(cursor="")
+            self.canvas.configure(cursor=self._original_cursor)
             self._cursor_set = False
 
     def set_x(self, x: int):
