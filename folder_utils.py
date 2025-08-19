@@ -97,3 +97,37 @@ def find_original_image_path(crop_image_path: str) -> str:
     else:
         DEBUG("Original image not found for crop: {}, expected: {}", crop_image_path, original_path)
         return ""
+
+def find_original_label_path(original_image_path: str) -> str:
+    """
+    從原圖路徑找到對應的標註檔路徑
+    
+    Args:
+        original_image_path: 原圖的完整路徑
+    
+    Returns:
+        str: 標註檔的完整路徑，如果找不到則返回空字串
+    """
+    if not original_image_path:
+        return ""
+    
+    # 取得原圖目錄、檔名和副檔名
+    image_dir = os.path.dirname(original_image_path)
+    image_filename = os.path.basename(original_image_path)
+    image_stem = os.path.splitext(image_filename)[0]
+    
+    # 找到標註目錄（從images目錄對應到labels目錄）
+    parent_dir = os.path.dirname(image_dir)
+    label_dir = os.path.join(parent_dir, "labels")
+    
+    # 構建標註檔路徑（與圖片同名但副檔名為.txt）
+    label_filename = image_stem + ".txt"
+    label_path = os.path.join(label_dir, label_filename)
+    
+    # 檢查檔案是否存在
+    if os.path.exists(label_path):
+        DEBUG("Found original label for image: {} -> {}", original_image_path, label_path)
+        return label_path
+    else:
+        DEBUG("Original label not found for image: {}, expected: {}", original_image_path, label_path)
+        return ""

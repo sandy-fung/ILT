@@ -1,199 +1,44 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## Project Purpose
+This repository contains **ILT (Image Labelling Tool)** — a Python desktop application for image annotation and YOLO-format labeling. The goal is to maintain a clean, event-driven MVC architecture with strong separation between UI, controller, and utility logic.
 
-## Project Overview
+## Tech Stack & Conventions
+- **UI Framework**: Tkinter  
+- **Image Processing**: OpenCV, Pillow, NumPy  
+- **Architecture**: MVC + Event-driven  
+- **Code Style**: PEP8, clear function/method names, comments for non-obvious logic  
+- **Logging**: Use the provided `log_levels.py` system, keep messages in English  
 
-This is the **ILT (Image Labelling Tool)** - a Python desktop application for image annotation and labeling. The tool provides a GUI interface for navigating through images, viewing/editing labels, and managing image-label datasets.
+## Key Modules
+- **main.py** → Application entry point  
+- **ILT_UI.py** → Tkinter UI components  
+- **Controller.py** → Business logic & event dispatch  
+- **bbox_controller.py** → Bounding box interactions  
+- **label_display_utils.py** → YOLO label parsing/sorting  
+- **config_utils.py** → Config.ini read/write  
+- **folder_utils.py** → Folder/image scanning  
+- **image_utils.py** → Image loading/conversion  
 
-## Development Setup
+## Important Guidelines
+- **Maintain MVC separation**  
+  - UI code only in `ILT_UI.py`  
+  - Business logic in `Controller.py`  
+  - No mixing of file I/O logic with UI  
+- **Preserve YOLO label compatibility**  
+  - Labels stored as text files alongside images  
+  - Auto-sorting (left-to-right within plates) must be preserved  
+- **Respect configuration system**  
+  - Do not break `config.ini` keys or sections  
+  - Support lazy label file creation by default  
+- **UI behavior**  
+  - Use event-driven flow (keyboard/mouse events)  
+  - Keep new features toggleable through config if relevant  
+- **Dependencies**  
+  - Do not add heavy new packages unless strictly necessary  
+  - Keep Tkinter as the only UI framework  
 
-### Environment
-- Uses Python 3.10 with a virtual environment located at `venv/`
-- Activate with: `source venv/bin/activate` (Linux/Mac) or `venv\Scripts\activate` (Windows)
-
-### Dependencies
-The project uses these key packages (installed in venv):
-- **opencv-python** (4.12.0.88) - Image processing
-- **pillow** (11.3.0) - Image manipulation for Tkinter
-- **numpy** (2.2.6) - Array operations
-- **tkinter** - GUI framework (built-in)
-
-### Running the Application
-```bash
-source venv/bin/activate
-python main.py
-```
-
-## Architecture
-
-### MVC Pattern with Event-Driven Design
-- **View**: `ILT_UI.py` - Tkinter GUI components and user interactions
-- **Controller**: `Controller.py` - Business logic and event coordination
-- **Model**: Configuration and utility modules
-- **Events**: `UI_event.py` defines event types using Enum for loose coupling
-
-### Key Components
-- **main.py** - Entry point, initializes UI and Controller
-- **ILT_UI.py** - Complete UI implementation with canvas, toolbar, and controls
-- **Controller.py** - Handles all business logic, image navigation, and event dispatching
-- **settings_dialog.py** - UI customization dialog for toggling component visibility
-- **bbox_controller.py** - Manages bounding box interactions (drawing, selection, dragging, resizing)
-- **label_display_utils.py** - YOLO label parsing, sorting, and LabelObject management
-- **Words_Label_mapping.py** - Character-to-class mapping for license plate annotation (0-9, A-Z)
-- **config_utils.py** - Manages config.ini file operations and UI settings
-- **folder_utils.py** - Scans image folders and manages label files
-- **image_utils.py** - Image loading, processing, and PIL conversion
-- **log_levels.py** - Custom logging system
-
-### Configuration
-- **config.ini** - Stores application state (folders, current image, dimensions)
-  - `[ImageInfo]` - Image dimensions
-  - `[Path]` - Folder paths, current image index, selected class ID
-  - `[UISettings]` - UI component visibility settings (show_class_id_buttons, show_text_box, show_preview, show_input_box)
-  - `[preview_magnifier]` - Magnifier settings (enabled, zoom_factor, cursor_type, region_size, cache_size)
-  - `[LabelFiles]` - Label file handling settings (auto_create_labels)
-- **Label File Strategy**: Uses lazy creation approach
-  - Label files are created only when actually needed (when saving labels)
-  - Empty label files are handled based on `auto_create_labels` configuration (default: False)
-  - Significantly improves performance when opening large datasets
-- Supports JPG, JPEG, PNG image formats
-
-## Application Features
-
-### Navigation
-- Arrow keys (Left/Right) for previous/next image
-- Automatic image resizing with window
-- Displays current image index
-
-### Image Management
-- **Delete Current Image**: Bottom toolbar "Delete" button removes current image file and associated label file
-- Automatic navigation to next available image after deletion
-- Confirmation dialog to prevent accidental deletion
-
-### UI Components
-- Top toolbar: "Reselect Folders", "Crop", "Add", "Delete", "Configuration" buttons
-- Main canvas with image display and bounding box visualization
-- Right panel: Class ID selection buttons (0-9, A-Z) for character annotation (optional)
-- Text box showing label content in YOLO format (optional)
-- Bottom toolbar: Additional tools and controls
-- Hint area with keyboard shortcuts (in Chinese)
-- Status display: Shows drawing mode, selection status, and sorting feedback
-
-### UI Customization
-The application includes a **Configuration** button in the top toolbar that opens a settings dialog for UI customization.
-
-**Configuration Dialog Features:**
-- Fixed size (400x300 pixels) modal dialog with compact layout
-- Checkboxes for toggling UI component visibility:
-  - Show Class ID Buttons (0-9, A-Z)
-  - Show Text Box
-  - Show Preview Panel
-  - Show Input Box
-- Save and Cancel buttons
-- Keyboard shortcuts: Enter (Save), Escape (Cancel)
-- **Real-time UI updates**: Settings applied immediately without restart
-- Settings automatically saved to config.ini for persistence
-
-**UI Configuration Options:**
-- `SHOW_CLASS_ID_BUTTONS`: Toggle class ID button panel visibility
-- `SHOW_TEXT_BOX`: Toggle text box visibility for streamlined interface
-- `SHOW_PREVIEW`: Toggle original size preview panel visibility
-- `SHOW_INPUT_BOX`: Toggle input box visibility
-
-### Bounding Box Features
-- **Visualization**: Display YOLO format labels as colored bounding boxes with class ID
-- **Selection**: Click to select boxes (red highlight)
-- **Class ID Assignment**: Select character button (0-9, A-Z) to set box class
-- **Drawing**: Two drawing modes available:
-  - Left Ctrl: Toggle drawing mode on/off
-  - Right Ctrl: Hold to enter drawing mode, release to exit
-- **Deletion**: Delete key or right-click to remove selected box
-- **Dragging**: Drag selected boxes to new positions
-- **Resizing**: Drag gray corner handles to resize boxes
-- **Auto-sorting**: Labels automatically sorted left-to-right on load and after operations
-  - Supports multiple license plates with intelligent grouping
-  - Uses 50% vertical overlap threshold for plate detection
-  - Re-sorts after adding, deleting, or moving boxes
-
-### Original Size Preview with Interactive Magnifier
-- **Location**: Bottom-right corner of the interface
-- **Basic Features**:
-  - Shows images at their original size without scaling
-  - Displays original image dimensions info in top-left corner
-  - Automatically updates when loading new images
-  - Scrollbars appear automatically when image exceeds preview panel size
-- **Interactive Magnifier Features**:
-  - **Smart Cursor**: Mouse cursor changes to target/crosshair when hovering over preview
-  - **Left-click Zoom**: Click anywhere to display 3x magnified tooltip with boundary detection
-  - **Right-drag Navigation**: Drag to navigate through images larger than the preview panel
-  - **Performance Optimized**: LRU cache system for smooth magnification experience
-- **Configuration**: 
-  - Toggle via `SHOW_PREVIEW` configuration or `toggle_preview()` method
-  - Magnifier settings in `[preview_magnifier]` config section (zoom factor, cursor type, cache size)
-
-### Event System
-Events are defined in `UI_event.py` and handled through the Controller:
-- Keyboard events: LEFT/RIGHT navigation, Left/Right Ctrl modifiers, Delete key
-- Mouse events: Left/right clicks, drag operations, bounding box interactions
-- Button events: Toolbar button clicks, class ID selection, image deletion
-- System events: Window ready, canvas resize
-- Bounding box events: Drawing mode toggle, selection, deletion, dragging, resizing
-- Magnifier events: MAGNIFIER_SHOW, MAGNIFIER_HIDE, PREVIEW_DRAG_START/DRAG/DRAG_END
-
-## Development Notes
-
-### Code Organization
-- UI logic is contained in `ILT_UI.py` with clear separation from business logic
-- Utility functions are modularized by responsibility
-- Event-driven architecture allows for easy feature extension
-
-### Image Processing Flow
-1. `folder_utils.py` scans for image files
-2. `image_utils.py` loads with OpenCV and converts to PIL
-3. `ILT_UI.py` displays on Tkinter canvas with auto-resize
-4. Labels are read/written as text files alongside images
-
-### Label Processing Flow
-1. `label_display_utils.py` parses YOLO format labels into LabelObject instances
-2. Auto-sorting triggers:
-   - On initial image load
-   - After creating new bounding box
-   - After deleting selected box
-   - After dragging box to new position
-3. Sorting algorithm:
-   - Groups labels by vertical overlap (same license plate detection)
-   - Sorts each group by X coordinate (left-to-right)
-   - Saves sorted results back to label files
-4. Visual feedback shows number of labels and detected plates
-
-### Configuration Management
-- Uses Python's configparser for config.ini
-- Graceful error handling for missing/corrupt config files
-- Automatic config creation with sensible defaults
-- Improved error messages for Windows-specific issues (e.g., file path access errors)
-- **UI Settings Management**: Complete API for UI customization
-  - `get_show_*()` functions for reading UI component visibility settings
-  - `save_ui_settings()` for batch updating UI settings
-  - `get_all_ui_settings()` for retrieving all settings as dictionary
-  - Dynamic UI component show/hide with `apply_ui_settings()` method
-  - Intelligent `toggle_*()` methods with automatic component creation and proper pack management
-  - Unified pack checking logic using try-except pattern for reliable widget state detection
-- **Magnifier Configuration**: Full API in `config_utils.py` for managing preview magnifier settings
-  - `get_magnifier_*()` functions for reading configuration
-  - `save_magnifier_config()` for updating settings
-  - Dynamic cursor switching with 7 available cursor types (target, dotbox, tcross, crosshair, plus, circle, sizing)
-- **Label File Configuration**: Enhanced performance-oriented settings
-  - `get_auto_create_labels()` and `set_auto_create_labels()` for controlling empty label file creation
-  - Backward compatibility maintained for existing projects
-
-### Performance Optimization
-- **Lazy Label File Creation**: Advanced on-demand file creation strategy
-  - Eliminated pre-creation of thousands of empty label files
-  - Folder selection time reduced from minutes to seconds for large datasets
-  - Memory usage optimized by avoiding unnecessary file operations
-  - Files created only when labels are actually saved
-- **Efficient Folder Scanning**: Only scans image files during folder selection
-- **Configurable Behavior**: Users can choose between lazy creation (default) and eager creation modes
-  - Use `config_utils.set_auto_create_labels(True)` to enable eager creation
-  - Use `config_utils.set_auto_create_labels(False)` to enable lazy creation (recommended)
+## Restrictions
+- Do not remove or rewrite the event system in `UI_event.py`  
+- Do not alter the config file schema  
+- Avoid introducing global state outside existing patterns  

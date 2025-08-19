@@ -406,6 +406,7 @@ class UI:
         self.original_image_for_preview = None
         self.original_photo_image = None
         self.pending_original_image = None
+        self.original_image_labels = []  # List of LabelObject instances for original image
         
         # Schedule placeholder text after window is rendered
         if self.preview_canvas:
@@ -645,6 +646,15 @@ class UI:
             if hasattr(self, 'original_canvas') and self.original_canvas:
                 self.clear_original_preview()
 
+    def set_original_image_labels(self, original_image_labels):
+        """Set the labels for original image preview
+        
+        Args:
+            original_image_labels: List of LabelObject instances for original image
+        """
+        self.original_image_labels = original_image_labels if original_image_labels else []
+        DEBUG("Set {} original image labels for preview", len(self.original_image_labels))
+
     def update_preview(self, original_image):
         """Update preview with the full original image
         
@@ -763,6 +773,10 @@ class UI:
         
         DEBUG("Original preview updated with scaled image: {}×{} -> {}×{} ({}%)", 
               img_width, img_height, scaled_width, scaled_height, scale_percent)
+        
+        # Draw labels on original canvas if available
+        if hasattr(self, 'original_image_labels') and self.original_image_labels:
+            self.draw_labels_on_original_canvas(self.original_image_labels)
         
         # Clear pending image since we've successfully updated
         self.pending_original_image = None
@@ -2036,6 +2050,71 @@ class UI:
 
     def update_path_label(self, path):
         self.path_label.config(text = f"{path}")
+
+    def draw_labels_on_original_canvas(self, labels):
+        """Draw label bounding boxes on original preview canvas (read-only view)"""
+        if not self.original_canvas or not labels:
+            return
+            
+        import label_display_utils
+        
+        DEBUG("Drawing {} labels on original canvas", len(labels))
+        
+        # Clear previous label items on original canvas
+        self.original_canvas.delete("original_label_box")
+        self.original_canvas.delete("original_label_text")
+        
+        # Get canvas and image dimensions for coordinate conversion
+        if not hasattr(self, 'original_preview_scale') or not hasattr(self, 'original_preview_offset'):
+            DEBUG("Original preview scale/offset not available, skipping label drawing")
+            return
+            
+        scale = self.original_preview_scale
+        x_offset, y_offset = self.original_preview_offset
+        
+        # Get original image size
+        if not self.original_image_for_preview:
+            return
+        original_width, original_height = self.original_image_for_preview.size
+        
+        # Define color for original image labels (different from crop labels)
+        original_label_color = "#00FFFF"  # Cyan color for original image labels
+        
+        for label in labels:
+            # Convert YOLO coordinates to original image pixel coordinates
+            center_x = label.cx_ratio * original_width
+            center_y = label.cy_ratio * original_height
+            box_width = label.w_ratio * original_width
+            box_height = label.h_ratio * original_height
+            
+            # Convert to canvas coordinates (top-left, bottom-right)
+            x1 = (center_x - box_width / 2) * scale + x_offset
+            y1 = (center_y - box_height / 2) * scale + y_offset
+            x2 = (center_x + box_width / 2) * scale + x_offset
+            y2 = (center_y + box_height / 2) * scale + y_offset
+            
+            # Draw bounding box
+            self.original_canvas.create_rectangle(
+                x1, y1, x2, y2,
+                outline=original_label_color,
+                width=2,
+                tags="original_label_box"
+            )
+            
+            ## Draw class ID text
+            #text_x = x1
+            #text_y = y1 - 5 if y1 > 15 else y2 + 5
+            #
+            #self.original_canvas.create_text(
+            #    text_x, text_y,
+            #    text=str(label.class_id),
+            #    fill=original_label_color,
+            #    font=("Arial", 10, "bold"),
+            #    anchor="nw",
+            #    tags="original_label_text"
+            #)
+        
+        DEBUG("Drew {} labels on original canvas", len(labels))
 
     def highlight_yolo_line_for_label(self, selected_label):
         if not self.label_text_box:
