@@ -429,6 +429,12 @@ class UI:
         
         # Initialize magnifier cache (LRU cache for magnified regions) 
         self.magnifier_cache = {}
+        
+        # Initialize preview magnifier drag state (separate from main canvas bbox selection)
+        self.preview_magnifier_dragging = False
+        self.preview_magnifier_drag_start_x = 0
+        self.preview_magnifier_drag_start_y = 0
+        self.preview_magnifier_selection_rect = None
     
     def on_preview_tab_changed(self, event):
         """Handle tab change in preview notebook"""
@@ -498,7 +504,13 @@ class UI:
         if canvas:
             canvas.bind("<Enter>", lambda event: self.on_preview_enter(event, canvas_type))
             canvas.bind("<Leave>", lambda event: self.on_preview_leave(event, canvas_type))
-            canvas.bind("<Button-1>", lambda event: self.on_preview_left_click(event, canvas_type))
+            
+            # Left mouse events for magnifier drag selection
+            canvas.bind("<Button-1>", lambda event: self.on_preview_left_press(event, canvas_type))
+            canvas.bind("<B1-Motion>", lambda event: self.on_preview_left_drag(event, canvas_type))
+            canvas.bind("<ButtonRelease-1>", lambda event: self.on_preview_left_release(event, canvas_type))
+            
+            # Right mouse events for canvas dragging
             canvas.bind("<Button-3>", lambda event: self.on_preview_right_drag_start(event, canvas_type))
             canvas.bind("<B3-Motion>", lambda event: self.on_preview_right_drag(event, canvas_type))
             canvas.bind("<ButtonRelease-3>", lambda event: self.on_preview_right_drag_end(event, canvas_type))
@@ -844,21 +856,82 @@ class UI:
         # Hide magnifier tooltip if visible
         self.hide_magnifier_tooltip()
         
-    def on_preview_left_click(self, event, canvas_type="crop"):
-        """Handle left click on preview canvas - show magnified tooltip"""
+    def on_preview_left_press(self, event, canvas_type="crop"):
+        """Handle left mouse press on preview canvas - start drag selection for magnifier"""
+        if not self.SHOW_PREVIEW or not self.magnifier_enabled:
+            return
+        
         canvas = self.preview_canvas if canvas_type == "crop" else self.original_canvas
         image = self.original_image if canvas_type == "crop" else self.original_image_for_preview
         
-        if not self.SHOW_PREVIEW or canvas is None or image is None or not self.magnifier_enabled:
+        if canvas is None or image is None:
             return
             
-        DEBUG("Left click on {} canvas at ({}, {})", canvas_type, event.x, event.y)
+        DEBUG("Left press on {} canvas at ({}, {})", canvas_type, event.x, event.y)
         
-        # Hide existing tooltip first
+        # Start magnifier drag selection
+        self.preview_magnifier_dragging = True
+        self.preview_magnifier_drag_start_x = event.x
+        self.preview_magnifier_drag_start_y = event.y
+        
+        # Hide existing tooltip
         self.hide_magnifier_tooltip()
         
-        # Show magnifier tooltip at clicked position
-        self.show_magnifier_tooltip(event.x, event.y, canvas_type)
+    def on_preview_left_drag(self, event, canvas_type="crop"):
+        """Handle left mouse drag on preview canvas - show selection rectangle"""
+        if not self.preview_magnifier_dragging:
+            return
+        
+        canvas = self.preview_canvas if canvas_type == "crop" else self.original_canvas
+        if canvas is None:
+            return
+        
+        # Clear previous selection rectangle
+        if self.preview_magnifier_selection_rect:
+            canvas.delete(self.preview_magnifier_selection_rect)
+        
+        # Draw selection rectangle with dashed line
+        self.preview_magnifier_selection_rect = canvas.create_rectangle(
+            self.preview_magnifier_drag_start_x, 
+            self.preview_magnifier_drag_start_y,
+            event.x, event.y,
+            outline="cyan", width=2, dash=(5, 5), tags="magnifier_selection"
+        )
+        
+    def on_preview_left_release(self, event, canvas_type="crop"):
+        """Handle left mouse release on preview canvas - decide magnification mode"""
+        if not self.preview_magnifier_dragging:
+            return
+        
+        canvas = self.preview_canvas if canvas_type == "crop" else self.original_canvas
+        if canvas is None:
+            return
+        
+        # Clear selection rectangle
+        if self.preview_magnifier_selection_rect:
+            canvas.delete(self.preview_magnifier_selection_rect)
+            self.preview_magnifier_selection_rect = None
+        
+        # Calculate drag distance
+        width = abs(event.x - self.preview_magnifier_drag_start_x)
+        height = abs(event.y - self.preview_magnifier_drag_start_y)
+        
+        DEBUG("Left release on {} canvas: drag size {}x{}", canvas_type, width, height)
+        
+        # Determine if this was a click or a drag
+        if width < 5 and height < 5:
+            # Small movement - treat as click, use original magnifier logic
+            self.show_magnifier_tooltip(event.x, event.y, canvas_type)
+        else:
+            # Any drag - always use the actual dragged region size
+            self.show_magnifier_for_region(
+                self.preview_magnifier_drag_start_x, 
+                self.preview_magnifier_drag_start_y,
+                event.x, event.y, canvas_type
+            )
+        
+        # Reset drag state
+        self.preview_magnifier_dragging = False
         
     def show_magnifier_tooltip(self, canvas_x, canvas_y, canvas_type="crop"):
         """Create and show magnifier tooltip with 3x zoomed region
@@ -902,7 +975,7 @@ class UI:
             tooltip_label.pack()
             
             # Calculate tooltip position to avoid screen edges
-            tooltip_x, tooltip_y = self.calculate_tooltip_position(canvas_x, canvas_y)
+            tooltip_x, tooltip_y = self.calculate_tooltip_position(canvas_x, canvas_y, canvas_type)
             self.magnifier_tooltip.geometry(f"+{tooltip_x}+{tooltip_y}")
             
             # Store image reference to prevent garbage collection
@@ -1130,43 +1203,396 @@ class UI:
         self.cache_access_order.clear()
         DEBUG("Magnifier cache cleared")
             
-    def calculate_tooltip_position(self, canvas_x, canvas_y):
-        """Calculate optimal tooltip position to avoid screen edges
+    def calculate_tooltip_position(self, canvas_x, canvas_y, canvas_type="crop"):
+        """Calculate optimal tooltip position for multi-monitor setup
         
         Args:
             canvas_x, canvas_y: Click position on canvas
+            canvas_type: Either "crop" or "original"
             
         Returns:
             tuple: (x, y) screen coordinates for tooltip
         """
-        # Get canvas position on screen
-        canvas_abs_x = self.preview_canvas.winfo_rootx()
-        canvas_abs_y = self.preview_canvas.winfo_rooty()
-        
-        # Calculate initial tooltip position (offset from click)
-        tooltip_x = canvas_abs_x + canvas_x + 20
-        tooltip_y = canvas_abs_y + canvas_y + 20
-        
-        # Get screen dimensions
-        screen_width = self.window.winfo_screenwidth()
-        screen_height = self.window.winfo_screenheight()
-        
-        # Estimate tooltip size (will be adjusted based on magnified region)
-        tooltip_width = 150  # Approximate
-        tooltip_height = 150
-        
-        # Adjust position to avoid screen edges
-        if tooltip_x + tooltip_width > screen_width:
-            tooltip_x = canvas_abs_x + canvas_x - tooltip_width - 20
+        try:
+            # Get the correct canvas based on canvas_type
+            canvas = self.preview_canvas if canvas_type == "crop" else self.original_canvas
+            if not canvas:
+                # Fallback to main canvas if preview canvas not available
+                canvas = self.canvas if hasattr(self, 'canvas') else None
             
-        if tooltip_y + tooltip_height > screen_height:
-            tooltip_y = canvas_abs_y + canvas_y - tooltip_height - 20
+            # Get canvas absolute position on screen (SAME FIX AS calculate_tooltip_position_for_region)
+            try:
+                if canvas:
+                    # Use rootx/rooty to get absolute screen position
+                    canvas_screen_x = canvas.winfo_rootx()
+                    canvas_screen_y = canvas.winfo_rooty()
+                else:
+                    # Fallback to window position if canvas not available
+                    canvas_screen_x = self.window.winfo_rootx()
+                    canvas_screen_y = self.window.winfo_rooty()
+            except Exception as e:
+                DEBUG("Failed to get canvas screen position: {}", str(e))
+                # Ultimate fallback
+                canvas_screen_x = 100
+                canvas_screen_y = 100
             
-        # Ensure tooltip is not off-screen
-        tooltip_x = max(0, tooltip_x)
-        tooltip_y = max(0, tooltip_y)
+            # Calculate tooltip position using screen coordinates (simplified)
+            tooltip_x = canvas_screen_x + canvas_x + 20
+            tooltip_y = canvas_screen_y + canvas_y + 20
+            
+            # Get window bounds for boundary checking
+            window_x = self.window.winfo_x()
+            window_y = self.window.winfo_y()
+            window_width = self.window.winfo_width()
+            window_height = self.window.winfo_height()
+            
+            # Estimate tooltip size (smaller for click magnification)
+            estimated_width = 200  # Smaller default for click magnification
+            estimated_height = 200
+            
+            # Keep tooltip within window bounds
+            window_right = window_x + window_width
+            window_bottom = window_y + window_height
+            
+            # Adjust horizontally if tooltip goes beyond window right edge
+            if tooltip_x + estimated_width > window_right:
+                # Try placing on the left side of cursor
+                alt_x = canvas_screen_x + canvas_x - estimated_width - 20
+                if alt_x >= window_x:
+                    tooltip_x = alt_x
+                else:
+                    # If still not enough space, center within window
+                    tooltip_x = window_x + (window_width - estimated_width) // 2
+            
+            # Adjust vertically if tooltip goes beyond window bottom edge
+            if tooltip_y + estimated_height > window_bottom:
+                # Try placing above cursor
+                alt_y = canvas_screen_y + canvas_y - estimated_height - 20
+                if alt_y >= window_y:
+                    tooltip_y = alt_y
+                else:
+                    # If still not enough space, center within window
+                    tooltip_y = window_y + (window_height - estimated_height) // 2
+            
+            # Final bounds check - ensure tooltip stays within window
+            tooltip_x = max(window_x, min(tooltip_x, window_right - estimated_width))
+            tooltip_y = max(window_y, min(tooltip_y, window_bottom - estimated_height))
+            
+            DEBUG("Tooltip position calculated: window=({},{},{},{}), tooltip=({},{})", 
+                  window_x, window_y, window_width, window_height, tooltip_x, tooltip_y)
+            
+            return tooltip_x, tooltip_y
+            
+        except Exception as e:
+            ERROR("Failed to calculate tooltip position: {}, using fallback", str(e))
+            # Fallback to simple offset using screen coordinates
+            try:
+                canvas = self.preview_canvas if canvas_type == "crop" else self.original_canvas
+                if not canvas:
+                    canvas = self.canvas if hasattr(self, 'canvas') else None
+                
+                if canvas:
+                    # Use screen coordinates for fallback too
+                    canvas_abs_x = canvas.winfo_rootx()
+                    canvas_abs_y = canvas.winfo_rooty()
+                    return canvas_abs_x + canvas_x + 20, canvas_abs_y + canvas_y + 20
+                else:
+                    return 100, 100
+            except:
+                return 100, 100  # Ultimate fallback
+    
+    def calculate_tooltip_position_for_region(self, x1, y1, x2, y2, tooltip_width, tooltip_height, canvas_type="crop"):
+        """Calculate tooltip position for region selection that doesn't cover the selection
         
-        return tooltip_x, tooltip_y
+        Args:
+            x1, y1: Start point of selection (drag start - click origin)
+            x2, y2: End point of selection  
+            tooltip_width, tooltip_height: Actual size of tooltip
+            canvas_type: Either "crop" or "original"
+            
+        Returns:
+            tuple: (x, y) position for tooltip that doesn't cover selection
+        """
+        try:
+            # Get canvas based on type
+            canvas = self.preview_canvas if canvas_type == "crop" else self.original_canvas
+            if not canvas:
+                canvas = self.canvas if hasattr(self, 'canvas') else None
+            
+            # Get canvas absolute position on screen (CRITICAL FIX!)
+            try:
+                if canvas:
+                    # Use rootx/rooty to get absolute screen position
+                    canvas_screen_x = canvas.winfo_rootx()
+                    canvas_screen_y = canvas.winfo_rooty()
+                else:
+                    # Fallback to window position if canvas not available
+                    canvas_screen_x = self.window.winfo_rootx()
+                    canvas_screen_y = self.window.winfo_rooty()
+            except Exception as e:
+                DEBUG("Failed to get canvas screen position: {}", str(e))
+                # Ultimate fallback
+                canvas_screen_x = 100
+                canvas_screen_y = 100
+            
+            # Calculate selection bounds in screen coordinates
+            sel_left = canvas_screen_x + min(x1, x2)
+            sel_top = canvas_screen_y + min(y1, y2)
+            sel_right = canvas_screen_x + max(x1, x2)
+            sel_bottom = canvas_screen_y + max(y1, y2)
+            
+            # Start position in screen coordinates (click origin point)
+            start_x = canvas_screen_x + x1
+            start_y = canvas_screen_y + y1
+            
+            # Get window bounds for boundary checking
+            window_x = self.window.winfo_x()
+            window_y = self.window.winfo_y()
+            window_width = self.window.winfo_width()
+            window_height = self.window.winfo_height()
+            
+            # Try different positions in priority order - prioritize positions near start point
+            positions = []
+            
+            # 1. HIGHEST PRIORITY: Positions near the start point (small offset)
+            positions.extend([
+                (start_x + 20, start_y + 20),  # Bottom-right of start (most common)
+                (start_x - tooltip_width - 20, start_y + 20),  # Bottom-left of start
+                (start_x + 20, start_y - tooltip_height - 20),  # Top-right of start
+                (start_x - tooltip_width - 20, start_y - tooltip_height - 20)  # Top-left of start
+            ])
+            
+            # 2. MEDIUM PRIORITY: Diagonal positions based on drag direction (avoid selection)
+            if x2 >= x1 and y2 >= y1:  # Dragged to bottom-right
+                # Place tooltip top-left of start to avoid bottom-right selection
+                positions.append((start_x - tooltip_width - 30, start_y - tooltip_height - 30))
+            elif x2 < x1 and y2 >= y1:  # Dragged to bottom-left
+                # Place tooltip top-right of start to avoid bottom-left selection
+                positions.append((start_x + 30, start_y - tooltip_height - 30))
+            elif x2 >= x1 and y2 < y1:  # Dragged to top-right
+                # Place tooltip bottom-left of start to avoid top-right selection
+                positions.append((start_x - tooltip_width - 30, start_y + 30))
+            else:  # Dragged to top-left
+                # Place tooltip bottom-right of start to avoid top-left selection
+                positions.append((start_x + 30, start_y + 30))
+            
+            # 3. FALLBACK: If start point area is blocked, use selection edges (keeping start point alignment)
+            positions.extend([
+                (sel_right + 10, start_y),  # Right of selection, start point level
+                (sel_left - tooltip_width - 10, start_y),  # Left of selection, start point level
+                (start_x, sel_bottom + 10),  # Below selection, start point column
+                (start_x, sel_top - tooltip_height - 10),  # Above selection, start point column
+            ])
+            
+            # 4. LAST RESORT: Selection corners (furthest from start point)
+            positions.extend([
+                (sel_right + 10, sel_top),  # Top-right corner of selection
+                (sel_right + 10, sel_bottom - tooltip_height),  # Bottom-right corner
+                (sel_left - tooltip_width - 10, sel_top),  # Top-left corner
+                (sel_left - tooltip_width - 10, sel_bottom - tooltip_height)  # Bottom-left corner
+            ])
+            
+            # Window bounds
+            window_right = window_x + window_width
+            window_bottom = window_y + window_height
+            
+            # Find the first position that fits within window bounds
+            for i, (pos_x, pos_y) in enumerate(positions):
+                # Check if position is within window bounds
+                if not (pos_x >= window_x and 
+                       pos_y >= window_y and 
+                       pos_x + tooltip_width <= window_right and 
+                       pos_y + tooltip_height <= window_bottom):
+                    continue
+                
+                # For positions near start point (first 4 positions), check overlap with selection
+                if i < 4:  # High priority positions near start point
+                    # Calculate tooltip bounds (all in screen coordinates now)
+                    tooltip_left = pos_x
+                    tooltip_right = pos_x + tooltip_width
+                    tooltip_top = pos_y
+                    tooltip_bottom = pos_y + tooltip_height
+                    
+                    # Selection bounds already in screen coordinates (sel_left, sel_top, sel_right, sel_bottom)
+                    # Check overlap directly
+                    overlap_x = max(0, min(tooltip_right, sel_right) - max(tooltip_left, sel_left))
+                    overlap_y = max(0, min(tooltip_bottom, sel_bottom) - max(tooltip_top, sel_top))
+                    overlap_area = overlap_x * overlap_y
+                    
+                    # Calculate areas for comparison
+                    selection_width = abs(x2 - x1)
+                    selection_height = abs(y2 - y1)
+                    selection_area = selection_width * selection_height
+                    tooltip_area = tooltip_width * tooltip_height
+                    
+                    # Allow position if overlap is small (< 15% of smaller area)
+                    smaller_area = min(selection_area, tooltip_area)
+                    if smaller_area > 0 and overlap_area < smaller_area * 0.15:
+                        DEBUG("Tooltip positioned near start point ({}, {}) with minimal overlap for selection ({},{}) to ({},{})", 
+                              pos_x, pos_y, x1, y1, x2, y2)
+                        return pos_x, pos_y
+                    else:
+                        DEBUG("Position ({}, {}) rejected due to significant overlap: {}px² vs threshold {}px²", 
+                              pos_x, pos_y, overlap_area, smaller_area * 0.15 if smaller_area > 0 else 0)
+                        continue
+                else:
+                    # For positions away from start point, no overlap check needed (they're designed to avoid selection)
+                    DEBUG("Tooltip positioned away from start point ({}, {}) for selection ({},{}) to ({},{})", 
+                          pos_x, pos_y, x1, y1, x2, y2)
+                    return pos_x, pos_y
+            
+            # Ultimate fallback: center in window
+            fallback_x = window_x + max(0, (window_width - tooltip_width) // 2)
+            fallback_y = window_y + max(0, (window_height - tooltip_height) // 2)
+            
+            DEBUG("Using fallback position ({}, {}) for tooltip", fallback_x, fallback_y)
+            return fallback_x, fallback_y
+            
+        except Exception as e:
+            ERROR("Failed to calculate tooltip position for region: {}, using simple fallback", str(e))
+            # Simple fallback to original calculation
+            return self.calculate_tooltip_position(x1, y1, canvas_type)
+        
+    def show_magnifier_for_region(self, x1, y1, x2, y2, canvas_type="crop"):
+        """Show magnifier for a selected region (drag area)
+        
+        Args:
+            x1, y1: Start coordinates of selection on canvas
+            x2, y2: End coordinates of selection on canvas
+            canvas_type: Either "crop" or "original"
+        """
+        image = self.original_image if canvas_type == "crop" else self.original_image_for_preview
+        if not image:
+            DEBUG("No {} image available for region magnification", canvas_type)
+            return
+            
+        try:
+            from PIL import Image, ImageTk
+            
+            # Ensure coordinates are in correct order
+            left = min(x1, x2)
+            top = min(y1, y2)
+            right = max(x1, x2)
+            bottom = max(y1, y2)
+            
+            # Convert canvas coordinates to image coordinates
+            img_left, img_top = self.canvas_to_image_coords(left, top, canvas_type)
+            img_right, img_bottom = self.canvas_to_image_coords(right, bottom, canvas_type)
+            
+            if img_left is None or img_top is None or img_right is None or img_bottom is None:
+                DEBUG("Invalid coordinates for region magnification")
+                return
+            
+            # Ensure image coordinates are in bounds
+            img_width, img_height = image.size
+            img_left = max(0, min(img_width, img_left))
+            img_top = max(0, min(img_height, img_top))
+            img_right = max(0, min(img_width, img_right))
+            img_bottom = max(0, min(img_height, img_bottom))
+            
+            # Extract the selected region from original image
+            region_width = abs(img_right - img_left)
+            region_height = abs(img_bottom - img_top)
+            
+            if region_width < 1 or region_height < 1:
+                DEBUG("Region too small for magnification: {}x{}", region_width, region_height)
+                return
+            
+            # Crop the region from the original image
+            region = image.crop((img_left, img_top, img_right, img_bottom))
+            
+            # Calculate appropriate zoom factor based on screen size instead of fixed tooltip size
+            try:
+                # Get screen dimensions (with fallback)
+                screen_width = self.window.winfo_screenwidth() if hasattr(self.window, 'winfo_screenwidth') else 1920
+                screen_height = self.window.winfo_screenheight() if hasattr(self.window, 'winfo_screenheight') else 1080
+            except:
+                # Fallback to common screen resolution
+                screen_width, screen_height = 1920, 1080
+            
+            # Use 80% of screen size as maximum window size
+            max_window_width = int(screen_width * 0.8)
+            max_window_height = int(screen_height * 0.8)
+            
+            # Calculate scaling factors based on screen limits
+            width_scale = max_window_width / region_width
+            height_scale = max_window_height / region_height
+            
+            # Use the configured zoom factor as the preferred scaling, but don't exceed screen limits
+            preferred_zoom = self.magnifier_zoom_factor
+            zoom_factor = min(preferred_zoom, width_scale, height_scale)
+            
+            # Ensure minimum zoom (don't make images smaller than original)
+            zoom_factor = max(1.0, zoom_factor)
+            
+            # Calculate magnified size
+            magnified_width = max(1, int(region_width * zoom_factor))
+            magnified_height = max(1, int(region_height * zoom_factor))
+            
+            # Resize the region with high quality
+            magnified_region = region.resize(
+                (magnified_width, magnified_height), 
+                Image.Resampling.LANCZOS
+            )
+            
+            # Convert to PhotoImage
+            photo_image = ImageTk.PhotoImage(magnified_region)
+            
+            # Create magnifier tooltip window
+            self.magnifier_tooltip = tk.Toplevel(self.window)
+            self.magnifier_tooltip.wm_overrideredirect(True)  # Remove window decorations
+            self.magnifier_tooltip.configure(bg="black", bd=2, relief="solid")
+            
+            # Create label for magnified region
+            tooltip_label = tk.Label(self.magnifier_tooltip, image=photo_image, bg="black")
+            tooltip_label.pack()
+            
+            # Update to get actual window size after packing
+            self.magnifier_tooltip.update_idletasks()
+            
+            # Get actual tooltip dimensions
+            try:
+                actual_width = self.magnifier_tooltip.winfo_width()
+                actual_height = self.magnifier_tooltip.winfo_height()
+                
+                # Ensure we have valid dimensions
+                if actual_width <= 1 or actual_height <= 1:
+                    # Fallback to photo dimensions if window size not available yet
+                    actual_width = magnified_width + 4  # Account for border
+                    actual_height = magnified_height + 4
+            except:
+                # Final fallback
+                actual_width = magnified_width + 4
+                actual_height = magnified_height + 4
+            
+            # Calculate tooltip position that doesn't cover the selection area
+            tooltip_x, tooltip_y = self.calculate_tooltip_position_for_region(
+                x1, y1, x2, y2, 
+                actual_width, actual_height, 
+                canvas_type
+            )
+            
+            self.magnifier_tooltip.geometry(f"+{tooltip_x}+{tooltip_y}")
+            
+            # Store image reference to prevent garbage collection
+            self.magnifier_tooltip.image = photo_image
+            
+            DEBUG("Region magnifier shown: region {}x{} -> magnified {}x{} (zoom: {:.2f})", 
+                  region_width, region_height, magnified_width, magnified_height, zoom_factor)
+                  
+            # Dispatch magnifier show event
+            if self.dispatch:
+                self.dispatch(UIEvent.MAGNIFIER_SHOW, {
+                    "canvas_x": (x1 + x2) // 2,
+                    "canvas_y": (y1 + y2) // 2,
+                    "image_x": (img_left + img_right) // 2,
+                    "image_y": (img_top + img_bottom) // 2,
+                    "region_size": (region_width, region_height),
+                    "zoom_factor": zoom_factor
+                })
+                  
+        except Exception as e:
+            ERROR("Failed to show region magnifier: {}", str(e))
         
     def on_preview_right_drag_start(self, event, canvas_type="crop"):
         """Handle right mouse button press - start dragging if image is larger than canvas"""
