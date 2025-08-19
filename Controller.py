@@ -206,7 +206,10 @@ class Controller:
             ERROR("Error handling text modified: {}", e)
     
     def check_if_any_overlaps(self):
-        text = self.view.label_text_box.get("1.0", "end").strip()
+        if self.view.label_text_box:
+            text = self.view.label_text_box.get("1.0", "end").strip()
+        else:
+            text = folder_utils.load_label(self.labels_path[self.image_index])
         labels = label_display_utils.parse_label_text(text)   
         if label_display_utils.check_labels_horizontal_overlap(labels) is True:
             self.view.show_error("標籤有重疊，請檢查")
@@ -753,8 +756,11 @@ class Controller:
                 else:
                     new_image_path = os.path.join(dest_folder_path, os.path.basename(image_path))
                     new_label_path = os.path.join(dest_folder_path, os.path.basename(label_path))
+                    
                 # Move and rename the files
-                self.on_fresh_image_label()
+                folder_utils.move_file(image_path, new_image_path)
+                folder_utils.move_file(label_path, new_label_path)
+                
             except Exception as e:
                 ERROR("Error deleting image or label file: {}", e)
                
@@ -778,8 +784,7 @@ class Controller:
                     self.view.update_image_canvas()
                     self.view.update_text_box()
                     return
-                # self.load_image(self.images_path)
-                # self.load_label(self.labels_path)
+ 
                 self.next_image()
             except Exception as e:
                 ERROR("Error reloading image or label after deletion: {}", e)
@@ -791,8 +796,6 @@ class Controller:
 
     def cut_image_into_two_parts(self, x_position):
         from cut_image_util import split_image_and_labels
-        print (f"image: {self.images_path[self.image_index]}")
-        print (f"labe:  {self.labels_path[self.image_index]}")
         canvas_height, canvas_width = self.view.get_canvas_size()
         dest_folder_path = os.path.join(self.image_folder_path, CUT_IMAGE_PATH)
         split_image_and_labels(

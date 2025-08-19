@@ -91,6 +91,15 @@ def parse_labels(label_path):
             labels.append([int(parts[0])] + [float(x) for x in parts[1:]])
     return labels
 
+def get_ocr_string(labels):
+    from Words_Label_mapping import get_label
+    class_ids = []
+    for label in labels:
+        cls, cx, cy, w, h = label
+        
+        class_ids.append(get_label(cls))
+    return "".join(map(str, class_ids))
+            
 def __split_image_and_labels(image_path, label_path, labels, cut_x, output_dir):
     """
     Split image and YOLO labels based on x position.
@@ -115,23 +124,29 @@ def __split_image_and_labels(image_path, label_path, labels, cut_x, output_dir):
     image_base_name = os.path.splitext(os.path.basename(image_path))[0]
     label_base_name = os.path.splitext(os.path.basename(label_path))[0]
 
-    # Append "left" to the base names
-    left_image_path = os.path.join(output_dir, f"{image_base_name}_left.jpg")
-    left_label_path = os.path.join(output_dir, f"{label_base_name}_left.txt")
 
-    # Append "right" to the base names (if needed)
-    right_image_path = os.path.join(output_dir, f"{image_base_name}_right.jpg")
-    right_label_path = os.path.join(output_dir, f"{label_base_name}_right.txt")
-    
-    # Crop left
+    # ==== Crop left =====
     left_image = image.crop((0, 0, cut_x, image_height))
     left_labels = adjust_labels_after_split(labels, cut_x, image_width, keep_left=True)
+    ocr_str = get_ocr_string(left_labels)
+    
+    # Append "left" to the base names
+    left_image_path = os.path.join(output_dir, f"{ocr_str}_{image_base_name}_left.jpg")
+    left_label_path = os.path.join(output_dir, f"{ocr_str}_{label_base_name}_left.txt")
+    
     left_image.save(left_image_path)
     save_yolo_labels(left_labels, left_label_path)
 
-    # Crop right
+
+    # ==== Crop right =====
     right_image = image.crop((cut_x, 0, image_width, image_height))
     right_labels = adjust_labels_after_split(labels, cut_x, image_width, keep_left=False)
+    ocr_str = get_ocr_string(right_labels)
+    
+    # Append "right" to the base names (if needed)
+    right_image_path = os.path.join(output_dir, f"{ocr_str}_{image_base_name}_right.jpg")
+    right_label_path = os.path.join(output_dir, f"{ocr_str}_{label_base_name}_right.txt")
+    
     right_image.save(right_image_path)
     save_yolo_labels(right_labels, right_label_path)
 
@@ -154,6 +169,7 @@ def save_yolo_labels(labels, out_path):
         for lbl in labels:
             cls, cx, cy, w, h = lbl
             f.write(f"{int(cls)} {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}\n")
+            # print(f"Saved label: {int(cls)} {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}")
             
             
 if __name__ == "__main__":

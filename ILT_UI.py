@@ -1150,12 +1150,10 @@ class UI:
             
 
     def on_cut_image(self, event):
-        print("Cut image event triggered")
         # Check if self.cut_line exists
         if hasattr(self, 'cut_line') and self.cut_line is not None:
             # Get the position of the cut line
             position = self.cut_line.get_x()
-            print(f"Cut line position: {position}")
             self.dispatch(UIEvent.CUT_IMAGE, {"position": position})
             
             # Add your logic here to handle the cut line position
