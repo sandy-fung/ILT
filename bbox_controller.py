@@ -171,6 +171,21 @@ class BBoxController:
         canvas_width = self.canvas.winfo_width()
         canvas_height = self.canvas.winfo_height()
         
+        # Check if width meets threshold requirement (only for new bbox creation)
+        if hasattr(self, 'show_bbox_dimensions') and self.show_bbox_dimensions:
+            if hasattr(self, 'min_width_threshold'):
+                # Get original image width
+                original_width = getattr(self, 'original_image_width', 1920)
+                
+                # Calculate actual width in original pixels
+                actual_width_pixels = width * (original_width / canvas_width)
+                
+                # Cancel if width is below threshold
+                if actual_width_pixels < self.min_width_threshold:
+                    DEBUG("Box width {} pixels below threshold {}, cancelled", 
+                          int(actual_width_pixels), self.min_width_threshold)
+                    return None
+        
         # Calculate YOLO format coordinates
         yolo_coords = self.calculate_yolo_format(x1, y1, x2, y2, canvas_width, canvas_height)
         
