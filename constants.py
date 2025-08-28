@@ -1,4 +1,4 @@
-VERSION_NUM = "1.6.1"
+VERSION_NUM = "1.6.2"
 
 CLASS_ID_COLOR_MAP = {
     # Numbers
