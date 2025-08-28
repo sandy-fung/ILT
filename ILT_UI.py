@@ -165,6 +165,14 @@ class UI:
         
         # Initialize drawing controller
         self.bbox_controller = bbox_controller.BBoxController(self.canvas)
+        
+        # Set properties for reference box feature
+        self.bbox_controller.show_bbox_dimensions = self.SHOW_BBOX_DIMENSIONS
+        self.bbox_controller.min_width_threshold = self.MIN_BBOX_WIDTH_THRESHOLD
+        
+        # Get original image width for proper scaling
+        original_height, original_width = config_utils.get_image_info()
+        self.bbox_controller.original_image_width = original_width
 
         # Create context menu
         self.create_context_menu()
@@ -2450,6 +2458,16 @@ class UI:
             self.SHOW_BBOX_DIMENSIONS = settings.get('show_bbox_dimensions', False)
             self.MIN_BBOX_WIDTH_THRESHOLD = settings.get('min_bbox_width_threshold', 70)
             self.LABEL_FONT_SIZE = settings.get('label_font_size', 12)
+            
+            # Update bbox_controller settings for reference box feature
+            if self.bbox_controller:
+                self.bbox_controller.show_bbox_dimensions = self.SHOW_BBOX_DIMENSIONS
+                self.bbox_controller.min_width_threshold = self.MIN_BBOX_WIDTH_THRESHOLD
+                
+                # Update original image width (in case image has changed)
+                original_height, original_width = config_utils.get_image_info()
+                self.bbox_controller.original_image_width = original_width
+            
             # Apply classification frame visibility
             self.toggle_classification_frame(self.SHOW_CLASSIFY_FRAME)
             
