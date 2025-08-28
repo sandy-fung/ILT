@@ -45,3 +45,11 @@ def move_file(src, dst):
     except OSError as e:
         ERROR("Error moving file from {} to {}: {}", src, dst, e)
         raise e
+    
+    
+def search_image_by_filename(images, filename):
+    for index, img in enumerate(images):
+        if filename in os.path.basename(img):  # Check if filename is a substring of the image's base name
+            return index
+    return -1
+

@@ -306,8 +306,8 @@ class Controller:
 
         elif event_type == UIEvent.CROP_BT_CLICK:
             DEBUG("Controller: Crop button clicked.")
-            DEBUG("entry_value:", event_data.get("value"))
-            DEBUG("do CROP EVENT")
+            # DEBUG("entry_value:", event_data.get("value"))
+            self.handle_crop_all()
 
         elif event_type == UIEvent.ADD_BT_CLICK:
             DEBUG("Controller: Add button clicked.")
@@ -352,7 +352,20 @@ class Controller:
             self.move_selected_image_and_label(MOVE_FILE_CLASSIFY_PATH, plate_type)
             self.view.clear_all_classify_checkbuttons()
             
-            
+        elif event_type == UIEvent.SEARCH_FILE:
+            DEBUG("Controller: Search file button pressed.")
+            search_term = event_data.get("filename", "")
+            DEBUG("Search term:", search_term)
+            if search_term:
+                found_index = folder_utils.search_image_by_filename(self.images, search_term)
+                if found_index >= 0:
+                    self.image_index = found_index
+                    config_utils.save_image_index(self.image_index)
+                    self.on_fresh_image_label()
+                else:
+                    self.view.show_error(f"not found: {search_term}")
+            else:
+                self.view.show_error("請輸入搜尋關鍵字")
 
         elif event_type == UIEvent.INPUT_ENTER:
             DEBUG("Controller: Input enter pressed.")
@@ -379,6 +392,11 @@ class Controller:
         if hasattr(self.view, 'update_selection_status_display'):
             self.view.update_selection_status_display(label)
 
+    def handle_crop_all(self):
+        import crop_helper
+        crop_helper.start_cropping(self.image_folder_path, self.images_path, self.labels_path)
+        
+        
     def handle_mouse_right_click(self, event_data):
         event = event_data.get("value")
         DEBUG("Right click at ({}, {})", event.x, event.y)

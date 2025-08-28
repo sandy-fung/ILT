@@ -11,6 +11,7 @@ import Words_Label_mapping as wlm
 from outline_font import draw_outlined_text
 from constants import VERSION_NUM
 from constants import CLASS_ID_COLOR_MAP
+from tkinter import ttk
 
 DEFAULT_W = 1920
 DEFAULT_H = 1080
@@ -299,6 +300,7 @@ class UI:
             self.label_text_box = None
 
         self.path_label = tk.Label(self.text_frame, bg = "#FAFAFA", font = ("Segoe UI", 11), fg = "#C0C00C", anchor = "w", justify = "left", wraplength = 700)
+        self.path_label.bind("<Button-1>", self._on_copy_file_name_text)
         self.path_label.pack(side = "bottom", fill = "x", padx = 20, pady = 10)
 
     def create_hint_area(self):
@@ -1345,7 +1347,11 @@ class UI:
             self.input_box.insert(0, "請輸入車牌號碼")
             self.input_box.config(fg = "#8E8E79")
 
-
+    def  _on_copy_file_name_text(self, event):
+        self.window.clipboard_clear()
+        self.window.clipboard_append(self.path_label.cget("text"))
+        text = self.path_label.cget("text")
+        self.show_info(f"copy file name: {text}")
 
 # Button events
     def show_info_menu(self):
@@ -1510,8 +1516,44 @@ class UI:
         DEBUG("on_delete_image_button")
         if self.dispatch:
             self.dispatch(UIEvent.DELETE_IMAGE,  None)
+       
+    def on_search_enter(self):
+        filename = self.search_entry.get().strip()
+        if filename and self.dispatch:
+            DEBUG("Search enter with text: {}", filename)
+            self.dispatch(UIEvent.SEARCH_FILE, {"filename": filename})
+        else:
+            DEBUG("Search enter with empty text or dispatch not set")
             
+    def open_search_window(self,event):    
+        
+        win_w, win_h = 600, 100
+        root_w = self.window.winfo_width()
+        root_h = self.window.winfo_height()
+        root_x = self.window.winfo_x()
+        root_y = self.window.winfo_y()
 
+        # 計算置中位置
+        pos_x = root_x + (root_w // 2) - (win_w // 2)
+        pos_y = root_y + (root_h // 2) - (win_h // 2) 
+        search_win = tk.Toplevel(self.window)
+        search_win.title("searching...")
+        search_win.geometry(f"{win_w}x{win_h}+{pos_x}+{pos_y}")
+    
+        # 輸入框
+        self.search_entry = ttk.Entry(search_win, width=80)
+        self.search_entry.grid(row=0, column=0, padx=10, pady=20)
+    
+        # 按鈕 
+        def on_enter():
+            text = self.search_entry.get()
+            search_win.destroy()  # 按下後關閉視窗
+    
+        btn = ttk.Button(search_win, text="enter", command=self.on_search_enter)
+        btn.grid(row=0, column=1, padx=5)
+    
+        # 自動 focus 到輸入框
+        self.search_entry.focus()
             
     def move_to_special_plates(self):
         DEBUG("Move to special plates")
@@ -1810,6 +1852,9 @@ class UI:
         self.window.bind("<Delete>", self.on_delete_key)
 
         self.window.bind("<Button-1>", self._clear_focus)
+        
+        # Searching file event binding
+        self.window.bind("<Control-f>", self.open_search_window)
 
         # Mouse event binding (support drawing functionality)
         self.canvas.bind("<Button-1>", self.on_mouse_press)
@@ -1823,6 +1868,9 @@ class UI:
         folder_path = filedialog.askdirectory(parent = self.window, title = title)
         return folder_path
 
+    def show_info(self, msg):
+        messagebox.showinfo("info", str(msg))
+        
     def show_warning(self, msg):
         messagebox.showwarning("Error", str(msg))
         
