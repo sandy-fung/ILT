@@ -4,7 +4,7 @@ from log_levels import DEBUG, INFO, ERROR
 
 DEFAULT_LABEL_FONT_SIZE = 10
 DIALOG_WIDTH = 450
-DIALOG_HEIGHT = 400
+DIALOG_HEIGHT = 500
 class SettingsDialog:
     def __init__(self, parent, current_settings, on_confirm_callback):
         """
@@ -28,6 +28,7 @@ class SettingsDialog:
         self.show_input_box_var = tk.BooleanVar()
         self.show_classify_frame_var = tk.BooleanVar()
         self.show_cut_image_var = tk.BooleanVar()
+        self.show_bbox_dimensions_var = tk.BooleanVar()
         self.label_font_size_current = str(DEFAULT_LABEL_FONT_SIZE)  # Default font size
 
         self.create_dialog()
@@ -113,7 +114,9 @@ class SettingsDialog:
             self.show_input_box_var.set(self.current_settings.get('show_input_box', True))
             self.show_classify_frame_var.set(self.current_settings.get('show_classify_frame', True))
             self.show_cut_image_var.set(self.current_settings.get('show_cut_image', True))
+            self.show_bbox_dimensions_var.set(self.current_settings.get('show_bbox_dimensions', False))
             self.label_font_size_current = self.current_settings.get('label_font_size')
+            self.min_bbox_width_threshold = self.current_settings.get('min_bbox_width_threshold', 70)
 
 
 
@@ -184,6 +187,13 @@ class SettingsDialog:
             )
             checkbox6.pack(anchor=tk.W, pady=2)
             
+            checkbox7 = ttk.Checkbutton(
+                settings_frame,
+                text="Show Bbox Dimensions",
+                variable=self.show_bbox_dimensions_var
+            )
+            checkbox7.pack(anchor=tk.W, pady=2)
+            
             # font size for label ascci
             font_frame = ttk.LabelFrame(main_frame, text="", padding="10")
             font_frame.pack(fill=tk.X, pady=(0, 10))
@@ -199,6 +209,15 @@ class SettingsDialog:
             # size =  self.current_settings.get('label_font_size', DEFAULT_LABEL_FONT_SIZE)
             # self.label_font_size_entry.insert(0, str(size))
             # self.label_font_size_entry.config(fg="gray")
+            
+            # Minimum bbox width threshold
+            threshold_describe = tk.Label(font_frame, text="Min bbox width (pixels)", font=("Arial", 11))
+            threshold_describe.grid(row=1, column=0, padx=5, pady=10)
+            threshold_value = self.current_settings.get('min_bbox_width_threshold', 70)
+            self.min_bbox_width_entry = tk.Entry(font_frame, font=("Arial", 12))
+            self.min_bbox_width_entry.grid(row=1, column=1, padx=5, pady=10)
+            self.min_bbox_width_entry.insert(0, str(threshold_value))
+            self.min_bbox_width_entry.config(fg="gray")
 
             # Button frame
             button_frame = ttk.Frame(main_frame)
@@ -236,7 +255,9 @@ class SettingsDialog:
             'show_input_box': self.show_input_box_var.get(),
             'show_classify_frame': self.show_classify_frame_var.get(),
             'show_cut_image': self.show_cut_image_var.get(),
-            'label_font_size': int(self.label_font_size_entry.get())
+            'show_bbox_dimensions': self.show_bbox_dimensions_var.get(),
+            'label_font_size': int(self.label_font_size_entry.get()),
+            'min_bbox_width_threshold': int(self.min_bbox_width_entry.get())
         }
 
     def on_confirm(self):
@@ -308,7 +329,9 @@ if __name__ == "__main__":
         'show_input_box': True,
         'show_classify_frame': True,
         'show_cut_image': True,
-        'label_font_size_entry': 12
+        'show_bbox_dimensions': False,
+        'label_font_size_entry': 12,
+        'min_bbox_width_threshold': 70
     }
 
     dialog = SettingsDialog(parent_window, current_settings, on_confirm)

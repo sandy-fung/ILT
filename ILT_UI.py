@@ -62,6 +62,8 @@ class UI:
         self.SHOW_INPUT_BOX = config_utils.get_show_input_box()
         self.SHOW_CLASSIFY_FRAME= config_utils.get_show_classify_frame()
         self.SHOW_CUT_IMAGE = config_utils.get_show_cut_image()
+        self.SHOW_BBOX_DIMENSIONS = config_utils.get_show_bbox_dimensions()
+        self.MIN_BBOX_WIDTH_THRESHOLD = config_utils.get_min_bbox_width_threshold()
         self.LABEL_FONT_SIZE = config_utils.get_ui_label_font_size_in_config()
 
         self.setup_ui()
@@ -1951,8 +1953,18 @@ class UI:
                 label, self.canvas_width, self.canvas_height
             )
             
+            # Check if bbox width is below threshold for warning (highest priority)
+            original_height, original_width = config_utils.get_image_info()
+            actual_bbox_width = int(label.w_ratio * original_width)
+            
             # Determine color and style based on state
-            if self.bbox_controller and self.bbox_controller.is_resizing and label == self.bbox_controller.resizing_label:
+            if actual_bbox_width < self.MIN_BBOX_WIDTH_THRESHOLD:
+                # Warning style: orange/red color for small bbox
+                color = "#FF4500"  # OrangeRed color for warning
+                width = 3  # Normal width (not thicker)
+                tags = ("label_box", "label_box_warning")
+                dash = None
+            elif self.bbox_controller and self.bbox_controller.is_resizing and label == self.bbox_controller.resizing_label:
                 # Resizing: special style with dotted line and bright color
                 color = "#C00CC0"  # Purple for resizing
                 width = 3
@@ -2014,6 +2026,37 @@ class UI:
                 text=wlm.get_label(label.class_id),
                 font=("Arial", font_size, "bold"),
                 outline_color="white", fill_color=color, thickness=2, tags="label_text")
+
+            # Draw bbox dimensions if enabled
+            if self.SHOW_BBOX_DIMENSIONS:
+                # Calculate actual bbox dimensions in pixels
+                bbox_height = int(label.h_ratio * original_height)
+                
+                # Add warning emoji if width below threshold
+                if actual_bbox_width < self.MIN_BBOX_WIDTH_THRESHOLD:
+                    dimension_text = f"⚠️ {actual_bbox_width}×{bbox_height}"
+                    dim_color = "#FF4500"  # Warning orange-red
+                else:
+                    dimension_text = f"{actual_bbox_width}×{bbox_height}"
+                    dim_color = color  # Normal color
+                
+                # Position outside top-right corner to avoid covering box lines
+                dim_text_x = x2 + 5  # Outside right edge
+                dim_text_y = y1 - 5  # Above box
+                # If too close to top, put it below the box instead
+                if y1 < 20:
+                    dim_text_y = y2 + 5
+                    anchor_pos = "nw"  # Northwest anchor for bottom placement
+                else:
+                    anchor_pos = "nw"  # Northwest anchor for top placement
+                
+                draw_outlined_text(
+                    self.canvas,
+                    dim_text_x, dim_text_y,
+                    text=dimension_text,
+                    font=("Arial", font_size - 2, "normal"),
+                    outline_color="white", fill_color=dim_color,
+                    thickness=2, tags="label_text", anchor=anchor_pos)
 
             DEBUG("Drew label: class_id={}, coords=({:.1f},{:.1f},{:.1f},{:.1f})",
                   label.class_id, x1, y1, x2, y2)
@@ -2404,6 +2447,8 @@ class UI:
             self.SHOW_INPUT_BOX = settings.get('show_input_box', True)
             self.SHOW_CLASSIFY_FRAME = settings.get('show_classify_frame', False)
             self.SHOW_CUT_IMAGE = settings.get('show_cut_image', True)
+            self.SHOW_BBOX_DIMENSIONS = settings.get('show_bbox_dimensions', False)
+            self.MIN_BBOX_WIDTH_THRESHOLD = settings.get('min_bbox_width_threshold', 70)
             self.LABEL_FONT_SIZE = settings.get('label_font_size', 12)
             # Apply classification frame visibility
             self.toggle_classification_frame(self.SHOW_CLASSIFY_FRAME)

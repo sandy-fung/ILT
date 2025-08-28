@@ -256,9 +256,24 @@ def get_ui_label_font_size_in_config():
     except:
         return 12  # Default font size
 
+def get_show_bbox_dimensions():
+    """Get whether to show bbox width/height dimensions"""
+    try:
+        return config.getboolean("UISettings", "show_bbox_dimensions")
+    except:
+        return False  # Default to False
+
+def get_min_bbox_width_threshold():
+    """Get minimum bbox width threshold for warning"""
+    try:
+        return config.getint("UISettings", "min_bbox_width_threshold")
+    except:
+        return 70  # Default 70 pixels
+
 def save_ui_settings(show_class_id_buttons=None, show_text_box=None,
                     show_preview=None, show_input_box=None, show_classify_frame=None, 
-                    show_cut_image=None, label_font_size=10):
+                    show_cut_image=None, label_font_size=10, show_bbox_dimensions=None,
+                    min_bbox_width_threshold=None):
     """Save UI settings to config file"""
     if not config.has_section("UISettings"):
         config.add_section("UISettings")
@@ -277,6 +292,10 @@ def save_ui_settings(show_class_id_buttons=None, show_text_box=None,
         config.set("UISettings", "show_classify_frame", str(show_classify_frame).lower())
     if show_cut_image is not None:
         config.set("UISettings", "show_cut_image", str(show_cut_image).lower())
+    if show_bbox_dimensions is not None:
+        config.set("UISettings", "show_bbox_dimensions", str(show_bbox_dimensions).lower())
+    if min_bbox_width_threshold is not None:
+        config.set("UISettings", "min_bbox_width_threshold", str(min_bbox_width_threshold))
     with open(DEFAULT_CONFI_PATH, "w") as f:
         config.write(f)
 
@@ -289,6 +308,8 @@ def get_all_ui_settings():
         'show_input_box': get_show_input_box(),
         'show_classify_frame': get_show_classify_frame(),
         'show_cut_image': get_show_cut_image(),
-        'label_font_size': get_ui_label_font_size_in_config()
+        'label_font_size': get_ui_label_font_size_in_config(),
+        'show_bbox_dimensions': get_show_bbox_dimensions(),
+        'min_bbox_width_threshold': get_min_bbox_width_threshold()
     }
 
