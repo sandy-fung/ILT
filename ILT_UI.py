@@ -1183,6 +1183,12 @@ class UI:
         if not self.SHOW_PREVIEW:
             return
         
+        # Initialize cache attributes if they don't exist
+        if not hasattr(self, 'magnifier_cache'):
+            self.magnifier_cache = {}
+        if not hasattr(self, 'cache_access_order'):
+            self.cache_access_order = []
+        
         if cache_key in self.magnifier_cache:
             # Move to end of access order (most recently used)
             self.cache_access_order.remove(cache_key)
@@ -1199,6 +1205,14 @@ class UI:
         """
         if not self.SHOW_PREVIEW:
             return
+        
+        # Initialize cache attributes if they don't exist
+        if not hasattr(self, 'magnifier_cache'):
+            self.magnifier_cache = {}
+        if not hasattr(self, 'cache_access_order'):
+            self.cache_access_order = []
+        if not hasattr(self, 'max_cache_size'):
+            self.max_cache_size = 50  # Default cache size
         
         # Remove if already exists
         if cache_key in self.magnifier_cache:
@@ -1223,6 +1237,12 @@ class UI:
         if not self.SHOW_PREVIEW:
             return
         
+        # Initialize cache attributes if they don't exist
+        if not hasattr(self, 'magnifier_cache'):
+            self.magnifier_cache = {}
+        if not hasattr(self, 'cache_access_order'):
+            self.cache_access_order = []
+            
         self.magnifier_cache.clear()
         self.cache_access_order.clear()
         DEBUG("Magnifier cache cleared")
