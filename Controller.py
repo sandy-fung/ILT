@@ -215,10 +215,6 @@ class Controller:
                 original_count = len(self.current_labels)
                 self.current_labels, plate_count = label_display_utils.sort_labels_by_position(self.current_labels)
                 DEBUG("Auto-sorted {} labels by position in {} plates", original_count, plate_count)
-                # 保存排序後的標籤
-                self.save_current_labels()
-                # 更新文字框顯示排序後的標籤
-                self.load_label(self.labels_path)
                 # 更新狀態顯示
                 if hasattr(self.view, 'update_sorting_status'):
                     self.view.update_sorting_status(original_count, plate_count)
@@ -831,7 +827,7 @@ class Controller:
                     self.view.update_text_box()
                     return
  
-                self.next_image()
+                self.on_fresh_image_label()
             except Exception as e:
                 ERROR("Error reloading image or label after deletion: {}", e)
                 self.view.show_error(f"Error reloading image or label: {e}")
