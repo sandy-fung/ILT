@@ -12,6 +12,9 @@ DELETE_FILE_TMP_PATH ="delete_tmp"
 MOVE_FILE_TMP_PATH ="issue_tmp"
 MOVE_FILE_CLASSIFY_PATH ="classified"
 CUT_IMAGE_PATH ="cut_tmp"
+
+# Delete mode configuration: "move" (移動到delete資料夾) 或 "delete" (直接刪除)
+DELETE_MODE = "move"
 class Controller:
     def __init__(self, view):
         self.view = view
@@ -799,12 +802,21 @@ class Controller:
                     new_image_path = os.path.join(dest_folder_path, os.path.basename(image_path))
                     new_label_path = os.path.join(dest_folder_path, os.path.basename(label_path))
                     
-                # Move and rename the files
-                folder_utils.move_file(image_path, new_image_path)
-                folder_utils.move_file(label_path, new_label_path)
+                # Move and rename the files using the new deletion handling
+                if destination == DELETE_FILE_TMP_PATH:
+                    # 使用新的delete處理機制
+                    folder_utils.handle_file_deletion(image_path, DELETE_MODE, new_image_path)
+                    folder_utils.handle_file_deletion(label_path, DELETE_MODE, new_label_path)
+                    
+                    # 檢查是否為crop圖片，如果是則檢查是否需要處理原始圖片
+                    self._handle_crop_deletion_check(image_path)
+                else:
+                    # 非delete操作，保持原有邏輯
+                    folder_utils.move_file(image_path, new_image_path)
+                    folder_utils.move_file(label_path, new_label_path)
                 
             except Exception as e:
-                ERROR("Error deleting image or label file: {}", e)
+                ERROR("Error processing image or label file: {}", e)
                
             # Remove from lists
             del self.images_path[self.image_index]
@@ -835,6 +847,58 @@ class Controller:
                
         else:
                 ERROR("No image to delete at index: {}", self.image_index)
+
+    def _handle_crop_deletion_check(self, crop_image_path: str):
+        """
+        檢查crop圖片刪除後是否需要處理原始圖片
+        
+        Args:
+            crop_image_path: 被刪除的crop圖片路徑
+        """
+        try:
+            crop_filename = os.path.basename(crop_image_path)
+            crop_stem = os.path.splitext(crop_filename)[0]
+            
+            # 檢查是否為crop圖片
+            if "_crop_" not in crop_stem:
+                DEBUG("Not a crop image, skipping original image check: {}", crop_image_path)
+                return
+            
+            # 取得原始檔案名稱
+            original_stem = folder_utils.get_original_filename_from_crop(crop_stem)
+            
+            # 檢查是否所有crop都在delete資料夾
+            if folder_utils.are_all_crops_in_delete_folder(original_stem, self.image_folder_path, DELETE_FILE_TMP_PATH):
+                DEBUG("All crops deleted for original: {}, processing original image", original_stem)
+                
+                # 找到原始圖片路徑
+                original_image_path = folder_utils.find_original_image_path(crop_image_path)
+                if not original_image_path:
+                    DEBUG("Original image not found for crop: {}", crop_image_path)
+                    return
+                
+                # 找到原始標註檔路徑
+                original_label_path = folder_utils.find_original_label_path(original_image_path)
+                
+                # 準備目標路徑
+                delete_folder_path = os.path.join(self.image_folder_path, DELETE_FILE_TMP_PATH)
+                original_image_filename = os.path.basename(original_image_path)
+                original_label_filename = os.path.basename(original_label_path) if original_label_path else ""
+                
+                dest_image_path = os.path.join(delete_folder_path, original_image_filename)
+                dest_label_path = os.path.join(delete_folder_path, original_label_filename) if original_label_filename else None
+                
+                # 處理原始圖片和標註檔
+                folder_utils.handle_file_deletion(original_image_path, DELETE_MODE, dest_image_path)
+                if original_label_path and dest_label_path:
+                    folder_utils.handle_file_deletion(original_label_path, DELETE_MODE, dest_label_path)
+                
+                INFO("Processed original image and label for deleted crops: {}", original_image_path)
+            else:
+                DEBUG("Not all crops deleted yet for original: {}", original_stem)
+                
+        except Exception as e:
+            ERROR("Error in crop deletion check: {}", e)
 
     def cut_image_into_two_parts(self, x_position):
         from cut_image_util import split_image_and_labels

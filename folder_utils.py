@@ -147,3 +147,80 @@ def find_original_label_path(original_image_path: str) -> str:
     else:
         DEBUG("Original label not found for image: {}, expected: {}", original_image_path, label_path)
         return ""
+
+def handle_file_deletion(file_path: str, delete_mode: str = "move", destination_path: str = None):
+    """
+    處理檔案刪除，支援移動或直接刪除
+    
+    Args:
+        file_path: 要處理的檔案路徑
+        delete_mode: "move" (移到delete資料夾) 或 "delete" (直接刪除)
+        destination_path: 當delete_mode為"move"時的目標路徑
+    """
+    if not os.path.exists(file_path):
+        DEBUG("File not found for deletion: {}", file_path)
+        return
+        
+    if delete_mode == "move" and destination_path:
+        move_file(file_path, destination_path)
+    elif delete_mode == "delete":
+        try:
+            os.remove(file_path)
+            INFO("Deleted file: {}", file_path)
+        except OSError as e:
+            ERROR("Error deleting file {}: {}", file_path, e)
+            raise e
+    else:
+        ERROR("Invalid delete mode or missing destination: mode={}, dest={}", delete_mode, destination_path)
+
+def find_all_crops_for_original(original_stem: str, folder_path: str) -> list:
+    """
+    找出某原始圖片的所有crop圖片
+    
+    Args:
+        original_stem: 原始檔案名稱（無副檔名）
+        folder_path: 要搜尋的資料夾路徑
+    
+    Returns:
+        list: 所有crop圖片的完整路徑列表
+    """
+    crop_files = []
+    if not os.path.exists(folder_path):
+        return crop_files
+    
+    for filename in os.listdir(folder_path):
+        if filename.lower().endswith(('.jpg', '.jpeg', '.png')):
+            file_stem = os.path.splitext(filename)[0]
+            # 檢查是否為此原始圖片的crop
+            if file_stem.startswith(original_stem + "_crop_"):
+                crop_files.append(os.path.join(folder_path, filename))
+    
+    DEBUG("Found {} crop files for original: {}", len(crop_files), original_stem)
+    return crop_files
+
+def are_all_crops_in_delete_folder(original_stem: str, image_folder_path: str, delete_folder_name: str) -> bool:
+    """
+    檢查某原始圖片的所有crop是否都已在delete資料夾
+    
+    Args:
+        original_stem: 原始檔案名稱（無副檔名）
+        image_folder_path: 主圖片資料夾路徑
+        delete_folder_name: delete子資料夾名稱
+    
+    Returns:
+        bool: 如果所有crop都在delete資料夾則返回True
+    """
+    # 在主資料夾中找所有crop
+    main_crops = find_all_crops_for_original(original_stem, image_folder_path)
+    
+    # 在delete資料夾中找所有crop
+    delete_folder_path = os.path.join(image_folder_path, delete_folder_name)
+    delete_crops = find_all_crops_for_original(original_stem, delete_folder_path)
+    
+    # 如果主資料夾沒有crop而delete資料夾有，代表全部都移過去了
+    if len(main_crops) == 0 and len(delete_crops) > 0:
+        DEBUG("All crops for {} are in delete folder", original_stem)
+        return True
+    
+    DEBUG("Crops still in main folder for {}: {}, in delete: {}", original_stem, len(main_crops), len(delete_crops))
+    return False
