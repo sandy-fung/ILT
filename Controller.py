@@ -85,6 +85,9 @@ class Controller:
         # Save paths to config
         config_utils.save_paths(self.image_folder_path, self.label_folder_path)
 
+        # 自動執行批次排序
+        self.auto_batch_sort_labels()
+
         self.load_image(self.images_path)
 
     def load_folder(self):
@@ -255,6 +258,7 @@ class Controller:
     def on_fresh_image_label(self):
         self.load_image(self.images_path)
         self.load_label(self.labels_path)
+        self.parse_current_labels()
         self.check_if_any_overlaps()
         
     def next_image(self):
@@ -264,6 +268,8 @@ class Controller:
             self.image_index += 1
         else:
             self.view.show_warning(f"Reach the End")
+            # 在最後一張時執行自動批次排序
+            self.auto_batch_sort_labels()
             return
         config_utils.save_image_index(self.image_index)
 
@@ -273,9 +279,12 @@ class Controller:
         DEBUG("Current image index:", self.image_index)
         if self.image_index > 0:
             self.image_index -= 1
-        config_utils.save_image_index(self.image_index)
-
-        self.on_fresh_image_label()
+            config_utils.save_image_index(self.image_index)
+            self.on_fresh_image_label()
+        else:
+            # 在第一張時顯示提示並執行自動批次排序
+            self.view.show_warning("Reach the Beginning")
+            self.auto_batch_sort_labels()
     
     def window_ready(self):
         INFO("Controller: Window is ready.")
@@ -419,6 +428,10 @@ class Controller:
         elif event_type == UIEvent.CONFIGURATION_BT_CLICK:
             DEBUG("Controller: Configuration button clicked.")
             self.handle_configuration_button()
+            
+        elif event_type == UIEvent.BATCH_SORT:
+            DEBUG("Controller: Batch sort button clicked.")
+            self.batch_sort_all_labels()
             
         elif event_type == UIEvent.SETTINGS_DIALOG_CONFIRM:
             DEBUG("Controller: Settings dialog confirmed.")
@@ -669,6 +682,166 @@ class Controller:
             except Exception as e:
                 ERROR("Unexpected error saving labels to file {}: {}", label_file_path, e)
                 self.view.show_error(f"Error saving label file\n{e}")
+
+    def batch_sort_all_labels(self):
+        """批次排序目錄下所有標籤檔案"""
+        if not self.label_folder_path or not os.path.exists(self.label_folder_path):
+            self.view.show_error("標籤資料夾路徑無效")
+            return
+        
+        try:
+            # 掃描標籤資料夾中的所有 .txt 檔案
+            label_files = [f for f in os.listdir(self.label_folder_path) if f.lower().endswith('.txt')]
+            
+            if not label_files:
+                self.view.show_warning("標籤資料夾中未找到任何 .txt 檔案")
+                return
+            
+            # 顯示確認對話框
+            from tkinter import messagebox
+            result = messagebox.askyesno(
+                "批次排序確認", 
+                f"即將對 {len(label_files)} 個標籤檔案進行排序\n"
+                "此操作會修改檔案內容，是否繼續？"
+            )
+            
+            if not result:
+                return
+            
+            processed_count = 0
+            sorted_count = 0
+            error_count = 0
+            
+            INFO("開始批次排序 {} 個標籤檔案", len(label_files))
+            
+            for label_file in label_files:
+                label_file_path = os.path.join(self.label_folder_path, label_file)
+                
+                try:
+                    # 解析標籤檔案
+                    labels = label_display_utils.parse_label_file(label_file_path)
+                    
+                    if not labels:
+                        DEBUG("跳過空白標籤檔案: {}", label_file)
+                        processed_count += 1
+                        continue
+                    
+                    # 記錄排序前的標籤數量
+                    original_count = len(labels)
+                    
+                    # 執行排序
+                    sorted_labels, plate_count = label_display_utils.sort_labels_by_position(labels)
+                    
+                    # 將排序後的標籤寫回檔案
+                    with open(label_file_path, 'w', encoding='utf-8') as f:
+                        for label in sorted_labels:
+                            yolo_line = f"{label.class_id} {label.cx_ratio:.17f} {label.cy_ratio:.17f} {label.w_ratio:.17f} {label.h_ratio:.17f}\n"
+                            f.write(yolo_line)
+                    
+                    DEBUG("已排序檔案 {}: {} 個標籤, {} 個車牌", label_file, original_count, plate_count)
+                    processed_count += 1
+                    sorted_count += 1
+                    
+                except Exception as e:
+                    ERROR("處理檔案 {} 時發生錯誤: {}", label_file, e)
+                    error_count += 1
+                    processed_count += 1
+            
+            # 顯示處理結果
+            result_message = f"批次排序完成！\n"
+            result_message += f"處理檔案: {processed_count}/{len(label_files)}\n"
+            result_message += f"成功排序: {sorted_count}\n"
+            
+            if error_count > 0:
+                result_message += f"發生錯誤: {error_count}"
+                self.view.show_warning(result_message)
+            else:
+                self.view.show_warning(result_message)
+            
+            # 重新載入當前標籤以反映變更
+            if self.image_index < len(self.labels_path):
+                self.parse_current_labels()
+                self.update_label_display()
+            
+            INFO("批次排序完成: {}/{} 檔案成功處理", sorted_count, len(label_files))
+            
+        except Exception as e:
+            ERROR("批次排序過程中發生錯誤: {}", e)
+            self.view.show_error(f"批次排序失敗: {e}")
+
+    def auto_batch_sort_labels(self):
+        """自動批次排序目錄下所有標籤檔案（無確認對話框）"""
+        if not self.label_folder_path or not os.path.exists(self.label_folder_path):
+            DEBUG("標籤資料夾路徑無效，跳過自動排序")
+            return
+        
+        try:
+            # 掃描標籤資料夾中的所有 .txt 檔案
+            label_files = [f for f in os.listdir(self.label_folder_path) if f.lower().endswith('.txt')]
+            
+            if not label_files:
+                INFO("標籤資料夾中未找到任何 .txt 檔案，跳過自動排序")
+                return
+            
+            processed_count = 0
+            sorted_count = 0
+            error_count = 0
+            
+            INFO("開始自動批次排序 {} 個標籤檔案", len(label_files))
+            
+            for label_file in label_files:
+                label_file_path = os.path.join(self.label_folder_path, label_file)
+                
+                try:
+                    # 解析標籤檔案
+                    labels = label_display_utils.parse_label_file(label_file_path)
+                    
+                    if not labels:
+                        DEBUG("跳過空白標籤檔案: {}", label_file)
+                        processed_count += 1
+                        continue
+                    
+                    # 記錄排序前的標籤數量
+                    original_count = len(labels)
+                    
+                    # 執行排序
+                    sorted_labels, plate_count = label_display_utils.sort_labels_by_position(labels)
+                    
+                    # 將排序後的標籤寫回檔案
+                    with open(label_file_path, 'w', encoding='utf-8') as f:
+                        for label in sorted_labels:
+                            yolo_line = f"{label.class_id} {label.cx_ratio:.17f} {label.cy_ratio:.17f} {label.w_ratio:.17f} {label.h_ratio:.17f}\n"
+                            f.write(yolo_line)
+                    
+                    DEBUG("已自動排序檔案 {}: {} 個標籤, {} 個車牌", label_file, original_count, plate_count)
+                    processed_count += 1
+                    sorted_count += 1
+                    
+                except Exception as e:
+                    ERROR("自動處理檔案 {} 時發生錯誤: {}", label_file, e)
+                    error_count += 1
+                    processed_count += 1
+            
+            # 顯示處理結果
+            result_message = f"自動批次排序完成！\n"
+            result_message += f"處理檔案: {processed_count}/{len(label_files)}\n"
+            result_message += f"成功排序: {sorted_count}\n"
+            
+            if error_count > 0:
+                result_message += f"發生錯誤: {error_count}"
+                self.view.show_warning(result_message)
+            else:
+                INFO("自動批次排序完成: {}/{} 檔案成功處理", sorted_count, len(label_files))
+                # 成功時不顯示對話框，只記錄日誌
+            
+            # 重新載入當前標籤以反映變更
+            if self.image_index < len(self.labels_path):
+                self.parse_current_labels()
+                self.update_label_display()
+            
+        except Exception as e:
+            ERROR("自動批次排序過程中發生錯誤: {}", e)
+            self.view.show_error(f"自動批次排序失敗: {e}")
 
     def update_label_display(self):
         """Update label display"""

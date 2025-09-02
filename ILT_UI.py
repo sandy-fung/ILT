@@ -133,6 +133,14 @@ class UI:
         self.move_menu.add_command(label="special plates", command=self.move_to_special_plates)
         self.move_menu.add_command(label="uncertain", command=self.move_to_uncertain)
         
+        self.batch_sort_button = tk.Button(
+            self.toolbar, bg = "#F4F4F4",
+            width = 10, height = 1,
+            text = "Batch Sort", font=("Segoe UI", 10), fg = "#0C0CC0",
+            relief = "flat", bd = 2,
+            command = self.on_bt_click_batch_sort
+        )
+        self.batch_sort_button.pack(side = "left", padx = 5)
 
         self.configuration_button = tk.Button(
             self.toolbar, bg = "#F4F4F4",
@@ -2441,6 +2449,12 @@ class UI:
         DEBUG(" Move to uncertain")      
         if self.dispatch:
             self.dispatch(UIEvent.MOVE_IMAGE,  {"plate_types": "UncertainPlates"})      
+
+    def on_bt_click_batch_sort(self):
+        """Handle batch sort button click"""
+        DEBUG("on_bt_click_batch_sort")
+        if self.dispatch:
+            self.dispatch(UIEvent.BATCH_SORT, {})
 
     def on_configuration_click(self):
         """Handle configuration button click"""
