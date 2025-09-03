@@ -111,11 +111,12 @@ class BBoxController:
                 current_width = abs(x - self.draw_start_x)
                 
                 # Get canvas and original image dimensions
-                canvas_width = self.canvas.winfo_width()
                 original_width = getattr(self, 'original_image_width', 1920)
+                displayed_width = getattr(self, 'displayed_image_width', self.canvas.winfo_width())
                 
                 # Calculate minimum width requirement (convert to canvas pixels)
-                min_width_in_canvas = self.min_width_threshold * (canvas_width / original_width)
+                scale_x = displayed_width / float(original_width) if original_width else 1.0
+                min_width_in_canvas = self.min_width_threshold * scale_x
                 
                 # Only show reference box when width is insufficient
                 if current_width < min_width_in_canvas:
