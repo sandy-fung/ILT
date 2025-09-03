@@ -1,3 +1,4 @@
+from cProfile import label
 import tkinter as tk
 from tkinter import filedialog
 from tkinter import ttk
@@ -54,6 +55,7 @@ class UI:
         
         # Initialize options
         self.original_image = None
+        self._ctx = None
 
         # Load UI settings from config
         self.SHOW_CLASS_ID_BUTTONS = config_utils.get_show_class_id_buttons()
@@ -630,6 +632,16 @@ class UI:
         # Clear magnifier cache when image changes
         self.clear_magnifier_cache()
         DEBUG("Original image reference updated for preview")
+
+        try:
+            if self.bbox_controller and self.original_image is not None:
+                w, h = self.original_image.size
+                self.bbox_controller.original_image_width = w
+                self.bbox_controller.original_image_height = h
+                DEBUG("bbox_controller.original_image_width set to {}", w)
+                DEBUG("bbox_controller.original_image_height set to {}", h)
+        except Exception as e:
+            ERROR("Failed to update bbox_controller.original_image_width: {}", str(e))
     
     def set_original_image_for_preview(self, original_image_for_preview):
         """Set the original image for preview functionality (for crop images)
@@ -1911,9 +1923,24 @@ class UI:
             DEBUG("No image provided to update canvas")
             return
         self.canvas.image = image
-        self.canvas.create_image(self.canvas_width//2, self.canvas_height//2, anchor = "center", image = image)
+        self.canvas.create_image(self.canvas_width//2, self.canvas_height//2, anchor = "center",
+                                  image = self.canvas.image, tags="bg_image")
         DEBUG("Image updated on canvas with height: {}, width: {}", self.canvas_height, self.canvas_width)
         self.create_vertical_line()
+
+        try:
+            if self.bbox_controller and hasattr(self.canvas, "image") and self.canvas.image:
+                disp_w = int(self.canvas.image.width())   # Tk PhotoImage 的實際寬度（顯示到主畫布的影像寬）
+                # 原圖寬度優先用 set_original_image() 傳進來的原圖；退而求其次用 controller 早前塞的值
+                if self.original_image is not None:
+                    orig_w = self.original_image.size[0]
+                else:
+                    orig_w = getattr(self.bbox_controller, "original_image_width", disp_w)
+                scale_x = float(disp_w) / float(orig_w) if orig_w else 1.0
+                self.bbox_controller.display_scale_x = scale_x
+                DEBUG("display_scale_x updated: disp_w={}, orig_w={}, scale_x={}", disp_w, orig_w, scale_x)
+        except Exception as e:
+            ERROR("Failed to update display_scale_x: {}", str(e))
 
     def clear_all_labels_canvas(self):
         """Clear all items on the canvas"""
@@ -1925,6 +1952,10 @@ class UI:
             if item_type in ["rectangle", "text"]:
                 self.canvas.delete(item_id)
                 DEBUG("Deleted item ID {} of type {}", item_id, item_type)
+
+
+    def set_image_context(self, ctx_dict):
+        self._ctx = ctx_dict
 
 
     def draw_labels_on_canvas(self, labels):
@@ -1982,9 +2013,18 @@ class UI:
             )
             
             # Check if bbox width is below threshold for warning (highest priority)
-            original_height, original_width = config_utils.get_image_info()
-            actual_bbox_width = int(label.w_ratio * original_width)
-            
+            if not self._ctx:
+                img_w = self.canvas_width
+                img_h = self.canvas_height
+                sx = sy = 1.0
+                ox = oy = 0.0
+            else:
+                img_w = self._ctx["img_w"]; img_h = self._ctx["img_h"]
+                sx    = self._ctx["sx"];    sy    = self._ctx["sy"]
+                ox    = self._ctx["ox"];    oy    = self._ctx["oy"]
+            actual_bbox_width  = int(label.w_ratio * img_w)
+            actual_bbox_height = int(label.h_ratio * img_h)
+
             # Determine color and style based on state
             if actual_bbox_width < self.MIN_BBOX_WIDTH_THRESHOLD:
                 # Warning style: orange/red color for small bbox
@@ -2057,15 +2097,24 @@ class UI:
 
             # Draw bbox dimensions if enabled
             if self.SHOW_BBOX_DIMENSIONS:
-                # Calculate actual bbox dimensions in pixels
-                bbox_height = int(label.h_ratio * original_height)
-                
-                # Add warning emoji if width below threshold
+                try:
+                    if self.original_image is not None:
+                        ow, oh = self.original_image.size
+                    else:
+                        # fallback：退回舊機制，但不建議
+                        from config_utils import get_image_info
+                        oh, ow = get_image_info()
+                except Exception:
+                    # 最後保底：用畫上去的 box 反推（避免整段 fail）
+                    ow = max(1, int(x2 - x1))
+                    oh = max(1, int(y2 - y1))
+
+
                 if actual_bbox_width < self.MIN_BBOX_WIDTH_THRESHOLD:
-                    dimension_text = f"⚠️ {actual_bbox_width}×{bbox_height}"
+                    dimension_text = f"⚠️ {actual_bbox_width}×{actual_bbox_height}"
                     dim_color = "#FF4500"  # Warning orange-red
                 else:
-                    dimension_text = f"{actual_bbox_width}×{bbox_height}"
+                    dimension_text = f"{actual_bbox_width}×{actual_bbox_height} "
                     dim_color = color  # Normal color
                 
                 # Position outside top-right corner to avoid covering box lines

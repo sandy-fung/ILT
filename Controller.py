@@ -7,6 +7,7 @@ import Words_Label_mapping as wlm
 import char_input_handler as char_handler
 import os
 from log_levels import DEBUG, INFO, ERROR
+from image_context import ImageContext
 
 DELETE_FILE_TMP_PATH ="delete_tmp"
 MOVE_FILE_TMP_PATH ="issue_tmp"
@@ -136,6 +137,13 @@ class Controller:
             if hasattr(self.view, "update_selection_status_display"):
                 self.view.update_selection_status_display(None)
 
+        try:
+            W, H = self.original_image.size
+            config_utils.save_image_info(H, W)
+            self._current_image_size = (W, H)
+        except Exception as e:
+            ERROR("Failed to update current image info: {}", e)
+
         self.update_resized_image()
 
     def update_resized_image(self):
@@ -150,7 +158,21 @@ class Controller:
             return
 
         resized = image_utils.resize_image(self.original_image, (canvas_width, canvas_height))
+        disp_w, disp_h = resized.size
+        ox = (canvas_width  - disp_w) / 2.0
+        oy = (canvas_height - disp_h) / 2.0
+        W, H = self.original_image.size
+        sx = float(disp_w) / float(W) if W else 1.0
+        sy = float(disp_h) / float(H) if H else 1.0
         self.image = image_utils.convert_to_tk(resized)
+
+        if hasattr(self.view, "set_image_context"):
+            self.view.set_image_context({
+                "img_w": W, "img_h": H,
+                "disp_w": disp_w, "disp_h": disp_h,
+                "ox": ox, "oy": oy,
+                "sx": sx, "sy": sy
+            })
 
         self.view.update_image_canvas(self.image)
         
