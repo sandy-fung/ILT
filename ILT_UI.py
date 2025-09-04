@@ -158,13 +158,8 @@ class UI:
             width = 4, height = 1,
             text="Info", font=("Segoe UI", 10), fg = "#0C0CC0",
             relief = "flat", bd = 2,
-            command = self.show_info_menu)
+            command = self.show_info_dialog)
         self.info_button.pack(side = "left", padx =0)
-        
-        
-         # 建立 version menu
-        self.info_menu = tk.Menu(self.window, tearoff=0)
-        self.info_menu.add_command(label="version-"+VERSION_NUM)
 
 
     def create_middle_area(self):
@@ -343,24 +338,6 @@ class UI:
         self.hint_frame = tk.Frame(self.bottom_frame, bg = "#FAFAFA")
         self.hint_frame.pack(side = "left", expand = True, fill = "y", pady = (0, 10))
 
-        hint_text = (
-            "← 上一張\n"
-            "→ 下一張\n"
-            "滑鼠左鍵：選取box\n"
-            "拖曳選中的box：移動box位置\n"
-            "拖曳右下角灰色方塊：調整box大小\n"
-            "滑鼠右鍵：刪除選中的box\n"
-            "Delete鍵：刪除選中的box\n"
-            "Ctrl：切換繪框模式\n"
-            "繪框模式下拖拽：繪製新box\n"
-            "※ 標籤會自動依位置排序"
-            )
-        self.hint_label = tk.Label(
-            self.hint_frame,
-            width = 50, height = 10, bg = "#FAFAFA",
-            text = hint_text, justify = "left", anchor = "w", fg = "#2d2d2d", font = ("Segoe UI", 10)
-        )
-        self.hint_label.grid(row = 1, column = 0, columnspan = 2, sticky = "s", pady = (10, 0))
         self.index_label = tk.Label(self.hint_frame, bg = "#FAFAFA", text = " : ", fg = "#C0C00C", font = ("Segoe UI", 11))
         self.index_label.grid(row = 0, column = 2, sticky = "nwse")
 
@@ -2302,13 +2279,96 @@ class UI:
 
 
 
-# Button events
-    def show_info_menu(self):
-        # 取得按鈕在畫面中的位置
-        x = self.info_button.winfo_rootx()
-        y = self.info_button.winfo_rooty() + self.info_button.winfo_height()
-        self.info_menu.tk_popup(x, y)
-        
+# Button events    
+    def show_info_dialog(self):
+        """Show a popup window with usage manual and version (styled like Configuration)"""
+
+        manual_text = (
+            "← 上一張\n"
+            "→ 下一張\n"
+            "滑鼠左鍵：選取box\n"
+            "拖曳選中的box：移動box位置\n"
+            "拖曳右下角灰色方塊：調整box大小\n"
+            "滑鼠右鍵：刪除選中的box\n"
+            "Delete鍵：刪除選中的box\n"
+            "Ctrl：切換繪框模式\n"
+            "繪框模式下拖拽：繪製新box\n"
+            "※ 標籤會自動依位置排序\n"
+        )
+
+        try:
+            from constants import VERSION_NUM
+            version = VERSION_NUM
+        except Exception:
+            version = "v0.0.0"
+
+        # === 建立固定大小對話框（同 Configuration 風格） ===
+        dialog_width  = 450
+        dialog_height = 360
+
+        top = tk.Toplevel(self.window)
+        top.title("Info")
+        top.geometry(f"{dialog_width}x{dialog_height}")
+        top.resizable(False, False)
+        top.transient(self.window)
+        top.grab_set()
+
+        # === 版面：外層、標題、群組框（圓角淺色）、版本、按鈕列 ===
+        main_frame = ttk.Frame(top, padding="10")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        title_label = ttk.Label(
+            main_frame,
+            text="UI Manual",
+            font=("Arial", 11, "bold")
+        )
+        title_label.pack(anchor=tk.W, pady=(0, 10))
+
+        # 操作建議群組框：圓角淺色（ttk.LabelFrame）
+        ops_group = ttk.LabelFrame(main_frame, text="操作方式", padding="10")
+        ops_group.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+
+        ops_label = ttk.Label(
+            ops_group,
+            text=manual_text,
+            justify="left",
+            anchor="nw",
+            font=("Arial", 10),
+            wraplength=dialog_width - 40
+        )
+        ops_label.pack(anchor="nw")
+
+        # 版本字樣：放在操作文字下方
+        version_row = ttk.Frame(main_frame)
+        version_row.pack(fill=tk.X, pady=(0, 6))
+        ttk.Label(
+            version_row,
+            text=f"版本：{version}",
+            font=("Arial", 9)
+        ).pack(side=tk.LEFT)
+
+        # 底部按鈕列
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill=tk.X)
+        ttk.Button(button_frame, text="關閉", command=top.destroy).pack(side=tk.RIGHT)
+
+        # === 置中（參考 Configuration 的置中邏輯） ===
+        try:
+            parent_x = self.window.winfo_rootx()
+            parent_y = self.window.winfo_rooty()
+            parent_w = self.window.winfo_width()
+            parent_h = self.window.winfo_height()
+            x = parent_x + (parent_w - dialog_width) // 2
+            y = parent_y + (parent_h - dialog_height) // 2
+            if x < 0: x = 0
+            if y < 0: y = 0
+            top.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
+            top.minsize(dialog_width, dialog_height)
+            top.maxsize(dialog_width, dialog_height)
+        except Exception:
+            pass
+
+
     def show_move_menu(self):
         # 取得按鈕在畫面中的位置
         x = self.mov_button.winfo_rootx()
