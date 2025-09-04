@@ -7,10 +7,15 @@ import Words_Label_mapping as wlm
 import char_input_handler as char_handler
 import os
 from log_levels import DEBUG, INFO, ERROR
+from image_context import ImageContext
 
 DELETE_FILE_TMP_PATH ="delete_tmp"
 MOVE_FILE_TMP_PATH ="issue_tmp"
 MOVE_FILE_CLASSIFY_PATH ="classified"
+CUT_IMAGE_PATH ="cut_tmp"
+
+# Delete mode configuration: "move" (移動到delete資料夾) 或 "delete" (直接刪除)
+DELETE_MODE = "move"
 class Controller:
     def __init__(self, view):
         self.view = view
@@ -25,6 +30,8 @@ class Controller:
         self.image_index = 0
         self.image_width = 0
         self.image_height = 0
+        self.original_image_for_preview = None
+        self.original_image_labels = []  # List of LabelObject instances for original image
 
         # initial state
         self.drawing_mode = False
@@ -79,6 +86,9 @@ class Controller:
         # Save paths to config
         config_utils.save_paths(self.image_folder_path, self.label_folder_path)
 
+        # 自動執行批次排序
+        self.auto_batch_sort_labels()
+
         self.load_image(self.images_path)
 
     def load_folder(self):
@@ -98,12 +108,47 @@ class Controller:
         image_path = imgs_path[index]
 
         self.original_image = image_utils.load_image(image_path)
+        
+        # Try to load original image for preview if this is a crop
+        original_image_path = folder_utils.find_original_image_path(image_path)
+        if original_image_path:
+            try:
+                self.original_image_for_preview = image_utils.load_image(original_image_path)
+                DEBUG("Loaded original image for crop preview: {}", original_image_path)
+                
+                # Try to load original image labels
+                original_label_path = folder_utils.find_original_label_path(original_image_path)
+                if original_label_path:
+                    try:
+                        import label_display_utils
+                        self.original_image_labels = label_display_utils.parse_label_file(original_label_path)
+                        DEBUG("Loaded {} original image labels from: {}", len(self.original_image_labels), original_label_path)
+                    except Exception as e:
+                        ERROR("Failed to load original image labels: {}", str(e))
+                        self.original_image_labels = []
+                else:
+                    self.original_image_labels = []
+                    
+            except Exception as e:
+                ERROR("Failed to load original image for preview: {}", str(e))
+                self.original_image_for_preview = None
+                self.original_image_labels = []
+        else:
+            self.original_image_for_preview = None
+            self.original_image_labels = []
 
         if hasattr(self.view, "bbox_controller"):
             self.view.bbox_controller.clear_selection(self.current_labels)
             DEBUG("Cleared selection in bbox_controller")
             if hasattr(self.view, "update_selection_status_display"):
                 self.view.update_selection_status_display(None)
+
+        try:
+            W, H = self.original_image.size
+            config_utils.save_image_info(H, W)
+            self._current_image_size = (W, H)
+        except Exception as e:
+            ERROR("Failed to update current image info: {}", e)
 
         self.update_resized_image()
 
@@ -119,7 +164,21 @@ class Controller:
             return
 
         resized = image_utils.resize_image(self.original_image, (canvas_width, canvas_height))
+        disp_w, disp_h = resized.size
+        ox = (canvas_width  - disp_w) / 2.0
+        oy = (canvas_height - disp_h) / 2.0
+        W, H = self.original_image.size
+        sx = float(disp_w) / float(W) if W else 1.0
+        sy = float(disp_h) / float(H) if H else 1.0
         self.image = image_utils.convert_to_tk(resized)
+
+        if hasattr(self.view, "set_image_context"):
+            self.view.set_image_context({
+                "img_w": W, "img_h": H,
+                "disp_w": disp_w, "disp_h": disp_h,
+                "ox": ox, "oy": oy,
+                "sx": sx, "sy": sy
+            })
 
         self.view.update_image_canvas(self.image)
         
@@ -129,6 +188,14 @@ class Controller:
             # Update preview with the full image
             if hasattr(self.view, 'update_preview'):
                 self.view.update_preview(self.original_image)
+        
+        # Set original image labels for preview first
+        if hasattr(self.view, 'set_original_image_labels'):
+            self.view.set_original_image_labels(self.original_image_labels)
+        
+        # Set original image for preview if available
+        if hasattr(self.view, 'set_original_image_for_preview'):
+            self.view.set_original_image_for_preview(self.original_image_for_preview)
         
         DEBUG("Controller.load_image() completed")
         self.view.update_index_label(self.image_index, self.images_path)
@@ -176,10 +243,6 @@ class Controller:
                 original_count = len(self.current_labels)
                 self.current_labels, plate_count = label_display_utils.sort_labels_by_position(self.current_labels)
                 DEBUG("Auto-sorted {} labels by position in {} plates", original_count, plate_count)
-                # 保存排序後的標籤
-                self.save_current_labels()
-                # 更新文字框顯示排序後的標籤
-                self.load_label(self.labels_path)
                 # 更新狀態顯示
                 if hasattr(self.view, 'update_sorting_status'):
                     self.view.update_sorting_status(original_count, plate_count)
@@ -217,12 +280,19 @@ class Controller:
     def on_fresh_image_label(self):
         self.load_image(self.images_path)
         self.load_label(self.labels_path)
+        self.parse_current_labels()
         self.check_if_any_overlaps()
         
     def next_image(self):
         DEBUG("Current image index:", self.image_index)
+      
         if self.image_index < len(self.images) - 1:
             self.image_index += 1
+        else:
+            self.view.show_warning(f"Reach the End")
+            # 在最後一張時執行自動批次排序
+            self.auto_batch_sort_labels()
+            return
         config_utils.save_image_index(self.image_index)
 
         self.on_fresh_image_label()
@@ -231,9 +301,12 @@ class Controller:
         DEBUG("Current image index:", self.image_index)
         if self.image_index > 0:
             self.image_index -= 1
-        config_utils.save_image_index(self.image_index)
-
-        self.on_fresh_image_label()
+            config_utils.save_image_index(self.image_index)
+            self.on_fresh_image_label()
+        else:
+            # 在第一張時顯示提示並執行自動批次排序
+            self.view.show_warning("Reach the Beginning")
+            self.auto_batch_sort_labels()
     
     def window_ready(self):
         INFO("Controller: Window is ready.")
@@ -343,7 +416,6 @@ class Controller:
         elif event_type == UIEvent.MOVE_IMAGE:
             DEBUG("Controller: Move image button pressed.")
             plate_type = event_data.get("plate_types", "")
-            
             self.move_selected_image_and_label(MOVE_FILE_TMP_PATH, plate_type)
             
         elif event_type == UIEvent.MOVE_IMAGE_CLASSIFIED:
@@ -366,6 +438,23 @@ class Controller:
                     self.view.show_error(f"not found: {search_term}")
             else:
                 self.view.show_error("請輸入搜尋關鍵字")
+        
+        elif event_type == UIEvent.CUT_IMAGE:
+            DEBUG("Controller: Cut image button pressed.")
+            x_position = event_data.get("position", "")
+            # Move the image and label to the cut folder
+            self.cut_image_into_two_parts(x_position)
+            self.next_image()
+           
+        elif event_type == UIEvent.VERTICAL_LINE_PRESS:
+            DEBUG("Controller: Vertical line pressed")
+            # 檢查是否在繪框模式
+            if self.view.bbox_controller and self.view.bbox_controller.is_in_drawing_mode():
+                # 退出繪框模式
+                self.view.bbox_controller.toggle_drawing_mode()
+                self.view.update_drawing_mode_display()
+                DEBUG("Exited drawing mode due to vertical line press")
+            
 
         elif event_type == UIEvent.INPUT_ENTER:
             DEBUG("Controller: Input enter pressed.")
@@ -376,6 +465,10 @@ class Controller:
         elif event_type == UIEvent.CONFIGURATION_BT_CLICK:
             DEBUG("Controller: Configuration button clicked.")
             self.handle_configuration_button()
+            
+        elif event_type == UIEvent.BATCH_SORT:
+            DEBUG("Controller: Batch sort button clicked.")
+            self.batch_sort_all_labels()
             
         elif event_type == UIEvent.SETTINGS_DIALOG_CONFIRM:
             DEBUG("Controller: Settings dialog confirmed.")
@@ -632,6 +725,166 @@ class Controller:
                 ERROR("Unexpected error saving labels to file {}: {}", label_file_path, e)
                 self.view.show_error(f"Error saving label file\n{e}")
 
+    def batch_sort_all_labels(self):
+        """批次排序目錄下所有標籤檔案"""
+        if not self.label_folder_path or not os.path.exists(self.label_folder_path):
+            self.view.show_error("標籤資料夾路徑無效")
+            return
+        
+        try:
+            # 掃描標籤資料夾中的所有 .txt 檔案
+            label_files = [f for f in os.listdir(self.label_folder_path) if f.lower().endswith('.txt')]
+            
+            if not label_files:
+                self.view.show_warning("標籤資料夾中未找到任何 .txt 檔案")
+                return
+            
+            # 顯示確認對話框
+            from tkinter import messagebox
+            result = messagebox.askyesno(
+                "批次排序確認", 
+                f"即將對 {len(label_files)} 個標籤檔案進行排序\n"
+                "此操作會修改檔案內容，是否繼續？"
+            )
+            
+            if not result:
+                return
+            
+            processed_count = 0
+            sorted_count = 0
+            error_count = 0
+            
+            INFO("開始批次排序 {} 個標籤檔案", len(label_files))
+            
+            for label_file in label_files:
+                label_file_path = os.path.join(self.label_folder_path, label_file)
+                
+                try:
+                    # 解析標籤檔案
+                    labels = label_display_utils.parse_label_file(label_file_path)
+                    
+                    if not labels:
+                        DEBUG("跳過空白標籤檔案: {}", label_file)
+                        processed_count += 1
+                        continue
+                    
+                    # 記錄排序前的標籤數量
+                    original_count = len(labels)
+                    
+                    # 執行排序
+                    sorted_labels, plate_count = label_display_utils.sort_labels_by_position(labels)
+                    
+                    # 將排序後的標籤寫回檔案
+                    with open(label_file_path, 'w', encoding='utf-8') as f:
+                        for label in sorted_labels:
+                            yolo_line = f"{label.class_id} {label.cx_ratio:.17f} {label.cy_ratio:.17f} {label.w_ratio:.17f} {label.h_ratio:.17f}\n"
+                            f.write(yolo_line)
+                    
+                    DEBUG("已排序檔案 {}: {} 個標籤, {} 個車牌", label_file, original_count, plate_count)
+                    processed_count += 1
+                    sorted_count += 1
+                    
+                except Exception as e:
+                    ERROR("處理檔案 {} 時發生錯誤: {}", label_file, e)
+                    error_count += 1
+                    processed_count += 1
+            
+            # 顯示處理結果
+            result_message = f"批次排序完成！\n"
+            result_message += f"處理檔案: {processed_count}/{len(label_files)}\n"
+            result_message += f"成功排序: {sorted_count}\n"
+            
+            if error_count > 0:
+                result_message += f"發生錯誤: {error_count}"
+                self.view.show_warning(result_message)
+            else:
+                self.view.show_warning(result_message)
+            
+            # 重新載入當前標籤以反映變更
+            if self.image_index < len(self.labels_path):
+                self.parse_current_labels()
+                self.update_label_display()
+            
+            INFO("批次排序完成: {}/{} 檔案成功處理", sorted_count, len(label_files))
+            
+        except Exception as e:
+            ERROR("批次排序過程中發生錯誤: {}", e)
+            self.view.show_error(f"批次排序失敗: {e}")
+
+    def auto_batch_sort_labels(self):
+        """自動批次排序目錄下所有標籤檔案（無確認對話框）"""
+        if not self.label_folder_path or not os.path.exists(self.label_folder_path):
+            DEBUG("標籤資料夾路徑無效，跳過自動排序")
+            return
+        
+        try:
+            # 掃描標籤資料夾中的所有 .txt 檔案
+            label_files = [f for f in os.listdir(self.label_folder_path) if f.lower().endswith('.txt')]
+            
+            if not label_files:
+                INFO("標籤資料夾中未找到任何 .txt 檔案，跳過自動排序")
+                return
+            
+            processed_count = 0
+            sorted_count = 0
+            error_count = 0
+            
+            INFO("開始自動批次排序 {} 個標籤檔案", len(label_files))
+            
+            for label_file in label_files:
+                label_file_path = os.path.join(self.label_folder_path, label_file)
+                
+                try:
+                    # 解析標籤檔案
+                    labels = label_display_utils.parse_label_file(label_file_path)
+                    
+                    if not labels:
+                        DEBUG("跳過空白標籤檔案: {}", label_file)
+                        processed_count += 1
+                        continue
+                    
+                    # 記錄排序前的標籤數量
+                    original_count = len(labels)
+                    
+                    # 執行排序
+                    sorted_labels, plate_count = label_display_utils.sort_labels_by_position(labels)
+                    
+                    # 將排序後的標籤寫回檔案
+                    with open(label_file_path, 'w', encoding='utf-8') as f:
+                        for label in sorted_labels:
+                            yolo_line = f"{label.class_id} {label.cx_ratio:.17f} {label.cy_ratio:.17f} {label.w_ratio:.17f} {label.h_ratio:.17f}\n"
+                            f.write(yolo_line)
+                    
+                    DEBUG("已自動排序檔案 {}: {} 個標籤, {} 個車牌", label_file, original_count, plate_count)
+                    processed_count += 1
+                    sorted_count += 1
+                    
+                except Exception as e:
+                    ERROR("自動處理檔案 {} 時發生錯誤: {}", label_file, e)
+                    error_count += 1
+                    processed_count += 1
+            
+            # 顯示處理結果
+            result_message = f"自動批次排序完成！\n"
+            result_message += f"處理檔案: {processed_count}/{len(label_files)}\n"
+            result_message += f"成功排序: {sorted_count}\n"
+            
+            if error_count > 0:
+                result_message += f"發生錯誤: {error_count}"
+                self.view.show_warning(result_message)
+            else:
+                INFO("自動批次排序完成: {}/{} 檔案成功處理", sorted_count, len(label_files))
+                # 成功時不顯示對話框，只記錄日誌
+            
+            # 重新載入當前標籤以反映變更
+            if self.image_index < len(self.labels_path):
+                self.parse_current_labels()
+                self.update_label_display()
+            
+        except Exception as e:
+            ERROR("自動批次排序過程中發生錯誤: {}", e)
+            self.view.show_error(f"自動批次排序失敗: {e}")
+
     def update_label_display(self):
         """Update label display"""
         # Update label boxes display on canvas
@@ -763,11 +1016,22 @@ class Controller:
                 else:
                     new_image_path = os.path.join(dest_folder_path, os.path.basename(image_path))
                     new_label_path = os.path.join(dest_folder_path, os.path.basename(label_path))
-                # Move and rename the files
-                folder_utils.move_file(image_path, new_image_path)
-                folder_utils.move_file(label_path, new_label_path)
+                    
+                # Move and rename the files using the new deletion handling
+                if destination == DELETE_FILE_TMP_PATH:
+                    # 使用新的delete處理機制
+                    folder_utils.handle_file_deletion(image_path, DELETE_MODE, new_image_path)
+                    folder_utils.handle_file_deletion(label_path, DELETE_MODE, new_label_path)
+                    
+                    # 檢查是否為crop圖片，如果是則檢查是否需要處理原始圖片
+                    self._handle_crop_deletion_check(image_path)
+                else:
+                    # 非delete操作，保持原有邏輯
+                    folder_utils.move_file(image_path, new_image_path)
+                    folder_utils.move_file(label_path, new_label_path)
+                
             except Exception as e:
-                ERROR("Error deleting image or label file: {}", e)
+                ERROR("Error processing image or label file: {}", e)
                
             # Remove from lists
             del self.images_path[self.image_index]
@@ -778,7 +1042,9 @@ class Controller:
             if self.image_index >= len(self.images_path):
                 self.image_index = max(0, len(self.images_path) - 1)
             config_utils.save_image_index(self.image_index)
-            # Reload image and labels
+            
+
+            # # Reload image and labels
             try:
                 if len(self.images_path) == 0:
                     self.view.show_warning(f"Folder of images is empty now")
@@ -787,8 +1053,8 @@ class Controller:
                     self.view.update_image_canvas()
                     self.view.update_text_box()
                     return
-                self.load_image(self.images_path)
-                self.load_label(self.labels_path)
+ 
+                self.on_fresh_image_label()
             except Exception as e:
                 ERROR("Error reloading image or label after deletion: {}", e)
                 self.view.show_error(f"Error reloading image or label: {e}")
@@ -797,6 +1063,70 @@ class Controller:
         else:
                 ERROR("No image to delete at index: {}", self.image_index)
 
+    def _handle_crop_deletion_check(self, crop_image_path: str):
+        """
+        檢查crop圖片刪除後是否需要處理原始圖片
+        
+        Args:
+            crop_image_path: 被刪除的crop圖片路徑
+        """
+        try:
+            crop_filename = os.path.basename(crop_image_path)
+            crop_stem = os.path.splitext(crop_filename)[0]
+            
+            # 檢查是否為crop圖片
+            if "_crop_" not in crop_stem:
+                DEBUG("Not a crop image, skipping original image check: {}", crop_image_path)
+                return
+            
+            # 取得原始檔案名稱
+            original_stem = folder_utils.get_original_filename_from_crop(crop_stem)
+            
+            # 檢查是否所有crop都在delete資料夾
+            if folder_utils.are_all_crops_in_delete_folder(original_stem, self.image_folder_path, DELETE_FILE_TMP_PATH):
+                DEBUG("All crops deleted for original: {}, processing original image", original_stem)
+                
+                # 找到原始圖片路徑
+                original_image_path = folder_utils.find_original_image_path(crop_image_path)
+                if not original_image_path:
+                    DEBUG("Original image not found for crop: {}", crop_image_path)
+                    return
+                
+                # 找到原始標註檔路徑
+                original_label_path = folder_utils.find_original_label_path(original_image_path)
+                
+                # 準備目標路徑
+                delete_folder_path = os.path.join(self.image_folder_path, DELETE_FILE_TMP_PATH)
+                original_image_filename = os.path.basename(original_image_path)
+                original_label_filename = os.path.basename(original_label_path) if original_label_path else ""
+                
+                dest_image_path = os.path.join(delete_folder_path, original_image_filename)
+                dest_label_path = os.path.join(delete_folder_path, original_label_filename) if original_label_filename else None
+                
+                # 處理原始圖片和標註檔
+                folder_utils.handle_file_deletion(original_image_path, DELETE_MODE, dest_image_path)
+                if original_label_path and dest_label_path:
+                    folder_utils.handle_file_deletion(original_label_path, DELETE_MODE, dest_label_path)
+                
+                INFO("Processed original image and label for deleted crops: {}", original_image_path)
+            else:
+                DEBUG("Not all crops deleted yet for original: {}", original_stem)
+                
+        except Exception as e:
+            ERROR("Error in crop deletion check: {}", e)
+
+    def cut_image_into_two_parts(self, x_position):
+        from cut_image_util import split_image_and_labels
+        canvas_height, canvas_width = self.view.get_canvas_size()
+        dest_folder_path = os.path.join(self.image_folder_path, CUT_IMAGE_PATH)
+        split_image_and_labels(
+            self.images_path[self.image_index],
+            self.labels_path[self.image_index],
+            x_position,
+            canvas_width,
+            dest_folder_path
+        )
+        
     def handle_configuration_button(self):
         """Handle configuration button click"""
         try:

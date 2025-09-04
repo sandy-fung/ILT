@@ -20,6 +20,8 @@ class UIEvent(Enum):
     MOVE_IMAGE = auto()
     MOVE_IMAGE_CLASSIFIED = auto()
     SEARCH_FILE = auto()
+    CUT_IMAGE = auto()
+    VERTICAL_LINE_PRESS = auto()
 
     RESELECT_BT_CLICK = auto()
     CROP_BT_CLICK = auto()
@@ -27,6 +29,7 @@ class UIEvent(Enum):
     CONFIGURATION_BT_CLICK = auto()
     CLASS_ID_CHANGE = auto()
     INPUT_ENTER = auto()
+    BATCH_SORT = auto()
     
     # Settings dialog events
     SETTINGS_DIALOG_CONFIRM = auto()

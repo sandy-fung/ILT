@@ -93,15 +93,51 @@ class BBoxController:
         if not self.is_drawing:
             return
             
-        # Clear previous preview box
+        # Clear previous preview boxes
         if self.current_preview_id:
             self.canvas.delete(self.current_preview_id)
+        self.canvas.delete("reference_box")  # Clear old reference box
         
-        # Draw new preview box
+        # Draw new preview box (cyan)
         self.current_preview_id = self.canvas.create_rectangle(
             self.draw_start_x, self.draw_start_y, x, y,
             outline="cyan", width=2, tags="preview_box"
         )
+        
+        # Check if we need to show gray reference box
+        if hasattr(self, 'show_bbox_dimensions') and self.show_bbox_dimensions:
+            if hasattr(self, 'min_width_threshold'):
+                # Calculate current dragging width (canvas pixels)
+                current_width = abs(x - self.draw_start_x)
+                
+                # Get canvas and original image dimensions
+                original_width = getattr(self, 'original_image_width', 1920)
+                displayed_width = getattr(self, 'displayed_image_width', self.canvas.winfo_width())
+                
+                # Calculate minimum width requirement (convert to canvas pixels)
+                scale_x = displayed_width / float(original_width) if original_width else 1.0
+                min_width_in_canvas = self.min_width_threshold * scale_x
+                
+                # Only show reference box when width is insufficient
+                if current_width < min_width_in_canvas:
+                    # Calculate reference box right boundary
+                    if x > self.draw_start_x:
+                        # Dragging to the right
+                        ref_x2 = self.draw_start_x + min_width_in_canvas
+                    else:
+                        # Dragging to the left
+                        ref_x2 = self.draw_start_x - min_width_in_canvas
+                    
+                    ref_y1 = min(self.draw_start_y, y)
+                    ref_y2 = max(self.draw_start_y, y)
+                    
+                    # Draw yellow dashed reference box
+                    self.canvas.create_rectangle(
+                        min(self.draw_start_x, ref_x2), ref_y1, 
+                        max(self.draw_start_x, ref_x2), ref_y2,
+                        outline="yellow", width=1, dash=(10, 5), tags="reference_box"
+                    )
+        
         DEBUG("Updated preview box to ({}, {}, {}, {})", 
               self.draw_start_x, self.draw_start_y, x, y)
 
@@ -112,10 +148,11 @@ class BBoxController:
             
         self.is_drawing = False
         
-        # Clear preview box
+        # Clear preview box and reference box
         if self.current_preview_id:
             self.canvas.delete(self.current_preview_id)
             self.current_preview_id = None
+        self.canvas.delete("reference_box")  # Clear reference box too
         
         # Calculate actual box coordinates (ensure top-left to bottom-right)
         x1 = min(self.draw_start_x, x)
@@ -134,6 +171,21 @@ class BBoxController:
         # Get canvas dimensions
         canvas_width = self.canvas.winfo_width()
         canvas_height = self.canvas.winfo_height()
+        
+        # Check if width meets threshold requirement (only for new bbox creation)
+        if hasattr(self, 'show_bbox_dimensions') and self.show_bbox_dimensions:
+            if hasattr(self, 'min_width_threshold'):
+                # Get original image width
+                original_width = getattr(self, 'original_image_width', 1920)
+                
+                # Calculate actual width in original pixels
+                actual_width_pixels = width * (original_width / canvas_width)
+                
+                # Cancel if width is below threshold
+                if actual_width_pixels < self.min_width_threshold:
+                    DEBUG("Box width {} pixels below threshold {}, cancelled", 
+                          int(actual_width_pixels), self.min_width_threshold)
+                    return None
         
         # Calculate YOLO format coordinates
         yolo_coords = self.calculate_yolo_format(x1, y1, x2, y2, canvas_width, canvas_height)
@@ -167,11 +219,15 @@ class BBoxController:
             if self.current_preview_id:
                 self.canvas.delete(self.current_preview_id)
                 self.current_preview_id = None
+            self.canvas.delete("reference_box")  # Clear reference box too
+            self.canvas.delete("resize_reference_box")  # Clear resize reference box too
             DEBUG("Drawing cancelled")
 
     def clear_preview(self):
         """Clear all preview boxes"""
         self.canvas.delete("preview_box")
+        self.canvas.delete("reference_box")  # Clear reference box too
+        self.canvas.delete("resize_reference_box")  # Clear resize reference box too
         self.current_preview_id = None
 
     def set_drawing_mode(self, mode):
@@ -547,6 +603,9 @@ class BBoxController:
         if not self.is_resizing or not self.resizing_label:
             return
             
+        # Clear old reference box
+        self.canvas.delete("resize_reference_box")
+            
         # 計算位移量
         dx = x - self.resize_start_x
         dy = y - self.resize_start_y
@@ -560,6 +619,32 @@ class BBoxController:
         
         # 使用 resize_by_delta 方法調整大小，傳入 handle 類型
         self.resizing_label.resize_by_delta(dx, dy, canvas_width, canvas_height, self.resize_handle_type)
+        
+        # Check if we need to show reference box during resize
+        if hasattr(self, 'show_bbox_dimensions') and self.show_bbox_dimensions:
+            if hasattr(self, 'min_width_threshold') and self.resizing_label:
+                # Get original image width
+                original_width = getattr(self, 'original_image_width', 1920)
+                
+                # Calculate current box width in original pixels
+                actual_bbox_width = int(self.resizing_label.w_ratio * original_width)
+                
+                # Only show reference box when width is insufficient
+                if actual_bbox_width < self.min_width_threshold:
+                    # Calculate box position on canvas
+                    x1 = (self.resizing_label.cx_ratio - self.resizing_label.w_ratio/2) * canvas_width
+                    y1 = (self.resizing_label.cy_ratio - self.resizing_label.h_ratio/2) * canvas_height
+                    y2 = (self.resizing_label.cy_ratio + self.resizing_label.h_ratio/2) * canvas_height
+                    
+                    # Calculate reference width in canvas pixels
+                    ref_width_canvas = self.min_width_threshold * (canvas_width / original_width)
+                    ref_x2 = x1 + ref_width_canvas
+                    
+                    # Draw yellow dashed reference box
+                    self.canvas.create_rectangle(
+                        x1, y1, ref_x2, y2,
+                        outline="yellow", width=1, dash=(10, 5), tags="resize_reference_box"
+                    )
         
         DEBUG("Resizing label moved by delta ({}, {}), new size=({:.3f}, {:.3f})", 
               dx, dy, self.resizing_label.w_ratio, self.resizing_label.h_ratio)
@@ -582,6 +667,9 @@ class BBoxController:
         self.resize_start_x = 0
         self.resize_start_y = 0
         self.resize_handle_type = None
+        
+        # Clear reference box
+        self.canvas.delete("resize_reference_box")
         
         # 恢復光標樣式
         if self.drawing_mode:
