@@ -85,6 +85,7 @@ def get_original_filename_from_crop(crop_stem: str) -> str:
 def find_original_image_path(crop_image_path: str) -> str:
     """
     從crop圖片路徑找到對應的原始圖片路徑
+    支援多層crop子目錄結構（如 crop/wrong_predictions/）
     
     Args:
         crop_image_path: crop圖片的完整路徑
@@ -92,7 +93,6 @@ def find_original_image_path(crop_image_path: str) -> str:
     Returns:
         str: 原始圖片的完整路徑，如果找不到則返回空字串
     """
-    crop_dir = os.path.dirname(crop_image_path)
     crop_filename = os.path.basename(crop_image_path)
     crop_stem = os.path.splitext(crop_filename)[0]
     crop_ext = os.path.splitext(crop_filename)[1]
@@ -101,18 +101,30 @@ def find_original_image_path(crop_image_path: str) -> str:
     original_stem = get_original_filename_from_crop(crop_stem)
     original_filename = original_stem + crop_ext
     
-    # 找到原始圖片目錄（從crop目錄往上一層，然後進入images目錄）
-    parent_dir = os.path.dirname(crop_dir)
-    original_dir = os.path.join(parent_dir, "images")
-    original_path = os.path.join(original_dir, original_filename)
+    # 從crop圖片目錄開始往上遍歷，尋找images目錄
+    current_dir = os.path.dirname(crop_image_path)
     
-    # 檢查檔案是否存在
-    if os.path.exists(original_path):
-        DEBUG("Found original image for crop: {} -> {}", crop_image_path, original_path)
-        return original_path
-    else:
-        DEBUG("Original image not found for crop: {}, expected: {}", crop_image_path, original_path)
-        return ""
+    # 最多往上搜尋10層，避免無限循環
+    max_levels = 10
+    for _ in range(max_levels):
+        parent_dir = os.path.dirname(current_dir)
+        if parent_dir == current_dir:  # 已經到達根目錄
+            break
+            
+        # 檢查父目錄是否包含images子目錄
+        images_dir = os.path.join(parent_dir, "images")
+        if os.path.exists(images_dir):
+            original_path = os.path.join(images_dir, original_filename)
+            if os.path.exists(original_path):
+                DEBUG("Found original image for crop: {} -> {}", crop_image_path, original_path)
+                return original_path
+            else:
+                DEBUG("Images directory found but original file not exists: {}", original_path)
+        
+        current_dir = parent_dir
+    
+    DEBUG("Original image not found for crop after searching up directory tree: {}", crop_image_path)
+    return ""
 
 def find_original_label_path(original_image_path: str) -> str:
     """
@@ -224,3 +236,32 @@ def are_all_crops_in_delete_folder(original_stem: str, image_folder_path: str, d
     
     DEBUG("Crops still in main folder for {}: {}, in delete: {}", original_stem, len(main_crops), len(delete_crops))
     return False
+
+def find_image_in_parent_directory(image_path: str) -> str:
+    """
+    當指定路徑找不到圖片時，往上一層目錄搜尋相同檔名的圖片
+    
+    Args:
+        image_path: 原始圖片路徑
+    
+    Returns:
+        str: 在上層目錄找到的圖片路徑，找不到則返回空字串
+    """
+    if not image_path:
+        return ""
+    
+    # 取得檔案名稱和目錄
+    filename = os.path.basename(image_path)
+    current_dir = os.path.dirname(image_path)
+    
+    # 往上一層目錄搜尋
+    parent_dir = os.path.dirname(current_dir)
+    parent_image_path = os.path.join(parent_dir, filename)
+    
+    # 檢查上層目錄是否存在該檔案
+    if os.path.exists(parent_image_path):
+        DEBUG("Found image in parent directory: {} -> {}", image_path, parent_image_path)
+        return parent_image_path
+    else:
+        DEBUG("Image not found in parent directory: {}, checked: {}", image_path, parent_image_path)
+        return ""
