@@ -2034,13 +2034,8 @@ class UI:
             actual_bbox_height = int(label.h_ratio * img_h)
 
             # Determine color and style based on state
-            if actual_bbox_width < self.MIN_BBOX_WIDTH_THRESHOLD:
-                # Warning style: orange/red color for small bbox
-                color = "#FF4500"  # OrangeRed color for warning
-                width = 3  # Normal width (not thicker)
-                tags = ("label_box", "label_box_warning")
-                dash = None
-            elif self.bbox_controller and self.bbox_controller.is_resizing and label == self.bbox_controller.resizing_label:
+            
+            if self.bbox_controller and self.bbox_controller.is_resizing and label == self.bbox_controller.resizing_label:
                 # Resizing: special style with dotted line and bright color
                 color = "#C00CC0"  # Purple for resizing
                 width = 3
@@ -2059,10 +2054,16 @@ class UI:
                 tags = ("label_box", "label_box_selected")
                 dash = None
             else:
-                # Not selected: green color
-                color = "#0CC00C"
+                if actual_bbox_width < self.MIN_BBOX_WIDTH_THRESHOLD:
+                    # Warning style: orange/red color for small bbox
+                    color = "#F07443"  # OrangeRed color for warning
+                    tags = ("label_box", "label_box_warning")
+
+                else:
+                    # Not selected: green color
+                    color = "#0CC00C"
+                    tags = ("label_box",)
                 width = 3
-                tags = ("label_box",)
                 dash = None
             
             # Draw bounding box
@@ -2083,7 +2084,7 @@ class UI:
             
             # Draw class ID text
             text_x = x1
-            text_y = y1 - 5 if y1 > 15 else y2 + 5
+            text_y = y1 - 15 if y1 > 20 else y2 + 15
 
             # self.canvas.create_text(
             #     text_x, text_y,
@@ -2120,20 +2121,15 @@ class UI:
 
                 if actual_bbox_width < self.MIN_BBOX_WIDTH_THRESHOLD:
                     dimension_text = f"⚠️ {actual_bbox_width}×{actual_bbox_height}"
-                    dim_color = "#FF4500"  # Warning orange-red
+                    dim_color = "#F07443"  # Warning yellow
                 else:
                     dimension_text = f"{actual_bbox_width}×{actual_bbox_height} "
                     dim_color = color  # Normal color
                 
                 # Position outside top-right corner to avoid covering box lines
-                dim_text_x = x2 + 5  # Outside right edge
-                dim_text_y = y1 - 5  # Above box
+                dim_text_x = x2 + 5
+                dim_text_y = y1 - 15 if y1 > 20 else y2 + 15  # Above box
                 # If too close to top, put it below the box instead
-                if y1 < 20:
-                    dim_text_y = y2 + 5
-                    anchor_pos = "nw"  # Northwest anchor for bottom placement
-                else:
-                    anchor_pos = "nw"  # Northwest anchor for top placement
                 
                 draw_outlined_text(
                     self.canvas,
@@ -2141,7 +2137,7 @@ class UI:
                     text=dimension_text,
                     font=("Arial", font_size - 2, "normal"),
                     outline_color="white", fill_color=dim_color,
-                    thickness=2, tags="label_text", anchor=anchor_pos)
+                    thickness=2, tags="label_text")
 
             DEBUG("Drew label: class_id={}, coords=({:.1f},{:.1f},{:.1f},{:.1f})",
                   label.class_id, x1, y1, x2, y2)
