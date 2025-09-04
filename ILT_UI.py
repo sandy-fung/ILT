@@ -195,7 +195,12 @@ class UI:
 
 
         self.create_text_area()
+        self.create_right_bottom_area()
     
+    def create_right_bottom_area(self):
+        self.right_bottom_frame = tk.Frame(self.bottom_frame, bg = "#FAFAFA")
+        self.right_bottom_frame.pack(side = "right", expand = True, fill = "both")
+        
         self.create_hint_area()
         self.create_preview_area()
             
@@ -335,8 +340,8 @@ class UI:
         self.path_label.pack(side = "bottom", fill = "x", padx = 20, pady = 10)
 
     def create_hint_area(self):
-        self.hint_frame = tk.Frame(self.bottom_frame, bg = "#FAFAFA")
-        self.hint_frame.pack(side = "left", expand = True, fill = "y", pady = (0, 10))
+        self.hint_frame = tk.Frame(self.right_bottom_frame, bg = "#FAFAFA")
+        self.hint_frame.pack(side = "top", expand = True, fill = "x")
 
         self.index_label = tk.Label(self.hint_frame, bg = "#FAFAFA", text = " : ", fg = "#C0C00C", font = ("Segoe UI", 11))
         self.index_label.grid(row = 0, column = 2, sticky = "nwse")
@@ -354,7 +359,7 @@ class UI:
             self.hint_frame, bg = "#FAFAFA", text = "未選中任何框", 
             fg = "#8E8E79", font = ("Segoe UI", 11)
         )
-        self.selection_status_label.grid(row = 0, column = 1, sticky = "nw", padx = (20, 0))
+        self.selection_status_label.grid(row = 0, column = 1, sticky = "nw", padx = (20, 20))
 
     def create_preview_area(self):
         if not self.SHOW_PREVIEW:
@@ -362,41 +367,27 @@ class UI:
             return
             
         # Create preview frame with border
-        self.preview_frame = tk.Frame(self.bottom_frame, bg = "#FAFAFA", relief = "ridge", bd = 2)
-        self.preview_frame.pack(side = "right", fill = "both", expand = True)
-        
+        self.preview_frame = tk.Frame(self.right_bottom_frame, bg = "#FAFAFA", relief = "ridge", bd = 2)
+        self.preview_frame.pack(side = "top", fill = "both", expand = True)
+
+        # Left: Crop
+        self.crop_container = tk.Frame(self.preview_frame, bg="#FAFAFA", relief="ridge", bd=2)
+        self.crop_container.pack(side = "left", fill = "both", expand = True)
+        tk.Label(self.crop_container, text="Crop", bg="#FAFAFA", fg="#2d2d2d",
+                font=("Segoe UI", 11, "bold")).pack(side="top", pady=5)
+        self._create_canvas_with_scrollbars("crop", parent_override=self.crop_container)
+
+        # Right: Original
+        self.original_container = tk.Frame(self.preview_frame, bg="#FAFAFA", relief="ridge", bd=2)
+        self.original_container.pack(side = "right", fill = "both", expand = True)
+        tk.Label(self.original_container, text="原圖", bg="#FAFAFA", fg="#2d2d2d",
+                font=("Segoe UI", 11, "bold")).pack(side="top", pady=5)
+        self._create_canvas_with_scrollbars("original", parent_override=self.original_container)
+
         # Set minimum size for preview frame
         self.preview_frame.update_idletasks()
         self.preview_frame.configure(width=250, height=250)
-        
-        # Add title label
-        self.preview_title = tk.Label(
-            self.preview_frame, 
-            text = "原尺寸預覽", 
-            bg = "#FAFAFA", 
-            fg = "#2d2d2d", 
-            font = ("Segoe UI", 11, "bold")
-        )
-        self.preview_title.pack(side = "top", pady = 5)
-        
-        # Create notebook for tabs
-        self.preview_notebook = ttk.Notebook(self.preview_frame)
-        self.preview_notebook.pack(side = "top", fill = "both", expand = True, padx = 10, pady = (0, 10))
-        
-        # Create crop preview tab
-        self.crop_tab_frame = tk.Frame(self.preview_notebook, bg = "#FAFAFA")
-        self.preview_notebook.add(self.crop_tab_frame, text = "Crop")
-        
-        # Create original preview tab
-        self.original_tab_frame = tk.Frame(self.preview_notebook, bg = "#FAFAFA")
-        self.preview_notebook.add(self.original_tab_frame, text = "原圖")
-        
-        # Create crop preview canvas and scrollbars
-        self._create_canvas_with_scrollbars("crop")
-        
-        # Create original preview canvas and scrollbars  
-        self._create_canvas_with_scrollbars("original")
-        
+
         # Initialize preview state
         self.preview_image = None
         self.preview_photo_image = None
@@ -415,9 +406,6 @@ class UI:
         self._bind_canvas_events(self.preview_canvas, "crop")
         self._bind_canvas_events(self.original_canvas, "original")
         
-        # Bind tab change event
-        self.preview_notebook.bind("<<NotebookTabChanged>>", self.on_preview_tab_changed)
-        
         # Initialize magnifier state
         self.magnifier_tooltip = None
         self.is_dragging_preview = False
@@ -434,33 +422,34 @@ class UI:
         self.preview_magnifier_drag_start_y = 0
         self.preview_magnifier_selection_rect = None
     
-    def on_preview_tab_changed(self, event):
-        """Handle tab change in preview notebook"""
-        try:
-            selected_tab = self.preview_notebook.index(self.preview_notebook.select())
-            DEBUG("Preview tab changed to index: {}", selected_tab)
-            
-            # If switched to original tab (index 1) and we have a pending image
-            if selected_tab == 1 and self.pending_original_image:
-                DEBUG("Switched to original tab, updating preview with pending image")
-                self.update_original_preview(self.pending_original_image)
-        except Exception as e:
-            ERROR("Error handling tab change: {}", str(e))
-    
-    def _create_canvas_with_scrollbars(self, canvas_type):
+    def _create_canvas_with_scrollbars(self, canvas_type, parent_override=None):
         """Create a canvas with scrollbars for the specified type (crop or original)"""
-        if canvas_type == "crop":
-            parent_frame = self.crop_tab_frame
-            canvas_name = "preview_canvas"
-            v_scrollbar_name = "preview_v_scrollbar"
-            h_scrollbar_name = "preview_h_scrollbar"
-            canvas_frame_name = "preview_canvas_frame"
-        else:  # original
-            parent_frame = self.original_tab_frame
-            canvas_name = "original_canvas"
-            v_scrollbar_name = "original_v_scrollbar"
-            h_scrollbar_name = "original_h_scrollbar"
-            canvas_frame_name = "original_canvas_frame"
+        if parent_override is not None:
+            parent_frame = parent_override
+            if canvas_type == "crop":
+                canvas_name = "preview_canvas"
+                v_scrollbar_name = "preview_v_scrollbar"
+                h_scrollbar_name = "preview_h_scrollbar"
+                canvas_frame_name = "preview_canvas_frame"
+            else:  # original
+                canvas_name = "original_canvas"
+                v_scrollbar_name = "original_v_scrollbar"
+                h_scrollbar_name = "original_h_scrollbar"
+                canvas_frame_name = "original_canvas_frame"
+
+        else:
+            if canvas_type == "crop":
+                parent_frame = self.crop_container
+                canvas_name = "preview_canvas"
+                v_scrollbar_name = "preview_v_scrollbar"
+                h_scrollbar_name = "preview_h_scrollbar"
+                canvas_frame_name = "preview_canvas_frame"
+            else:
+                parent_frame = self.original_container
+                canvas_name = "original_canvas"
+                v_scrollbar_name = "original_v_scrollbar"
+                h_scrollbar_name = "original_h_scrollbar"
+                canvas_frame_name = "original_canvas_frame"
         
         # Create canvas container
         canvas_frame = tk.Frame(parent_frame, bg = "#FAFAFA")
@@ -629,7 +618,7 @@ class UI:
             ERROR("Failed to update bbox_controller.original_image_width: {}", str(e))
     
     def set_original_image_for_preview(self, original_image_for_preview):
-        """Set the original image for preview functionality (for crop images)
+        """Set the original image for preview (right-bottom '原圖' panel).
         
         Args:
             original_image_for_preview: PIL.Image object of the original image for preview
@@ -641,10 +630,8 @@ class UI:
             DEBUG("Original image for preview set, will update when tab is selected")
             # Only update if original tab is currently selected
             try:
-                if hasattr(self, 'preview_notebook') and self.preview_notebook:
-                    selected_tab = self.preview_notebook.index(self.preview_notebook.select())
-                    if selected_tab == 1:  # Original tab is selected
-                        self.update_original_preview(original_image_for_preview)
+                if hasattr(self, 'original_canvas') and self.original_canvas:
+                    self.update_original_preview(original_image_for_preview)
             except:
                 pass  # Tab not ready yet, will update on tab change
         else:
@@ -2033,7 +2020,7 @@ class UI:
             else:
                 if actual_bbox_width < self.MIN_BBOX_WIDTH_THRESHOLD:
                     # Warning style: orange/red color for small bbox
-                    color = "#F07443"  # OrangeRed color for warning
+                    color = "#FF8B2C"  # OrangeRed color for warning
                     tags = ("label_box", "label_box_warning")
 
                 else:
@@ -2098,7 +2085,7 @@ class UI:
 
                 if actual_bbox_width < self.MIN_BBOX_WIDTH_THRESHOLD:
                     dimension_text = f"⚠️ {actual_bbox_width}×{actual_bbox_height}"
-                    dim_color = "#F07443"  # Warning yellow
+                    dim_color = "#FF8B2C"  # Warning yellow
                 else:
                     dimension_text = f"{actual_bbox_width}×{actual_bbox_height} "
                     dim_color = color  # Normal color
