@@ -2477,6 +2477,10 @@ class UI:
         if self.bbox_controller and hasattr(self, 'current_labels') and self.current_labels:
             # Update cursor based on mouse position using stored labels
             self.bbox_controller.update_cursor_for_position(event.x, event.y, self.current_labels)
+        
+        # Update crosshair auxiliary lines when in drawing mode
+        if self.bbox_controller:
+            self.bbox_controller.update_crosshair_position(event.x, event.y)
 
     # Key events
     def on_lc_press_switch_pen(self, event):

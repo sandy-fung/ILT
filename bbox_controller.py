@@ -59,6 +59,11 @@ class BBoxController:
         # Current hover state
         self.current_hover_label = None
         self.current_edge_type = None
+        
+        # Crosshair auxiliary lines state
+        self.crosshair_vertical_id = None
+        self.crosshair_horizontal_id = None
+        self.crosshair_visible = False
 
     def toggle_drawing_mode(self):
         """Toggle drawing mode"""
@@ -70,6 +75,8 @@ class BBoxController:
             self.canvas.config(cursor="pencil")
         else:
             self.canvas.config(cursor="arrow")
+            # Hide crosshair lines when exiting drawing mode
+            self.hide_crosshair_lines()
             
         return self.drawing_mode
 
@@ -785,6 +792,64 @@ class BBoxController:
                     return "select"
         
         return "none"
+    
+    def show_crosshair_lines(self, x, y):
+        """
+        Display crosshair auxiliary lines at the specified position
+        
+        Args:
+            x, y (int): Position coordinates on canvas
+        """
+        if not self.drawing_mode:
+            return
+            
+        canvas_width = self.canvas.winfo_width()
+        canvas_height = self.canvas.winfo_height()
+        
+        # Hide existing lines first
+        self.hide_crosshair_lines()
+        
+        # Create vertical line (x=constant, y from 0 to canvas_height)
+        self.crosshair_vertical_id = self.canvas.create_line(
+            x, 0, x, canvas_height,
+            fill="#00BFFF", width=2, dash=(2, 2), tags="crosshair_lines"
+        )
+        
+        # Create horizontal line (y=constant, x from 0 to canvas_width)  
+        self.crosshair_horizontal_id = self.canvas.create_line(
+            0, y, canvas_width, y,
+            fill="#00BFFF", width=2, dash=(2, 2), tags="crosshair_lines"
+        )
+        
+        self.crosshair_visible = True
+        
+    def hide_crosshair_lines(self):
+        """Hide crosshair auxiliary lines"""
+        if self.crosshair_vertical_id:
+            self.canvas.delete(self.crosshair_vertical_id)
+            self.crosshair_vertical_id = None
+            
+        if self.crosshair_horizontal_id:
+            self.canvas.delete(self.crosshair_horizontal_id)
+            self.crosshair_horizontal_id = None
+            
+        # Also delete by tags as a safety measure
+        self.canvas.delete("crosshair_lines")
+        self.crosshair_visible = False
+        
+    def update_crosshair_position(self, x, y):
+        """
+        Update crosshair lines position
+        
+        Args:
+            x, y (int): New position coordinates on canvas
+        """
+        if self.drawing_mode:
+            # Simply recreate the lines at new position
+            self.show_crosshair_lines(x, y)
+        else:
+            # Hide lines if not in drawing mode
+            self.hide_crosshair_lines()
 
 class DrawingState:
     """Drawing state enumeration"""
