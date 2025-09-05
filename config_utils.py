@@ -264,11 +264,12 @@ def get_show_bbox_dimensions():
         return False  # Default to False
 
 def get_min_bbox_width_threshold():
+    from ILT_UI import DEFAULT_MIN_PLATE_WIDTH
     """Get minimum bbox width threshold for warning"""
     try:
         return config.getint("UISettings", "min_bbox_width_threshold")
     except:
-        return 70  # Default 70 pixels
+        return DEFAULT_MIN_PLATE_WIDTH  # Default 70 pixels
 
 def save_ui_settings(show_class_id_buttons=None, show_text_box=None,
                     show_preview=None, show_input_box=None, show_classify_frame=None, 

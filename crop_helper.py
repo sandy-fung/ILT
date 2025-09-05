@@ -65,7 +65,7 @@ def crop_and_save_labels(image_path, labels, current_label_path, output_dir):
         cropped_image = image[y_min:y_max, x_min:x_max]
 
         # Construct the output file name
-        output_file_name = f"{os.path.basename(current_label_path)}_{label_index}.jpg"
+        output_file_name = f"{Path(current_label_path).stem}_{label_index}.jpg"
         output_file_path = os.path.join(output_dir, output_file_name)
 
         # Save the cropped image

@@ -18,7 +18,7 @@ from DragableVerticalLine import DraggableVerticalLine
 
 DEFAULT_W = 1920
 DEFAULT_H = 1080
-
+DEFAULT_MIN_PLATE_WIDTH    = 70
 class UI:
     def __init__(self):
         self.dispatch = None
@@ -2626,7 +2626,7 @@ class UI:
             self.SHOW_CLASSIFY_FRAME = settings.get('show_classify_frame', False)
             self.SHOW_CUT_IMAGE = settings.get('show_cut_image', True)
             self.SHOW_BBOX_DIMENSIONS = settings.get('show_bbox_dimensions', False)
-            self.MIN_BBOX_WIDTH_THRESHOLD = settings.get('min_bbox_width_threshold', 70)
+            self.MIN_BBOX_WIDTH_THRESHOLD = settings.get('min_bbox_width_threshold', DEFAULT_MIN_PLATE_WIDTH)
             self.LABEL_FONT_SIZE = settings.get('label_font_size', 12)
             
             # Update bbox_controller settings for reference box feature

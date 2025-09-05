@@ -106,6 +106,7 @@ class SettingsDialog:
             ERROR("Error centering dialog: {}", e)
 
     def load_current_settings(self):
+        from ILT_UI import DEFAULT_MIN_PLATE_WIDTH
         """Load current settings into dialog variables"""
         try:
             self.show_class_id_buttons_var.set(self.current_settings.get('show_class_id_buttons', False))
@@ -116,7 +117,7 @@ class SettingsDialog:
             self.show_cut_image_var.set(self.current_settings.get('show_cut_image', True))
             self.show_bbox_dimensions_var.set(self.current_settings.get('show_bbox_dimensions', False))
             self.label_font_size_current = self.current_settings.get('label_font_size')
-            self.min_bbox_width_threshold = self.current_settings.get('min_bbox_width_threshold', 70)
+            self.min_bbox_width_threshold = self.current_settings.get('min_bbox_width_threshold', DEFAULT_MIN_PLATE_WIDTH)
 
 
 
@@ -126,6 +127,7 @@ class SettingsDialog:
             ERROR("Error loading current settings: {}", e)
 
     def create_ui_elements(self):
+        from ILT_UI import DEFAULT_MIN_PLATE_WIDTH
         """Create dialog UI elements"""
         try:
             # Main frame with smaller padding
@@ -213,7 +215,7 @@ class SettingsDialog:
             # Minimum bbox width threshold
             threshold_describe = tk.Label(font_frame, text="Min bbox width (pixels)", font=("Arial", 11))
             threshold_describe.grid(row=1, column=0, padx=5, pady=10)
-            threshold_value = self.current_settings.get('min_bbox_width_threshold', 70)
+            threshold_value = self.current_settings.get('min_bbox_width_threshold', DEFAULT_MIN_PLATE_WIDTH)
             self.min_bbox_width_entry = tk.Entry(font_frame, font=("Arial", 12))
             self.min_bbox_width_entry.grid(row=1, column=1, padx=5, pady=10)
             self.min_bbox_width_entry.insert(0, str(threshold_value))
@@ -312,6 +314,7 @@ class SettingsDialog:
 
 # for implementation testing
 if __name__ == "__main__":
+    from ILT_UI import DEFAULT_MIN_PLATE_WIDTH
     def on_confirm(settings):
         print("Settings confirmed:", settings)
 
@@ -331,7 +334,7 @@ if __name__ == "__main__":
         'show_cut_image': True,
         'show_bbox_dimensions': False,
         'label_font_size_entry': 12,
-        'min_bbox_width_threshold': 70
+        'min_bbox_width_threshold': DEFAULT_MIN_PLATE_WIDTH
     }
 
     dialog = SettingsDialog(parent_window, current_settings, on_confirm)
