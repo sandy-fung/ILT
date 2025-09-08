@@ -32,7 +32,7 @@ class TimerSetupDialog:
         
         # Game time message
         tk.Label(main_frame, 
-                text=f"遊戲時間 {self.default_minutes} 分鐘，計時開始！", 
+                text=f"標註時間 {self.default_minutes} 分鐘，計時開始！", 
                 font=("Segoe UI", 12, "bold")).pack(pady=10)
         
         # Store minutes in variable (not shown to user)

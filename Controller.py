@@ -98,9 +98,10 @@ class Controller:
 
         self.load_image(self.images_path)
         
-        # Auto-show timer dialog after folder selection
+        # Auto-show timer dialog after folder selection if enabled
         self.timer_shown_on_startup = True
-        self.show_timer_setup_dialog()
+        if config_utils.get_timer_enabled():
+            self.show_timer_setup_dialog()
 
     def load_folder(self):
         # load image folder
@@ -324,8 +325,8 @@ class Controller:
         self.on_fresh_image_label()
         self.view.show_class_id_buttons(config_utils.get_class_id_vars(), wlm.get_labels())
         
-        # Show timer dialog if not shown yet (for auto-loaded config case)
-        if not self.timer_shown_on_startup:
+        # Show timer dialog if not shown yet and timer is enabled (for auto-loaded config case)
+        if not self.timer_shown_on_startup and config_utils.get_timer_enabled():
             self.timer_shown_on_startup = True
             self.show_timer_setup_dialog()
         
@@ -485,10 +486,6 @@ class Controller:
         elif event_type == UIEvent.CONFIGURATION_BT_CLICK:
             DEBUG("Controller: Configuration button clicked.")
             self.handle_configuration_button()
-            
-        elif event_type == UIEvent.TIMER_BT_CLICK:
-            DEBUG("Controller: Timer button clicked.")
-            self.handle_timer_button()
             
         elif event_type == UIEvent.BATCH_SORT:
             DEBUG("Controller: Batch sort button clicked.")
@@ -1038,9 +1035,7 @@ class Controller:
 
         if not char_handler.is_same_length_as_labels(class_ids, len(self.current_labels)):
             self.view.show_error("輸入長度與標籤數量不符，請重新輸入")
-
-            if hasattr(self.view, "clear_input_box"):
-                self.view.clear_input_box()
+            
             if hasattr(self.view, "focus_input_box"):
                 self.view.focus_input_box()
                 
@@ -1201,19 +1196,6 @@ class Controller:
         except Exception as e:
             ERROR("Error handling configuration button: {}", e)
     
-    def handle_timer_button(self):
-        """Handle timer button click - show setup dialog or stop timer"""
-        try:
-            if self.timer_active:
-                # Stop timer if active
-                self.stop_timer()
-            else:
-                # Show timer setup dialog
-                self.show_timer_setup_dialog()
-            
-        except Exception as e:
-            ERROR("Error handling timer button: {}", e)
-    
     def show_timer_setup_dialog(self):
         """Show timer setup dialog and start timer if confirmed"""
         try:
@@ -1222,7 +1204,7 @@ class Controller:
             # Get timer default minutes from config
             default_minutes = config_utils.get_timer_default_minutes()
             if default_minutes is None:
-                default_minutes = 1  # Default to 1 minute
+                default_minutes = 10  # Default to 10 minute
             
             # Create and show timer dialog
             timer_dialog = TimerSetupDialog(self.view.window, default_minutes)
@@ -1241,14 +1223,13 @@ class Controller:
             self.timer_seconds_remaining = minutes * 60
             self.timer_active = True
             
-            # Update timer button text
-            if hasattr(self.view, 'timer_button'):
-                self.view.timer_button.config(text="Stop", fg="red")
-            
             # Start countdown
             self.update_timer()
             
             INFO("Timer started for {} minutes", minutes)
+            
+            # Save timer settings to config
+            config_utils.save_timer_settings(default_minutes=minutes)
             
         except Exception as e:
             ERROR("Error starting timer: {}", e)
@@ -1297,10 +1278,6 @@ class Controller:
             if hasattr(self.view, 'update_timer_display'):
                 self.view.update_timer_display("", "blue")
             
-            # Reset timer button
-            if hasattr(self.view, 'timer_button'):
-                self.view.timer_button.config(text="Timer", fg="#0C0CC0")
-            
             INFO("Timer stopped")
             
         except Exception as e:
@@ -1315,10 +1292,6 @@ class Controller:
             if hasattr(self.view, 'update_timer_display'):
                 self.view.update_timer_display("時間到！", "red")
             
-            # Reset timer button
-            if hasattr(self.view, 'timer_button'):
-                self.view.timer_button.config(text="Timer", fg="#0C0CC0")
-            
             # Show notification
             messagebox.showinfo(
                 "休息時間", 
@@ -1332,8 +1305,9 @@ class Controller:
             
             INFO("Timer finished - notification shown")
             
-            # Auto-restart timer setup after break
-            self.show_timer_setup_dialog()
+            # Auto-restart timer setup after break if enabled
+            if config_utils.get_timer_enabled():
+                self.show_timer_setup_dialog()
             
         except Exception as e:
             ERROR("Error handling timer finished: {}", e)

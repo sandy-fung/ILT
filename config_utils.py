@@ -275,7 +275,24 @@ def get_timer_default_minutes():
     try:
         return config.getint("Timer", "default_minutes")
     except:
-        return 1  # Default to 1 minute
+        return 10  # Default to 10 minutes
+
+def get_timer_enabled():
+    """Get whether timer is enabled"""
+    try:
+        return config.getboolean("Timer", "enabled")
+    except:
+        return False  # Default to disabled
+
+def set_timer_enabled(enabled):
+    """Set whether timer is enabled"""
+    if not config.has_section("Timer"):
+        config.add_section("Timer")
+    
+    config.set("Timer", "enabled", str(enabled).lower())
+    
+    with open(DEFAULT_CONFI_PATH, "w") as f:
+        config.write(f)
 
 def save_timer_settings(default_minutes=None):
     """Save timer settings to config file"""

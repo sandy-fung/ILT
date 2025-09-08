@@ -168,14 +168,6 @@ class UI:
             text="", font=("Segoe UI", 11, "bold"), fg = "blue"
         )
         self.timer_label.pack(side = "left", padx = 10)
-        
-        self.timer_button = tk.Button(
-            self.toolbar, bg = "#F4F4F4",
-            width = 6, height = 1,
-            text="Timer", font=("Segoe UI", 10), fg = "#0C0CC0",
-            relief = "flat", bd = 2,
-            command = self.on_timer_click)
-        self.timer_button.pack(side = "left", padx = 5)
 
 
     def create_middle_area(self):
@@ -2269,12 +2261,6 @@ class UI:
         else:
             DEBUG("Dispatch is not initialized.")
 
-    def clear_input_box(self):
-        """Clear the input box"""
-        if self.input_box:
-            self.input_box.delete(0, tk.END)
-            DEBUG("Input box cleared")
-
     def focus_input_box(self):
         """Focus the input box"""
         if self.input_box:
@@ -2319,7 +2305,7 @@ class UI:
             "【框選操作】\n"
             "滑鼠左鍵：選取box\n"
             "拖曳選中的box：移動box位置\n"
-            "拖曳右下角灰色方塊：調整box大小\n"
+            "拖曳選中的box邊框：調整box大小\n"
             "滑鼠右鍵：刪除選中的box\n"
             "Delete鍵：刪除選中的box\n"
             "\n"
@@ -2651,11 +2637,6 @@ class UI:
         if self.dispatch:
             self.dispatch(UIEvent.CONFIGURATION_BT_CLICK, None)
     
-    def on_timer_click(self):
-        """Handle timer button click"""
-        DEBUG("on_timer_click")
-        if self.dispatch:
-            self.dispatch(UIEvent.TIMER_BT_CLICK, None)
 
     def on_text_modified(self, event):
         if self.label_text_box.edit_modified():
