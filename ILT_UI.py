@@ -161,6 +161,21 @@ class UI:
             relief = "flat", bd = 2,
             command = self.show_info_dialog)
         self.info_button.pack(side = "left", padx =0)
+        
+        # Timer display label (shows countdown when active)
+        self.timer_label = tk.Label(
+            self.toolbar, bg = "#F4F4F4",
+            text="", font=("Segoe UI", 11, "bold"), fg = "blue"
+        )
+        self.timer_label.pack(side = "left", padx = 10)
+        
+        self.timer_button = tk.Button(
+            self.toolbar, bg = "#F4F4F4",
+            width = 6, height = 1,
+            text="Timer", font=("Segoe UI", 10), fg = "#0C0CC0",
+            relief = "flat", bd = 2,
+            command = self.on_timer_click)
+        self.timer_button.pack(side = "left", padx = 5)
 
 
     def create_middle_area(self):
@@ -2275,6 +2290,15 @@ class UI:
         self.show_info(f"copy file name: {text}")
 
 # Button events    
+    def update_timer_display(self, text, color="blue"):
+        """Update the timer display in the toolbar
+        
+        Args:
+            text: Text to display (e.g., "10:00" or empty string to hide)
+            color: Color of the text (blue, orange, red)
+        """
+        self.timer_label.config(text=text, fg=color)
+    
     def show_info_dialog(self):
         """Show a popup window with usage manual and version (styled like Configuration)"""
 
@@ -2601,6 +2625,12 @@ class UI:
         DEBUG("on_configuration_click")
         if self.dispatch:
             self.dispatch(UIEvent.CONFIGURATION_BT_CLICK, None)
+    
+    def on_timer_click(self):
+        """Handle timer button click"""
+        DEBUG("on_timer_click")
+        if self.dispatch:
+            self.dispatch(UIEvent.TIMER_BT_CLICK, None)
 
     def on_text_modified(self, event):
         if self.label_text_box.edit_modified():

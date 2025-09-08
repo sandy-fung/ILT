@@ -8,6 +8,7 @@ import char_input_handler as char_handler
 import os
 from log_levels import DEBUG, INFO, ERROR
 from image_context import ImageContext
+from tkinter import messagebox
 
 DELETE_FILE_TMP_PATH ="delete_tmp"
 MOVE_FILE_TMP_PATH ="issue_tmp"
@@ -35,6 +36,12 @@ class Controller:
 
         # initial state
         self.drawing_mode = False
+        
+        # Timer state
+        self.timer_active = False
+        self.timer_seconds_remaining = 0
+        self.timer_id = None
+        self.timer_shown_on_startup = False  # Track if timer was shown on startup
         
         # Dragging redraw strategy (複用 image_label_tool 的完整重繪策略)
         self.check_config()
@@ -90,6 +97,10 @@ class Controller:
         self.auto_batch_sort_labels()
 
         self.load_image(self.images_path)
+        
+        # Auto-show timer dialog after folder selection
+        self.timer_shown_on_startup = True
+        self.show_timer_setup_dialog()
 
     def load_folder(self):
         # load image folder
@@ -313,6 +324,11 @@ class Controller:
         self.on_fresh_image_label()
         self.view.show_class_id_buttons(config_utils.get_class_id_vars(), wlm.get_labels())
         
+        # Show timer dialog if not shown yet (for auto-loaded config case)
+        if not self.timer_shown_on_startup:
+            self.timer_shown_on_startup = True
+            self.show_timer_setup_dialog()
+        
    #=====  handle_event  ===========
     def handle_event(self, event_type, event_data):
         if event_type == UIEvent.WINDOW_READY:
@@ -465,6 +481,10 @@ class Controller:
         elif event_type == UIEvent.CONFIGURATION_BT_CLICK:
             DEBUG("Controller: Configuration button clicked.")
             self.handle_configuration_button()
+            
+        elif event_type == UIEvent.TIMER_BT_CLICK:
+            DEBUG("Controller: Timer button clicked.")
+            self.handle_timer_button()
             
         elif event_type == UIEvent.BATCH_SORT:
             DEBUG("Controller: Batch sort button clicked.")
@@ -1138,6 +1158,143 @@ class Controller:
                 ERROR("Settings dialog not implemented in view")
         except Exception as e:
             ERROR("Error handling configuration button: {}", e)
+    
+    def handle_timer_button(self):
+        """Handle timer button click - show setup dialog or stop timer"""
+        try:
+            if self.timer_active:
+                # Stop timer if active
+                self.stop_timer()
+            else:
+                # Show timer setup dialog
+                self.show_timer_setup_dialog()
+            
+        except Exception as e:
+            ERROR("Error handling timer button: {}", e)
+    
+    def show_timer_setup_dialog(self):
+        """Show timer setup dialog and start timer if confirmed"""
+        try:
+            from timer_dialog import TimerSetupDialog
+            
+            # Get timer default minutes from config
+            default_minutes = config_utils.get_timer_default_minutes()
+            if default_minutes is None:
+                default_minutes = 1  # Default to 1 minute
+            
+            # Create and show timer dialog
+            timer_dialog = TimerSetupDialog(self.view.window, default_minutes)
+            minutes = timer_dialog.show()
+            
+            if minutes is not None:
+                # Start timer with selected minutes
+                self.start_timer(minutes)
+                
+        except Exception as e:
+            ERROR("Error showing timer setup dialog: {}", e)
+    
+    def start_timer(self, minutes):
+        """Start the countdown timer"""
+        try:
+            self.timer_seconds_remaining = minutes * 60
+            self.timer_active = True
+            
+            # Update timer button text
+            if hasattr(self.view, 'timer_button'):
+                self.view.timer_button.config(text="Stop", fg="red")
+            
+            # Start countdown
+            self.update_timer()
+            
+            INFO("Timer started for {} minutes", minutes)
+            
+        except Exception as e:
+            ERROR("Error starting timer: {}", e)
+    
+    def update_timer(self):
+        """Update the timer countdown"""
+        if self.timer_active and self.timer_seconds_remaining > 0:
+            # Update display
+            minutes = self.timer_seconds_remaining // 60
+            seconds = self.timer_seconds_remaining % 60
+            time_text = f"{minutes:02d}:{seconds:02d}"
+            
+            # Determine color based on remaining time
+            if self.timer_seconds_remaining <= 60:
+                color = "red"
+            elif self.timer_seconds_remaining <= 180:
+                color = "orange"
+            else:
+                color = "blue"
+            
+            # Update timer display
+            if hasattr(self.view, 'update_timer_display'):
+                self.view.update_timer_display(time_text, color)
+            
+            # Decrement timer
+            self.timer_seconds_remaining -= 1
+            
+            # Schedule next update
+            self.timer_id = self.view.window.after(1000, self.update_timer)
+            
+        elif self.timer_active and self.timer_seconds_remaining == 0:
+            # Timer finished
+            self.timer_finished()
+    
+    def stop_timer(self):
+        """Stop the countdown timer"""
+        try:
+            self.timer_active = False
+            
+            # Cancel scheduled update
+            if self.timer_id:
+                self.view.window.after_cancel(self.timer_id)
+                self.timer_id = None
+            
+            # Clear timer display
+            if hasattr(self.view, 'update_timer_display'):
+                self.view.update_timer_display("", "blue")
+            
+            # Reset timer button
+            if hasattr(self.view, 'timer_button'):
+                self.view.timer_button.config(text="Timer", fg="#0C0CC0")
+            
+            INFO("Timer stopped")
+            
+        except Exception as e:
+            ERROR("Error stopping timer: {}", e)
+    
+    def timer_finished(self):
+        """Handle timer finished event"""
+        try:
+            self.timer_active = False
+            
+            # Clear timer display
+            if hasattr(self.view, 'update_timer_display'):
+                self.view.update_timer_display("時間到！", "red")
+            
+            # Reset timer button
+            if hasattr(self.view, 'timer_button'):
+                self.view.timer_button.config(text="Timer", fg="#0C0CC0")
+            
+            # Show notification
+            messagebox.showinfo(
+                "休息時間", 
+                "標註時間到了！\n請休息一下，保護眼睛！",
+                parent=self.view.window
+            )
+            
+            # Clear display after notification
+            if hasattr(self.view, 'update_timer_display'):
+                self.view.update_timer_display("", "blue")
+            
+            INFO("Timer finished - notification shown")
+            
+            # Auto-restart timer setup after break
+            self.show_timer_setup_dialog()
+            
+        except Exception as e:
+            ERROR("Error handling timer finished: {}", e)
     
     def handle_settings_confirm(self, event_data):
         """Handle settings dialog confirmation"""

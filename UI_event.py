@@ -30,6 +30,7 @@ class UIEvent(Enum):
     CLASS_ID_CHANGE = auto()
     INPUT_ENTER = auto()
     BATCH_SORT = auto()
+    TIMER_BT_CLICK = auto()
     
     # Settings dialog events
     SETTINGS_DIALOG_CONFIRM = auto()
