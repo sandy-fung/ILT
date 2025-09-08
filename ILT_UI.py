@@ -379,6 +379,14 @@ class UI:
             fg = "#8E8E79", font = ("Segoe UI", 11)
         )
         self.selection_status_label.grid(row = 0, column = 1, sticky = "nw", padx = (20, 20))
+        
+        # Add select leftmost bbox button
+        self.select_leftmost_button = tk.Button(
+            self.hint_frame, bg = "#E0E0E0", text = "快速校正車牌字元(熱鍵: T)",
+            fg = "#2D2D2D", font = ("Segoe UI", 10),
+            command = lambda: self.dispatch(UIEvent.SELECT_LEFTMOST_BBOX, {}) if self.dispatch else None
+        )
+        self.select_leftmost_button.grid(row = 0, column = 3, sticky = "w", padx = (10, 0))
 
     def create_preview_area(self):
         if not self.SHOW_PREVIEW:
@@ -2559,6 +2567,11 @@ class UI:
         DEBUG("on_delete_key")
         if self.dispatch:
             self.dispatch(UIEvent.DELETE_KEY, {"value": event})
+    
+    def on_t_key(self, event):
+        DEBUG("on_t_key - Quick correction hotkey pressed")
+        if self.dispatch:
+            self.dispatch(UIEvent.SELECT_LEFTMOST_BBOX, {})
 
     def on_delete_image_button(self):
         DEBUG("on_delete_image_button")
@@ -3006,6 +3019,10 @@ class UI:
         
         # Searching file event binding
         self.window.bind("<Control-f>", self.open_search_window)
+        
+        # Quick correction hotkey (T key)
+        self.window.bind("<t>", self.on_t_key)
+        self.window.bind("<T>", self.on_t_key)
 
         self.window.bind("<Shift-C>", self.on_cut_image)
         

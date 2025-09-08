@@ -478,6 +478,10 @@ class Controller:
             DEBUG("Input text:", input_text)
             self.apply_input_text_to_labels(input_text)
             
+        elif event_type == UIEvent.SELECT_LEFTMOST_BBOX:
+            DEBUG("Controller: Select leftmost bbox clicked.")
+            self.select_leftmost_bbox_and_trigger_input()
+            
         elif event_type == UIEvent.CONFIGURATION_BT_CLICK:
             DEBUG("Controller: Configuration button clicked.")
             self.handle_configuration_button()
@@ -961,6 +965,44 @@ class Controller:
             ERROR("Error deleting selected label: {}", e)
             return False
         
+    def select_leftmost_bbox_and_trigger_input(self):
+        """Select the leftmost bbox and trigger input enter event"""
+        if not self.current_labels:
+            DEBUG("No labels to select")
+            return
+            
+        bbox_ctrl = self.view.bbox_controller
+        if not bbox_ctrl:
+            DEBUG("No bbox controller available")
+            return
+            
+        # Find leftmost label (minimum cx_ratio)
+        leftmost_label = min(self.current_labels, key=lambda label: label.cx_ratio)
+        DEBUG("Found leftmost label with cx_ratio: {}", leftmost_label.cx_ratio)
+        
+        # Clear current selection
+        bbox_ctrl.clear_selection(self.current_labels)
+        
+        # Select the leftmost label
+        leftmost_label.set_selected(True)
+        bbox_ctrl.selected_label = leftmost_label
+        
+        # Update display
+        self.update_label_display()
+        self.view.update_selection_status_display(leftmost_label)
+        
+        # Get text from input box and trigger input enter
+        if self.view.input_box:
+            input_text = self.view.input_box.get().strip()
+            if input_text and input_text != "請輸入車牌號碼":
+                DEBUG("Triggering input enter with text: {}", input_text)
+                self.apply_input_text_to_labels(input_text)
+                self.view.window.focus_set()
+            else:
+                DEBUG("Input box is empty or has placeholder text")
+        else:
+            DEBUG("Input box not available")
+    
     def apply_input_text_to_labels(self, input_text):
         DEBUG("Current labels count : {}", len(self.current_labels))
 
