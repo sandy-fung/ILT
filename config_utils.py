@@ -306,6 +306,27 @@ def save_timer_settings(default_minutes=None):
     with open(DEFAULT_CONFI_PATH, "w") as f:
         config.write(f)
 
+def ensure_timer_config():
+    """Ensure Timer settings exist in config.ini without overwriting existing values"""
+    if not config.has_section("Timer"):
+        config.add_section("Timer")
+    
+    modified = False
+    
+    # Only set defaults if they don't exist
+    if not config.has_option("Timer", "enabled"):
+        config.set("Timer", "enabled", "false")
+        modified = True
+    
+    if not config.has_option("Timer", "default_minutes"):
+        config.set("Timer", "default_minutes", "10")
+        modified = True
+    
+    # Only write to file if we made changes
+    if modified:
+        with open(DEFAULT_CONFI_PATH, "w") as f:
+            config.write(f)
+
 def save_ui_settings(show_class_id_buttons=None, show_text_box=None,
                     show_preview=None, show_input_box=None, show_classify_frame=None, 
                     show_cut_image=None, label_font_size=10, show_bbox_dimensions=None,
