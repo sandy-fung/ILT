@@ -43,6 +43,10 @@ class Controller:
         self.timer_id = None
         self.timer_shown_on_startup = False  # Track if timer was shown on startup
         
+        # 確保 Timer 設定存在於 config.ini
+        config_utils.set_timer_enabled(False)  # 寫入預設值 false
+        config_utils.save_timer_settings(default_minutes=10)  # 寫入預設 10 分鐘
+        
         # Dragging redraw strategy (複用 image_label_tool 的完整重繪策略)
         self.check_config()
 
