@@ -161,6 +161,13 @@ class UI:
             relief = "flat", bd = 2,
             command = self.show_info_dialog)
         self.info_button.pack(side = "left", padx =0)
+        
+        # Timer display label (shows countdown when active)
+        self.timer_label = tk.Label(
+            self.toolbar, bg = "#F4F4F4",
+            text="", font=("Segoe UI", 11, "bold"), fg = "blue"
+        )
+        self.timer_label.pack(side = "left", padx = 10)
 
 
     def create_middle_area(self):
@@ -364,6 +371,14 @@ class UI:
             fg = "#8E8E79", font = ("Segoe UI", 11)
         )
         self.selection_status_label.grid(row = 0, column = 1, sticky = "nw", padx = (20, 20))
+        
+        # Add select leftmost bbox button
+        self.select_leftmost_button = tk.Button(
+            self.hint_frame, bg = "#E0E0E0", text = "快速校正車牌字元(熱鍵: T)",
+            fg = "#2D2D2D", font = ("Segoe UI", 10),
+            command = lambda: self.dispatch(UIEvent.SELECT_LEFTMOST_BBOX, {}) if self.dispatch else None
+        )
+        self.select_leftmost_button.grid(row = 0, column = 3, sticky = "w", padx = (10, 0))
 
     def create_preview_area(self):
         if not self.SHOW_PREVIEW:
@@ -2246,12 +2261,6 @@ class UI:
         else:
             DEBUG("Dispatch is not initialized.")
 
-    def clear_input_box(self):
-        """Clear the input box"""
-        if self.input_box:
-            self.input_box.delete(0, tk.END)
-            DEBUG("Input box cleared")
-
     def focus_input_box(self):
         """Focus the input box"""
         if self.input_box:
@@ -2275,19 +2284,40 @@ class UI:
         self.show_info(f"copy file name: {text}")
 
 # Button events    
+    def update_timer_display(self, text, color="blue"):
+        """Update the timer display in the toolbar
+        
+        Args:
+            text: Text to display (e.g., "10:00" or empty string to hide)
+            color: Color of the text (blue, orange, red)
+        """
+        self.timer_label.config(text=text, fg=color)
+    
     def show_info_dialog(self):
         """Show a popup window with usage manual and version (styled like Configuration)"""
 
         manual_text = (
+            "【基本導航】\n"
             "← 上一張\n"
             "→ 下一張\n"
+            "Ctrl+F：開啟檔案搜尋\n"
+            "\n"
+            "【框選操作】\n"
             "滑鼠左鍵：選取box\n"
             "拖曳選中的box：移動box位置\n"
-            "拖曳右下角灰色方塊：調整box大小\n"
+            "拖曳選中的box邊框：調整box大小\n"
             "滑鼠右鍵：刪除選中的box\n"
             "Delete鍵：刪除選中的box\n"
+            "\n"
+            "【繪製模式】\n"
             "Ctrl：切換繪框模式\n"
             "繪框模式下拖拽：繪製新box\n"
+            "\n"
+            "【輔助功能】\n"
+            "T：快速校正車牌字元\n"
+            "Shift+C：裁切圖片（需啟用裁切功能）\n"
+            "右Ctrl（按住）：顯示放大鏡\n"
+            "\n"
             "※ 標籤會自動依位置排序\n"
         )
 
@@ -2299,7 +2329,7 @@ class UI:
 
         # === 建立固定大小對話框（同 Configuration 風格） ===
         dialog_width  = 450
-        dialog_height = 360
+        dialog_height = 480
 
         top = tk.Toplevel(self.window)
         top.title("Info")
@@ -2477,6 +2507,10 @@ class UI:
         if self.bbox_controller and hasattr(self, 'current_labels') and self.current_labels:
             # Update cursor based on mouse position using stored labels
             self.bbox_controller.update_cursor_for_position(event.x, event.y, self.current_labels)
+        
+        # Update crosshair auxiliary lines when in drawing mode
+        if self.bbox_controller:
+            self.bbox_controller.update_crosshair_position(event.x, event.y)
 
     # Key events
     def on_lc_press_switch_pen(self, event):
@@ -2531,6 +2565,11 @@ class UI:
         DEBUG("on_delete_key")
         if self.dispatch:
             self.dispatch(UIEvent.DELETE_KEY, {"value": event})
+    
+    def on_t_key(self, event):
+        DEBUG("on_t_key - Quick correction hotkey pressed")
+        if self.dispatch:
+            self.dispatch(UIEvent.SELECT_LEFTMOST_BBOX, {})
 
     def on_delete_image_button(self):
         DEBUG("on_delete_image_button")
@@ -2597,6 +2636,7 @@ class UI:
         DEBUG("on_configuration_click")
         if self.dispatch:
             self.dispatch(UIEvent.CONFIGURATION_BT_CLICK, None)
+    
 
     def on_text_modified(self, event):
         if self.label_text_box.edit_modified():
@@ -2972,6 +3012,10 @@ class UI:
         
         # Searching file event binding
         self.window.bind("<Control-f>", self.open_search_window)
+        
+        # Quick correction hotkey (T key)
+        self.window.bind("<t>", self.on_t_key)
+        self.window.bind("<T>", self.on_t_key)
 
         self.window.bind("<Shift-C>", self.on_cut_image)
         

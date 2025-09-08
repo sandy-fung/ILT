@@ -8,6 +8,7 @@ import char_input_handler as char_handler
 import os
 from log_levels import DEBUG, INFO, ERROR
 from image_context import ImageContext
+from tkinter import messagebox
 
 DELETE_FILE_TMP_PATH ="delete_tmp"
 MOVE_FILE_TMP_PATH ="issue_tmp"
@@ -35,6 +36,12 @@ class Controller:
 
         # initial state
         self.drawing_mode = False
+        
+        # Timer state
+        self.timer_active = False
+        self.timer_seconds_remaining = 0
+        self.timer_id = None
+        self.timer_shown_on_startup = False  # Track if timer was shown on startup
         
         # Dragging redraw strategy (複用 image_label_tool 的完整重繪策略)
         self.check_config()
@@ -90,6 +97,11 @@ class Controller:
         self.auto_batch_sort_labels()
 
         self.load_image(self.images_path)
+        
+        # Auto-show timer dialog after folder selection if enabled
+        self.timer_shown_on_startup = True
+        if config_utils.get_timer_enabled():
+            self.show_timer_setup_dialog()
 
     def load_folder(self):
         # load image folder
@@ -313,6 +325,11 @@ class Controller:
         self.on_fresh_image_label()
         self.view.show_class_id_buttons(config_utils.get_class_id_vars(), wlm.get_labels())
         
+        # Show timer dialog if not shown yet and timer is enabled (for auto-loaded config case)
+        if not self.timer_shown_on_startup and config_utils.get_timer_enabled():
+            self.timer_shown_on_startup = True
+            self.show_timer_setup_dialog()
+        
    #=====  handle_event  ===========
     def handle_event(self, event_type, event_data):
         if event_type == UIEvent.WINDOW_READY:
@@ -461,6 +478,10 @@ class Controller:
             input_text = event_data.get("text", "")
             DEBUG("Input text:", input_text)
             self.apply_input_text_to_labels(input_text)
+            
+        elif event_type == UIEvent.SELECT_LEFTMOST_BBOX:
+            DEBUG("Controller: Select leftmost bbox clicked.")
+            self.select_leftmost_bbox_and_trigger_input()
             
         elif event_type == UIEvent.CONFIGURATION_BT_CLICK:
             DEBUG("Controller: Configuration button clicked.")
@@ -941,6 +962,44 @@ class Controller:
             ERROR("Error deleting selected label: {}", e)
             return False
         
+    def select_leftmost_bbox_and_trigger_input(self):
+        """Select the leftmost bbox and trigger input enter event"""
+        if not self.current_labels:
+            DEBUG("No labels to select")
+            return
+            
+        bbox_ctrl = self.view.bbox_controller
+        if not bbox_ctrl:
+            DEBUG("No bbox controller available")
+            return
+            
+        # Find leftmost label (minimum cx_ratio)
+        leftmost_label = min(self.current_labels, key=lambda label: label.cx_ratio)
+        DEBUG("Found leftmost label with cx_ratio: {}", leftmost_label.cx_ratio)
+        
+        # Clear current selection
+        bbox_ctrl.clear_selection(self.current_labels)
+        
+        # Select the leftmost label
+        leftmost_label.set_selected(True)
+        bbox_ctrl.selected_label = leftmost_label
+        
+        # Update display
+        self.update_label_display()
+        self.view.update_selection_status_display(leftmost_label)
+        
+        # Get text from input box and trigger input enter
+        if self.view.input_box:
+            input_text = self.view.input_box.get().strip()
+            if input_text and input_text != "請輸入車牌號碼":
+                DEBUG("Triggering input enter with text: {}", input_text)
+                self.apply_input_text_to_labels(input_text)
+                self.view.window.focus_set()
+            else:
+                DEBUG("Input box is empty or has placeholder text")
+        else:
+            DEBUG("Input box not available")
+    
     def apply_input_text_to_labels(self, input_text):
         DEBUG("Current labels count : {}", len(self.current_labels))
 
@@ -976,9 +1035,7 @@ class Controller:
 
         if not char_handler.is_same_length_as_labels(class_ids, len(self.current_labels)):
             self.view.show_error("輸入長度與標籤數量不符，請重新輸入")
-
-            if hasattr(self.view, "clear_input_box"):
-                self.view.clear_input_box()
+            
             if hasattr(self.view, "focus_input_box"):
                 self.view.focus_input_box()
                 
@@ -1138,6 +1195,122 @@ class Controller:
                 ERROR("Settings dialog not implemented in view")
         except Exception as e:
             ERROR("Error handling configuration button: {}", e)
+    
+    def show_timer_setup_dialog(self):
+        """Show timer setup dialog and start timer if confirmed"""
+        try:
+            from timer_dialog import TimerSetupDialog
+            
+            # Get timer default minutes from config
+            default_minutes = config_utils.get_timer_default_minutes()
+            if default_minutes is None:
+                default_minutes = 10  # Default to 10 minute
+            
+            # Create and show timer dialog
+            timer_dialog = TimerSetupDialog(self.view.window, default_minutes)
+            minutes = timer_dialog.show()
+            
+            if minutes is not None:
+                # Start timer with selected minutes
+                self.start_timer(minutes)
+                
+        except Exception as e:
+            ERROR("Error showing timer setup dialog: {}", e)
+    
+    def start_timer(self, minutes):
+        """Start the countdown timer"""
+        try:
+            self.timer_seconds_remaining = minutes * 60
+            self.timer_active = True
+            
+            # Start countdown
+            self.update_timer()
+            
+            INFO("Timer started for {} minutes", minutes)
+            
+            # Save timer settings to config
+            config_utils.save_timer_settings(default_minutes=minutes)
+            
+        except Exception as e:
+            ERROR("Error starting timer: {}", e)
+    
+    def update_timer(self):
+        """Update the timer countdown"""
+        if self.timer_active and self.timer_seconds_remaining > 0:
+            # Update display
+            minutes = self.timer_seconds_remaining // 60
+            seconds = self.timer_seconds_remaining % 60
+            time_text = f"{minutes:02d}:{seconds:02d}"
+            
+            # Determine color based on remaining time
+            if self.timer_seconds_remaining <= 60:
+                color = "red"
+            elif self.timer_seconds_remaining <= 180:
+                color = "orange"
+            else:
+                color = "blue"
+            
+            # Update timer display
+            if hasattr(self.view, 'update_timer_display'):
+                self.view.update_timer_display(time_text, color)
+            
+            # Decrement timer
+            self.timer_seconds_remaining -= 1
+            
+            # Schedule next update
+            self.timer_id = self.view.window.after(1000, self.update_timer)
+            
+        elif self.timer_active and self.timer_seconds_remaining == 0:
+            # Timer finished
+            self.timer_finished()
+    
+    def stop_timer(self):
+        """Stop the countdown timer"""
+        try:
+            self.timer_active = False
+            
+            # Cancel scheduled update
+            if self.timer_id:
+                self.view.window.after_cancel(self.timer_id)
+                self.timer_id = None
+            
+            # Clear timer display
+            if hasattr(self.view, 'update_timer_display'):
+                self.view.update_timer_display("", "blue")
+            
+            INFO("Timer stopped")
+            
+        except Exception as e:
+            ERROR("Error stopping timer: {}", e)
+    
+    def timer_finished(self):
+        """Handle timer finished event"""
+        try:
+            self.timer_active = False
+            
+            # Clear timer display
+            if hasattr(self.view, 'update_timer_display'):
+                self.view.update_timer_display("時間到！", "red")
+            
+            # Show notification
+            messagebox.showinfo(
+                "休息時間", 
+                "標註時間到了！\n請休息一下，保護眼睛！",
+                parent=self.view.window
+            )
+            
+            # Clear display after notification
+            if hasattr(self.view, 'update_timer_display'):
+                self.view.update_timer_display("", "blue")
+            
+            INFO("Timer finished - notification shown")
+            
+            # Auto-restart timer setup after break if enabled
+            if config_utils.get_timer_enabled():
+                self.show_timer_setup_dialog()
+            
+        except Exception as e:
+            ERROR("Error handling timer finished: {}", e)
     
     def handle_settings_confirm(self, event_data):
         """Handle settings dialog confirmation"""

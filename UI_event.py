@@ -29,7 +29,9 @@ class UIEvent(Enum):
     CONFIGURATION_BT_CLICK = auto()
     CLASS_ID_CHANGE = auto()
     INPUT_ENTER = auto()
+    SELECT_LEFTMOST_BBOX = auto()
     BATCH_SORT = auto()
+    TIMER_BT_CLICK = auto()
     
     # Settings dialog events
     SETTINGS_DIALOG_CONFIRM = auto()
