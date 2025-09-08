@@ -2311,15 +2311,27 @@ class UI:
         """Show a popup window with usage manual and version (styled like Configuration)"""
 
         manual_text = (
+            "【基本導航】\n"
             "← 上一張\n"
             "→ 下一張\n"
+            "Ctrl+F：開啟檔案搜尋\n"
+            "\n"
+            "【框選操作】\n"
             "滑鼠左鍵：選取box\n"
             "拖曳選中的box：移動box位置\n"
             "拖曳右下角灰色方塊：調整box大小\n"
             "滑鼠右鍵：刪除選中的box\n"
             "Delete鍵：刪除選中的box\n"
+            "\n"
+            "【繪製模式】\n"
             "Ctrl：切換繪框模式\n"
             "繪框模式下拖拽：繪製新box\n"
+            "\n"
+            "【輔助功能】\n"
+            "T：快速校正車牌字元\n"
+            "Shift+C：裁切圖片（需啟用裁切功能）\n"
+            "右Ctrl（按住）：顯示放大鏡\n"
+            "\n"
             "※ 標籤會自動依位置排序\n"
         )
 
@@ -2331,7 +2343,7 @@ class UI:
 
         # === 建立固定大小對話框（同 Configuration 風格） ===
         dialog_width  = 450
-        dialog_height = 360
+        dialog_height = 480
 
         top = tk.Toplevel(self.window)
         top.title("Info")
