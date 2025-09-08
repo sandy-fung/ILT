@@ -976,9 +976,7 @@ class Controller:
 
         if not char_handler.is_same_length_as_labels(class_ids, len(self.current_labels)):
             self.view.show_error("輸入長度與標籤數量不符，請重新輸入")
-
-            if hasattr(self.view, "clear_input_box"):
-                self.view.clear_input_box()
+            
             if hasattr(self.view, "focus_input_box"):
                 self.view.focus_input_box()
                 
