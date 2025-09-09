@@ -2567,6 +2567,9 @@ class UI:
             self.dispatch(UIEvent.DELETE_KEY, {"value": event})
     
     def on_t_key(self, event):
+        if self.input_box and self.window.focus_get() is self.input_box:
+            return
+        
         DEBUG("on_t_key - Quick correction hotkey pressed")
         if self.dispatch:
             self.dispatch(UIEvent.SELECT_LEFTMOST_BBOX, {})
