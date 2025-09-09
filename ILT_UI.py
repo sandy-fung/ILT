@@ -2307,7 +2307,7 @@ class UI:
             "拖曳選中的box：移動box位置\n"
             "拖曳選中的box邊框：調整box大小\n"
             "滑鼠右鍵：刪除選中的box\n"
-            "Delete鍵：刪除選中的box\n"
+            "D：刪除選中的box\n"
             "\n"
             "【繪製模式】\n"
             "Ctrl：切換繪框模式\n"
@@ -2561,10 +2561,13 @@ class UI:
         if self.dispatch:
             self.dispatch(UIEvent.WINDOW_POSITION, {})
 
-    def on_delete_key(self, event):
-        DEBUG("on_delete_key")
+    def on_d_key(self, event):
+        if self.input_box and self.window.focus_get() is self.input_box:
+            return
+        
+        DEBUG("on_d_key")
         if self.dispatch:
-            self.dispatch(UIEvent.DELETE_KEY, {"value": event})
+            self.dispatch(UIEvent.D_KEY, {"value": event})
     
     def on_t_key(self, event):
         DEBUG("on_t_key - Quick correction hotkey pressed")
@@ -3005,8 +3008,9 @@ class UI:
         #Windows changes posiotion or size
         self.window.bind("<Configure>", self.on_win_configure)
 
-        # Delete key event binding
-        self.window.bind("<Delete>", self.on_delete_key)
+        # Delete hotkey (D key)
+        self.window.bind("<d>", self.on_d_key)
+        self.window.bind("<D>", self.on_d_key)
 
         self.window.bind("<Button-1>", self._clear_focus)
         
@@ -3056,10 +3060,8 @@ class UI:
     
     def delete_from_context_menu(self):
         """從右鍵菜單觸發刪除"""
-        # 顯示確認對話框
-        result = messagebox.askyesno("Delete", "Delete selected box?")
-        if result and self.dispatch:
-            self.dispatch(UIEvent.DELETE_KEY, {"value": None})
+        if self.dispatch:
+            self.dispatch(UIEvent.D_KEY, {"value": None})
     
     def cancel_current_drawing(self):
         """Cancel current drawing"""

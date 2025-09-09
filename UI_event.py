@@ -15,7 +15,7 @@ class UIEvent(Enum):
 
     DRAWING_MODE_TOGGLE = auto()
 
-    DELETE_KEY = auto()
+    D_KEY = auto()
     DELETE_IMAGE = auto()
     MOVE_IMAGE = auto()
     MOVE_IMAGE_CLASSIFIED = auto()
