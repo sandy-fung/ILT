@@ -425,8 +425,8 @@ class Controller:
             self.handle_mouse_drag(event_data)
 
 
-        elif event_type == UIEvent.D_KEY:
-            DEBUG("Controller: D key pressed.")
+        elif event_type == UIEvent.DELETE_KEY:
+            DEBUG("Controller: Delete key pressed.")
             self.delete_selected_label()
 
         elif event_type == UIEvent.DELETE_IMAGE:
