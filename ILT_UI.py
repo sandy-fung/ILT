@@ -1947,6 +1947,9 @@ class UI:
 
     def set_image_context(self, ctx_dict):
         self._ctx = ctx_dict
+        # Pass context to bbox_controller for coordinate handling
+        if self.bbox_controller:
+            self.bbox_controller.set_image_context(ctx_dict)
 
 
     def draw_labels_on_canvas(self, labels):
@@ -1998,21 +2001,33 @@ class UI:
         ]
         
         for label in labels:
-            # Convert label coordinates to canvas pixel coordinates
-            x1, y1, x2, y2 = label_display_utils.convert_label_to_canvas_coords(
-                label, self.canvas_width, self.canvas_height
-            )
-            
-            # Check if bbox width is below threshold for warning (highest priority)
+            # Get context for coordinate conversion
             if not self._ctx:
                 img_w = self.canvas_width
                 img_h = self.canvas_height
                 sx = sy = 1.0
                 ox = oy = 0.0
+                disp_w = self.canvas_width
+                disp_h = self.canvas_height
             else:
                 img_w = self._ctx["img_w"]; img_h = self._ctx["img_h"]
                 sx    = self._ctx["sx"];    sy    = self._ctx["sy"]
                 ox    = self._ctx["ox"];    oy    = self._ctx["oy"]
+                disp_w = self._ctx["disp_w"]
+                disp_h = self._ctx["disp_h"]
+
+            # Convert label coordinates to canvas pixel coordinates
+            # Use display dimensions for the actual image area (not full canvas)
+            x1, y1, x2, y2 = label_display_utils.convert_label_to_canvas_coords(
+                label, disp_w, disp_h
+            )
+
+            # Apply offset for black borders
+            x1 += ox
+            y1 += oy
+            x2 += ox
+            y2 += oy
+
             actual_bbox_width  = int(label.w_ratio * img_w)
             actual_bbox_height = int(label.h_ratio * img_h)
 

@@ -178,13 +178,21 @@ class Controller:
             ERROR("Failed to get canvas size.")
             return
 
-        resized = image_utils.resize_image(self.original_image, (canvas_width, canvas_height))
-        disp_w, disp_h = resized.size
-        ox = (canvas_width  - disp_w) / 2.0
-        oy = (canvas_height - disp_h) / 2.0
+        # Use aspect ratio preserving resize
+        resized, actual_rect = image_utils.resize_image_aspect_ratio(
+            self.original_image, (canvas_width, canvas_height)
+        )
+
+        # Extract actual image area information
+        disp_w = actual_rect['width']
+        disp_h = actual_rect['height']
+        ox = actual_rect['x']
+        oy = actual_rect['y']
+
         W, H = self.original_image.size
         sx = float(disp_w) / float(W) if W else 1.0
         sy = float(disp_h) / float(H) if H else 1.0
+
         self.image = image_utils.convert_to_tk(resized)
 
         if hasattr(self.view, "set_image_context"):
@@ -522,9 +530,8 @@ class Controller:
         if bbox_controller and bbox_controller.get_selected_label():
             # 如果有選中的標籤，檢查右鍵是否點擊在選中的標籤上
             selected_label = bbox_controller.get_selected_label()
-            canvas_width = self.view.get_canvas_size()[1]
-            canvas_height = self.view.get_canvas_size()[0]
-            if selected_label.contains(event.x, event.y, canvas_width, canvas_height):
+            # 使用已修正的 _label_contains_point 方法，它會正確處理黑邊偏移
+            if bbox_controller._label_contains_point(selected_label, event.x, event.y):
                 # 顯示右鍵菜單
                 if hasattr(self.view, 'show_context_menu'):
                     self.view.show_context_menu(event)

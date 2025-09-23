@@ -12,7 +12,10 @@ class BBoxController:
         self.canvas = canvas
         self.drawing_mode = False
         self.is_drawing = False
-        
+
+        # Image context for coordinate conversion
+        self._ctx = None
+
         # Drawing state variables
         self.draw_start_x = 0
         self.draw_start_y = 0
@@ -65,11 +68,43 @@ class BBoxController:
         self.crosshair_horizontal_id = None
         self.crosshair_visible = False
 
+    def set_image_context(self, ctx):
+        """Set image context for coordinate conversion"""
+        self._ctx = ctx
+        DEBUG("BBoxController: Image context updated: {}", ctx if ctx else "None")
+
+    def _is_within_image_area(self, x, y):
+        """Check if coordinates are within actual image area (excluding black borders)"""
+        if not self._ctx:
+            return True  # If no context, assume all canvas is valid
+
+        ox = self._ctx.get("ox", 0)
+        oy = self._ctx.get("oy", 0)
+        disp_w = self._ctx.get("disp_w", self.canvas.winfo_width())
+        disp_h = self._ctx.get("disp_h", self.canvas.winfo_height())
+
+        return ox <= x <= ox + disp_w and oy <= y <= oy + disp_h
+
+    def _clamp_to_image_area(self, x, y):
+        """Clamp coordinates to actual image area"""
+        if not self._ctx:
+            return x, y
+
+        ox = self._ctx.get("ox", 0)
+        oy = self._ctx.get("oy", 0)
+        disp_w = self._ctx.get("disp_w", self.canvas.winfo_width())
+        disp_h = self._ctx.get("disp_h", self.canvas.winfo_height())
+
+        x = max(ox, min(x, ox + disp_w))
+        y = max(oy, min(y, oy + disp_h))
+
+        return x, y
+
     def toggle_drawing_mode(self):
         """Toggle drawing mode"""
         self.drawing_mode = not self.drawing_mode
         DEBUG("Drawing mode toggled to: {}", self.drawing_mode)
-        
+
         # Update cursor style
         if self.drawing_mode:
             self.canvas.config(cursor="pencil")
@@ -77,7 +112,7 @@ class BBoxController:
             self.canvas.config(cursor="arrow")
             # Hide crosshair lines when exiting drawing mode
             self.hide_crosshair_lines()
-            
+
         return self.drawing_mode
 
     def is_in_drawing_mode(self):
@@ -88,7 +123,12 @@ class BBoxController:
         """Start drawing bounding box"""
         if not self.drawing_mode:
             return False
-            
+
+        # Check if click is within actual image area
+        if not self._is_within_image_area(x, y):
+            DEBUG("Click outside image area at ({}, {}), ignoring", x, y)
+            return False
+
         self.is_drawing = True
         self.draw_start_x = x
         self.draw_start_y = y
@@ -99,12 +139,15 @@ class BBoxController:
         """Update preview box display"""
         if not self.is_drawing:
             return
-            
+
+        # Clamp coordinates to image area
+        x, y = self._clamp_to_image_area(x, y)
+
         # Clear previous preview boxes
         if self.current_preview_id:
             self.canvas.delete(self.current_preview_id)
         self.canvas.delete("reference_box")  # Clear old reference box
-        
+
         # Draw new preview box (cyan)
         self.current_preview_id = self.canvas.create_rectangle(
             self.draw_start_x, self.draw_start_y, x, y,
@@ -152,9 +195,12 @@ class BBoxController:
         """Complete drawing and return result"""
         if not self.is_drawing:
             return None
-            
+
+        # Clamp end point to image area
+        x, y = self._clamp_to_image_area(x, y)
+
         self.is_drawing = False
-        
+
         # Clear preview box and reference box
         if self.current_preview_id:
             self.canvas.delete(self.current_preview_id)
@@ -178,22 +224,27 @@ class BBoxController:
         # Get canvas dimensions
         canvas_width = self.canvas.winfo_width()
         canvas_height = self.canvas.winfo_height()
-        
+
         # Check if width meets threshold requirement (only for new bbox creation)
         if hasattr(self, 'show_bbox_dimensions') and self.show_bbox_dimensions:
             if hasattr(self, 'min_width_threshold'):
-                # Get original image width
+                # Get original image width and display width from context
                 original_width = getattr(self, 'original_image_width', 1920)
-                
+                if self._ctx:
+                    disp_w = self._ctx.get("disp_w", canvas_width)
+                else:
+                    disp_w = canvas_width
+
                 # Calculate actual width in original pixels
-                actual_width_pixels = width * (original_width / canvas_width)
-                
+                # width is in canvas pixels, convert to original image pixels
+                actual_width_pixels = width * (original_width / disp_w)
+
                 # Cancel if width is below threshold
                 if actual_width_pixels < self.min_width_threshold:
-                    DEBUG("Box width {} pixels below threshold {}, cancelled", 
+                    DEBUG("Box width {} pixels below threshold {}, cancelled",
                           int(actual_width_pixels), self.min_width_threshold)
                     return None
-        
+
         # Calculate YOLO format coordinates
         yolo_coords = self.calculate_yolo_format(x1, y1, x2, y2, canvas_width, canvas_height)
         
@@ -211,12 +262,34 @@ class BBoxController:
     def calculate_yolo_format(self, x1, y1, x2, y2, canvas_w, canvas_h):
         """
         Calculate YOLO format coordinates (center_x, center_y, width_ratio, height_ratio)
-        Convert YOLO coordinates to canvas pixel coordinates
+        Convert canvas coordinates to YOLO format, accounting for black borders
         """
-        cx = (x1 + x2) / 2 / canvas_w
-        cy = (y1 + y2) / 2 / canvas_h
-        w_ratio = abs(x2 - x1) / canvas_w
-        h_ratio = abs(y2 - y1) / canvas_h
+        # Get image context for proper coordinate conversion
+        if self._ctx:
+            ox = self._ctx.get("ox", 0)
+            oy = self._ctx.get("oy", 0)
+            disp_w = self._ctx.get("disp_w", canvas_w)
+            disp_h = self._ctx.get("disp_h", canvas_h)
+
+            # Convert canvas coordinates to image area coordinates
+            # Subtract offset to get coordinates relative to actual image area
+            img_x1 = x1 - ox
+            img_y1 = y1 - oy
+            img_x2 = x2 - ox
+            img_y2 = y2 - oy
+
+            # Calculate YOLO format based on actual image dimensions
+            cx = (img_x1 + img_x2) / 2 / disp_w
+            cy = (img_y1 + img_y2) / 2 / disp_h
+            w_ratio = abs(img_x2 - img_x1) / disp_w
+            h_ratio = abs(img_y2 - img_y1) / disp_h
+        else:
+            # Fallback to original calculation if no context
+            cx = (x1 + x2) / 2 / canvas_w
+            cy = (y1 + y2) / 2 / canvas_h
+            w_ratio = abs(x2 - x1) / canvas_w
+            h_ratio = abs(y2 - y1) / canvas_h
+
         return cx, cy, w_ratio, h_ratio
 
     def cancel_drawing(self):
@@ -353,21 +426,35 @@ class BBoxController:
     def get_label_edge_type(self, x, y, label):
         """
         Get edge type for a specific label
-        
+
         Args:
-            x, y (float): Point coordinates
+            x, y (float): Point coordinates (canvas coordinates)
             label (LabelObject): Label object to check
-            
+
         Returns:
             str: Edge type or None
         """
-        canvas_width = self.canvas.winfo_width()
-        canvas_height = self.canvas.winfo_height()
-        
-        # Convert label to canvas coordinates
+        # Get actual image dimensions and offset from context
+        if self._ctx:
+            disp_w = self._ctx.get("disp_w", self.canvas.winfo_width())
+            disp_h = self._ctx.get("disp_h", self.canvas.winfo_height())
+            ox = self._ctx.get("ox", 0)
+            oy = self._ctx.get("oy", 0)
+        else:
+            disp_w = self.canvas.winfo_width()
+            disp_h = self.canvas.winfo_height()
+            ox = oy = 0
+
+        # Convert label to canvas coordinates using actual image dimensions
         x1, y1, x2, y2 = label_display_utils.convert_label_to_canvas_coords(
-            label, canvas_width, canvas_height)
-        
+            label, disp_w, disp_h)
+
+        # Apply offset for black borders
+        x1 += ox
+        y1 += oy
+        x2 += ox
+        y2 += oy
+
         return self._get_edge_type(x, y, x1, y1, x2, y2)
 
     def get_cursor_for_edge_type(self, edge_type):
@@ -441,12 +528,12 @@ class BBoxController:
     def handle_selection(self, x, y, labels):
         """
         處理點擊選擇邏輯，最上層標籤優先
-        
+
         Args:
-            x (float): 點擊的 x 座標
-            y (float): 點擊的 y 座標
+            x (float): 點擊的 x 座標 (canvas 像素)
+            y (float): 點擊的 y 座標 (canvas 像素)
             labels (list): LabelObject 列表
-            
+
         Returns:
             LabelObject or None: 選中的標籤對象，未選中時返回 None
         """
@@ -454,24 +541,21 @@ class BBoxController:
         if self.drawing_mode:
             DEBUG("Selection disabled in drawing mode")
             return None
-            
-        canvas_width = self.canvas.winfo_width()
-        canvas_height = self.canvas.winfo_height()
-        
+
         # Check from top layer (last drawn) first
         for label in reversed(labels):
-            if label.contains(x, y, canvas_width, canvas_height):
+            if self._label_contains_point(label, x, y):
                 # 清除所有標籤的選中狀態
                 self.clear_selection(labels)
-                
+
                 # 設定當前標籤為選中
                 label.set_selected(True)
                 self.selected_label = label
-                
-                DEBUG("Selected label: class_id={}, coords=({:.3f}, {:.3f}, {:.3f}, {:.3f})", 
+
+                DEBUG("Selected label: class_id={}, coords=({:.3f}, {:.3f}, {:.3f}, {:.3f})",
                       label.class_id, label.cx_ratio, label.cy_ratio, label.w_ratio, label.h_ratio)
                 return label
-        
+
         # Clear selection if no label was clicked
         self.clear_selection(labels)
         return None
@@ -498,15 +582,50 @@ class BBoxController:
         """
         return self.selected_label
 
+    def _label_contains_point(self, label, x, y):
+        """
+        Check if a point is inside a label's bounding box
+
+        Args:
+            label (LabelObject): Label to check
+            x, y (float): Point coordinates (canvas coordinates)
+
+        Returns:
+            bool: True if point is inside label
+        """
+        # Get actual image dimensions and offset from context
+        if self._ctx:
+            disp_w = self._ctx.get("disp_w", self.canvas.winfo_width())
+            disp_h = self._ctx.get("disp_h", self.canvas.winfo_height())
+            ox = self._ctx.get("ox", 0)
+            oy = self._ctx.get("oy", 0)
+        else:
+            disp_w = self.canvas.winfo_width()
+            disp_h = self.canvas.winfo_height()
+            ox = oy = 0
+
+        # Convert label to canvas coordinates using actual image dimensions
+        x1, y1, x2, y2 = label_display_utils.convert_label_to_canvas_coords(
+            label, disp_w, disp_h)
+
+        # Apply offset for black borders
+        x1 += ox
+        y1 += oy
+        x2 += ox
+        y2 += oy
+
+        # Check if point is inside rectangle
+        return x1 <= x <= x2 and y1 <= y <= y2
+
     def start_drag(self, x, y, labels):
         """
         初始化拖曳操作
-        
+
         Args:
             x (float): 拖曳起始 X 座標 (canvas 像素)
-            y (float): 拖曳起始 Y 座標 (canvas 像素)  
+            y (float): 拖曳起始 Y 座標 (canvas 像素)
             labels (list): LabelObject 列表
-            
+
         Returns:
             bool: 是否成功開始拖曳
         """
@@ -514,50 +633,55 @@ class BBoxController:
         if self.drawing_mode:
             DEBUG("Dragging disabled in drawing mode")
             return False
-            
+
         # 檢查是否有選中的標籤且點擊在其內部
-        if self.selected_label and self.selected_label.contains(x, y, 
-                                                               self.canvas.winfo_width(), 
-                                                               self.canvas.winfo_height()):
+        if self.selected_label and self._label_contains_point(self.selected_label, x, y):
             self.is_dragging = True
             self.dragging_label = self.selected_label
             self.drag_start_x = x
             self.drag_start_y = y
-            
+
             # 更改光標樣式
             self.canvas.config(cursor="fleur")
-            
-            DEBUG("Started dragging label: class_id={}, coords=({:.3f}, {:.3f}, {:.3f}, {:.3f})", 
-                  self.dragging_label.class_id, self.dragging_label.cx_ratio, 
+
+            DEBUG("Started dragging label: class_id={}, coords=({:.3f}, {:.3f}, {:.3f}, {:.3f})",
+                  self.dragging_label.class_id, self.dragging_label.cx_ratio,
                   self.dragging_label.cy_ratio, self.dragging_label.w_ratio, self.dragging_label.h_ratio)
             return True
-        
+
         return False
 
     def update_drag(self, x, y):
         """
         處理拖曳移動
-        
+
         Args:
             x (float): 當前 X 座標 (canvas 像素)
             y (float): 當前 Y 座標 (canvas 像素)
         """
         if not self.is_dragging or not self.dragging_label:
             return
-            
+
+        # Clamp coordinates to image area
+        x, y = self._clamp_to_image_area(x, y)
+
         # 計算位移量
         dx = x - self.drag_start_x
         dy = y - self.drag_start_y
-        
+
         if dx == 0 and dy == 0:
             return
-            
-        # 獲取 canvas 尺寸
-        canvas_width = self.canvas.winfo_width()
-        canvas_height = self.canvas.winfo_height()
-        
-        # 移動標籤 (使用 canvas 像素增量)
-        self.dragging_label.move_by_canvas_delta(dx, dy, canvas_width, canvas_height)
+
+        # Get actual image dimensions from context
+        if self._ctx:
+            disp_w = self._ctx.get("disp_w", self.canvas.winfo_width())
+            disp_h = self._ctx.get("disp_h", self.canvas.winfo_height())
+        else:
+            disp_w = self.canvas.winfo_width()
+            disp_h = self.canvas.winfo_height()
+
+        # 移動標籤 (使用實際圖片尺寸而非canvas尺寸)
+        self.dragging_label.move_by_canvas_delta(dx, dy, disp_w, disp_h)
         
         # 更新拖曳起始位置
         self.drag_start_x = x
@@ -602,30 +726,40 @@ class BBoxController:
     def update_resize(self, x, y):
         """
         處理 resize 移動
-        
+
         Args:
             x (float): 當前 X 座標 (canvas 像素)
             y (float): 當前 Y 座標 (canvas 像素)
         """
         if not self.is_resizing or not self.resizing_label:
             return
-            
+
+        # Clamp coordinates to image area
+        x, y = self._clamp_to_image_area(x, y)
+
         # Clear old reference box
         self.canvas.delete("resize_reference_box")
-            
+
         # 計算位移量
         dx = x - self.resize_start_x
         dy = y - self.resize_start_y
-        
+
         # 更新起始位置
         self.resize_start_x, self.resize_start_y = x, y
-        
-        # 獲取 canvas 尺寸
-        canvas_width = self.canvas.winfo_width()
-        canvas_height = self.canvas.winfo_height()
-        
-        # 使用 resize_by_delta 方法調整大小，傳入 handle 類型
-        self.resizing_label.resize_by_delta(dx, dy, canvas_width, canvas_height, self.resize_handle_type)
+
+        # Get actual image dimensions from context
+        if self._ctx:
+            disp_w = self._ctx.get("disp_w", self.canvas.winfo_width())
+            disp_h = self._ctx.get("disp_h", self.canvas.winfo_height())
+            ox = self._ctx.get("ox", 0)
+            oy = self._ctx.get("oy", 0)
+        else:
+            disp_w = self.canvas.winfo_width()
+            disp_h = self.canvas.winfo_height()
+            ox = oy = 0
+
+        # 使用 resize_by_delta 方法調整大小，使用實際圖片尺寸
+        self.resizing_label.resize_by_delta(dx, dy, disp_w, disp_h, self.resize_handle_type)
         
         # Check if we need to show reference box during resize
         if hasattr(self, 'show_bbox_dimensions') and self.show_bbox_dimensions:
@@ -638,15 +772,15 @@ class BBoxController:
                 
                 # Only show reference box when width is insufficient
                 if actual_bbox_width < self.min_width_threshold:
-                    # Calculate box position on canvas
-                    x1 = (self.resizing_label.cx_ratio - self.resizing_label.w_ratio/2) * canvas_width
-                    y1 = (self.resizing_label.cy_ratio - self.resizing_label.h_ratio/2) * canvas_height
-                    y2 = (self.resizing_label.cy_ratio + self.resizing_label.h_ratio/2) * canvas_height
-                    
+                    # Calculate box position on canvas (with offset)
+                    x1 = (self.resizing_label.cx_ratio - self.resizing_label.w_ratio/2) * disp_w + ox
+                    y1 = (self.resizing_label.cy_ratio - self.resizing_label.h_ratio/2) * disp_h + oy
+                    y2 = (self.resizing_label.cy_ratio + self.resizing_label.h_ratio/2) * disp_h + oy
+
                     # Calculate reference width in canvas pixels
-                    ref_width_canvas = self.min_width_threshold * (canvas_width / original_width)
+                    ref_width_canvas = self.min_width_threshold * (disp_w / original_width)
                     ref_x2 = x1 + ref_width_canvas
-                    
+
                     # Draw yellow dashed reference box
                     self.canvas.create_rectangle(
                         x1, y1, ref_x2, y2,

@@ -42,6 +42,58 @@ def resize_image(image_pil, size):
     DEBUG("Image resized to: {}", size)
     return rsz_image
 
+def resize_image_aspect_ratio(image_pil, canvas_size):
+    """
+    Resize image maintaining aspect ratio and add black borders
+
+    Args:
+        image_pil: PIL Image object
+        canvas_size: tuple (width, height) of target canvas
+
+    Returns:
+        tuple: (resized_image, actual_image_rect)
+            - resized_image: PIL Image with black borders
+            - actual_image_rect: dict with keys 'x', 'y', 'width', 'height'
+                                representing actual image area in canvas
+    """
+    canvas_width, canvas_height = canvas_size
+    img_width, img_height = image_pil.size
+
+    # Calculate scale to fit image in canvas while maintaining aspect ratio
+    scale_x = canvas_width / img_width
+    scale_y = canvas_height / img_height
+    scale = min(scale_x, scale_y)
+
+    # Calculate new dimensions
+    new_width = int(img_width * scale)
+    new_height = int(img_height * scale)
+
+    # Resize image
+    resized = image_pil.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+    # Create black canvas
+    result = Image.new('RGB', (canvas_width, canvas_height), color='black')
+
+    # Calculate position to center the image
+    x_offset = (canvas_width - new_width) // 2
+    y_offset = (canvas_height - new_height) // 2
+
+    # Paste resized image onto black canvas
+    result.paste(resized, (x_offset, y_offset))
+
+    # Return image and actual image area information
+    actual_rect = {
+        'x': x_offset,
+        'y': y_offset,
+        'width': new_width,
+        'height': new_height
+    }
+
+    DEBUG("Image resized with aspect ratio: original {}x{}, new {}x{}, offset ({}, {})",
+          img_width, img_height, new_width, new_height, x_offset, y_offset)
+
+    return result, actual_rect
+
 def convert_to_tk(rsz_image):
     tk_image = ImageTk.PhotoImage(rsz_image)
     return tk_image
