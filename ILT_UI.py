@@ -1882,9 +1882,11 @@ class UI:
         self.canvas_height = self.canvas.winfo_height()
         self.canvas_width = self.canvas.winfo_width()
         DEBUG("Canvas size: height: {}, width: {}", self.canvas_height, self.canvas_width)
-        if self.canvas_height == 0 or self.canvas_width == 0:
+        # Ensure minimum canvas size to prevent resize errors
+        if self.canvas_height <= 10 or self.canvas_width <= 10:
             self.canvas_height = 720
             self.canvas_width = 1920
+            DEBUG("Canvas too small, using default size: {}x{}", self.canvas_width, self.canvas_height)
         return self.canvas_height, self.canvas_width
     
     def on_canvas_resize(self, event):

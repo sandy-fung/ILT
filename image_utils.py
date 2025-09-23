@@ -64,9 +64,9 @@ def resize_image_aspect_ratio(image_pil, canvas_size):
     scale_y = canvas_height / img_height
     scale = min(scale_x, scale_y)
 
-    # Calculate new dimensions
-    new_width = int(img_width * scale)
-    new_height = int(img_height * scale)
+    # Calculate new dimensions (ensure minimum size of 1)
+    new_width = max(1, int(img_width * scale))
+    new_height = max(1, int(img_height * scale))
 
     # Resize image
     resized = image_pil.resize((new_width, new_height), Image.Resampling.LANCZOS)
