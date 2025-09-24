@@ -55,38 +55,45 @@ def search_image_by_filename(images, filename):
 def get_original_filename_from_crop(crop_stem: str) -> str:
     """
     從crop檔案名稱推導原始檔案名稱
-    
+
     Args:
         crop_stem: crop檔案的stem (無副檔名)
+        例如: "frame_0000_crop_00" -> "frame_0000"
         例如: "3109Q_frame_20250624_072650_00000001_1" -> "frame_20250624_072650_00000001"
         例如: "227103_output_20250726_091833A_20250728_140924_235_0" -> "output_20250726_091833A_20250728_140924_235"
-    
+
     Returns:
         str: 原始檔案名稱
     """
+    def handle_plate_prefix(stem):
+        """處理車牌號前綴的內部函數"""
+        # 識別並移除車牌號前綴
+        # 車牌號模式：在 frame_ 或 output_ 之前的字母數字組合
+        if '_frame_' in stem:
+            # 例：3109Q_frame_xxx → frame_xxx
+            idx = stem.find('_frame_')
+            if idx > 0:
+                return stem[idx+1:]  # 從 frame_ 開始保留
+        elif '_output_' in stem:
+            # 例：227103_output_xxx → output_xxx
+            idx = stem.find('_output_')
+            if idx > 0:
+                return stem[idx+1:]  # 從 output_ 開始保留
+        return stem
+
     # 首先處理 _crop_ 模式
     if '_crop_' in crop_stem:
         crop_stem = crop_stem.split('_crop_')[0]
-    
-    # 移除末尾的 _數字 (如 _0, _1 等)
+        # 直接處理車牌號前綴並返回，不執行移除末尾數字
+        return handle_plate_prefix(crop_stem)
+
+    # 沒有 _crop_ 的情況才移除末尾數字 (如 _0, _1 等)
     parts = crop_stem.rsplit('_', 1)
     if len(parts) > 1 and parts[1].isdigit():
         crop_stem = parts[0]
-    
-    # 識別並移除車牌號前綴
-    # 車牌號模式：在 frame_ 或 output_ 之前的字母數字組合
-    if '_frame_' in crop_stem:
-        # 例：3109Q_frame_xxx → frame_xxx
-        idx = crop_stem.find('_frame_')
-        if idx > 0:
-            return crop_stem[idx+1:]  # 從 frame_ 開始保留
-    elif '_output_' in crop_stem:
-        # 例：227103_output_xxx → output_xxx
-        idx = crop_stem.find('_output_')
-        if idx > 0:
-            return crop_stem[idx+1:]  # 從 output_ 開始保留
-    
-    return crop_stem
+
+    # 處理車牌號前綴
+    return handle_plate_prefix(crop_stem)
 
 def find_original_image_path(crop_image_path: str) -> str:
     """
