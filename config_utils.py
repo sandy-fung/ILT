@@ -370,3 +370,30 @@ def get_all_ui_settings():
         'min_bbox_width_threshold': get_min_bbox_width_threshold()
     }
 
+def get_recent_plates():
+    """Get recent plates from config"""
+    try:
+        plates_str = config.get("PlateMemory", "recent_plates")
+        if plates_str.strip():
+            return [plate.strip() for plate in plates_str.split(",") if plate.strip()]
+        return []
+    except:
+        return []
+
+def save_recent_plates(plates_list):
+    """Save recent plates to config"""
+    try:
+        if not config.has_section("PlateMemory"):
+            config.add_section("PlateMemory")
+
+        # Convert list to comma-separated string
+        plates_str = ",".join(plates_list)
+        config.set("PlateMemory", "recent_plates", plates_str)
+
+        with open(DEFAULT_CONFI_PATH, "w") as f:
+            config.write(f)
+        return True
+    except Exception as e:
+        ERROR("Failed to save recent plates: {}", e)
+        return False
+

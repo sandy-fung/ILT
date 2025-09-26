@@ -1034,7 +1034,11 @@ class Controller:
 
                     self.save_current_labels()
                     self.update_label_display()
-                
+
+                # Add to plate memory after successful application
+                if hasattr(self.view, 'add_plate_to_memory_from_controller'):
+                    self.view.add_plate_to_memory_from_controller(input_text)
+
                 return
 
             except ValueError:
@@ -1056,6 +1060,10 @@ class Controller:
 
         self.save_current_labels()
         self.update_label_display()
+
+        # Add to plate memory after successful application
+        if hasattr(self.view, 'add_plate_to_memory_from_controller'):
+            self.view.add_plate_to_memory_from_controller(input_text)
 
     def move_selected_image_and_label(self, destination, plate_type=None): 
         if self.image_index < len(self.images_path):

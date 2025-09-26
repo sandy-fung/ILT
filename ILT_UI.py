@@ -15,6 +15,7 @@ from constants import VERSION_NUM
 from constants import CLASS_ID_COLOR_MAP
 from tkinter import ttk
 from DragableVerticalLine import DraggableVerticalLine
+from collections import deque
 
 DEFAULT_W = 1920
 DEFAULT_H = 1080
@@ -68,6 +69,14 @@ class UI:
         self.SHOW_BBOX_DIMENSIONS = config_utils.get_show_bbox_dimensions()
         self.MIN_BBOX_WIDTH_THRESHOLD = config_utils.get_min_bbox_width_threshold()
         self.LABEL_FONT_SIZE = config_utils.get_ui_label_font_size_in_config()
+
+        # Initialize plate memory
+        self.recent_plates = deque(maxlen=5)
+        self.plate_memory_frame = None
+        self.plate_memory_buttons = []
+
+        # Load existing plate memory from config
+        self.load_plate_memory_from_config()
 
         self.setup_ui()
         self.setup_events()
@@ -325,9 +334,17 @@ class UI:
             self.input_box.bind("<Return>", self.input_enter)
             self.input_box.bind("<KeyRelease>", self.force_uppercase)
 
+            # Initialize plate memory frame
+            self.plate_memory_frame = tk.Frame(self.text_frame, bg="#FAFAFA")
+            self.plate_memory_frame.pack(side="top", fill="x", padx=20, pady=(0, 10))
+
+            # Update plate memory buttons on startup
+            self.update_plate_memory_buttons()
+
         else:
             DEBUG("Input box is not shown as per configuration.")
             self.input_box = None
+            self.plate_memory_frame = None
 
         # Initialize text box if enabled
         if self.SHOW_TEXT_BOX:
@@ -2271,6 +2288,8 @@ class UI:
             input_text = self.input_box.get().strip()
             if input_text:
                 DEBUG("Input text: {}", input_text)
+                # Add to plate memory
+                self.add_to_plate_memory(input_text)
                 self.dispatch(UIEvent.INPUT_ENTER, {"text": input_text})
                 self.window.focus_set()
             else:
@@ -2293,6 +2312,104 @@ class UI:
         if not self.input_box.get():
             self.input_box.insert(0, "請輸入車牌號碼")
             self.input_box.config(fg = "#8E8E79")
+
+    def add_to_plate_memory(self, plate_text):
+        """Add a plate to memory and update button display"""
+        if not plate_text or plate_text == "請輸入車牌號碼":
+            return
+
+        plate_text = plate_text.strip().upper()
+        if not plate_text:
+            return
+
+        # Remove if already exists to move it to front
+        if plate_text in self.recent_plates:
+            self.recent_plates.remove(plate_text)
+
+        # Add to front
+        self.recent_plates.appendleft(plate_text)
+        DEBUG("Added plate to memory: {}, total: {}", plate_text, len(self.recent_plates))
+
+        # Update button display
+        self.update_plate_memory_buttons()
+
+        # Save to config
+        self.save_plate_memory_to_config()
+
+    def update_plate_memory_buttons(self):
+        """Update the display of plate memory buttons"""
+        if not self.plate_memory_frame:
+            return
+
+        # Clear existing buttons
+        for button in self.plate_memory_buttons:
+            button.destroy()
+        self.plate_memory_buttons.clear()
+
+        # Create new buttons for each plate in memory
+        for plate_text in self.recent_plates:
+            btn = tk.Button(
+                self.plate_memory_frame,
+                text=plate_text,
+                font=("Segoe UI", 9),
+                bg="#E8E8E8",
+                fg="#2D2D2D",
+                relief="flat",
+                bd=1,
+                padx=8,
+                pady=2,
+                cursor="hand2",
+                command=lambda p=plate_text: self.on_memory_button_click(p)
+            )
+            btn.pack(side="left", padx=(0, 5))
+
+            # Add hover effects
+            def on_enter(e, button=btn):
+                button.config(bg="#D0D0D0")
+            def on_leave(e, button=btn):
+                button.config(bg="#E8E8E8")
+
+            btn.bind("<Enter>", on_enter)
+            btn.bind("<Leave>", on_leave)
+
+            self.plate_memory_buttons.append(btn)
+
+    def on_memory_button_click(self, plate_text):
+        """Handle clicking a plate memory button"""
+        if self.input_box:
+            # Clear current input and insert selected plate
+            self.input_box.delete(0, tk.END)
+            self.input_box.insert(0, plate_text)
+            self.input_box.config(fg="#2D2D2D")
+
+            # Focus the input box
+            self.input_box.focus_set()
+            DEBUG("Filled input box with plate from memory: {}", plate_text)
+
+    def add_plate_to_memory_from_controller(self, plate_text):
+        """Public method for Controller to add plates to memory"""
+        self.add_to_plate_memory(plate_text)
+
+    def load_plate_memory_from_config(self):
+        """Load plate memory from config file"""
+        try:
+            plates_list = config_utils.get_recent_plates()
+            # Add plates to deque in reverse order to maintain correct order
+            for plate in reversed(plates_list):
+                if plate:  # Only add non-empty plates
+                    self.recent_plates.appendleft(plate)
+            DEBUG("Loaded {} plates from config", len(self.recent_plates))
+        except Exception as e:
+            DEBUG("Failed to load plate memory from config: {}", e)
+
+    def save_plate_memory_to_config(self):
+        """Save current plate memory to config file"""
+        try:
+            plates_list = list(self.recent_plates)
+            config_utils.save_recent_plates(plates_list)
+            DEBUG("Saved {} plates to config", len(plates_list))
+        except Exception as e:
+            ERROR("Failed to save plate memory to config: {}", e)
 
     def  _on_copy_file_name_text(self, event):
         self.window.clipboard_clear()
