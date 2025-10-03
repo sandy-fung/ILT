@@ -3176,36 +3176,45 @@ class UI:
 
         # Bind each hotkey to its handler
         for action_key, hotkey in hotkeys.items():
-            if action_key in action_handlers and hotkey:
+            # Only bind if hotkey is not empty (skip empty or whitespace-only strings)
+            if action_key in action_handlers and hotkey and hotkey.strip():
                 handler = action_handlers[action_key]
-                self.window.bind(hotkey, handler)
+                try:
+                    self.window.bind(hotkey, handler)
 
-                # Special case for quick_correction: also bind uppercase
-                if action_key == 'quick_correction':
-                    # If it's a single letter key, also bind the uppercase version
-                    if hotkey.startswith('<') and hotkey.endswith('>'):
-                        key = hotkey[1:-1]  # Remove < and >
-                        if len(key) == 1 and key.isalpha():
-                            self.window.bind(f'<{key.upper()}>', handler)
+                    # Special case for quick_correction: also bind uppercase
+                    if action_key == 'quick_correction':
+                        # If it's a single letter key, also bind the uppercase version
+                        if hotkey.startswith('<') and hotkey.endswith('>'):
+                            key = hotkey[1:-1]  # Remove < and >
+                            if len(key) == 1 and key.isalpha():
+                                self.window.bind(f'<{key.upper()}>', handler)
 
-                # Store binding for later unbinding
-                self.hotkey_bindings[action_key] = hotkey
+                    # Store binding for later unbinding
+                    self.hotkey_bindings[action_key] = hotkey
 
-                DEBUG(f"Bound hotkey {hotkey} to {action_key}")
+                    DEBUG(f"Bound hotkey {hotkey} to {action_key}")
+                except tk.TclError as e:
+                    ERROR(f"Failed to bind hotkey {hotkey} for {action_key}: {e}")
 
     def rebind_hotkeys(self):
         """Unbind old hotkeys and rebind with new configuration"""
         # Unbind old hotkeys
         for action_key, old_hotkey in self.hotkey_bindings.items():
-            if old_hotkey:
-                self.window.unbind(old_hotkey)
+            # Only unbind if hotkey is not empty
+            if old_hotkey and old_hotkey.strip():
+                try:
+                    self.window.unbind(old_hotkey)
 
-                # Also unbind uppercase variant for quick_correction
-                if action_key == 'quick_correction':
-                    if old_hotkey.startswith('<') and old_hotkey.endswith('>'):
-                        key = old_hotkey[1:-1]
-                        if len(key) == 1 and key.isalpha():
-                            self.window.unbind(f'<{key.upper()}>')
+                    # Also unbind uppercase variant for quick_correction
+                    if action_key == 'quick_correction':
+                        if old_hotkey.startswith('<') and old_hotkey.endswith('>'):
+                            key = old_hotkey[1:-1]
+                            if len(key) == 1 and key.isalpha():
+                                self.window.unbind(f'<{key.upper()}>')
+                except tk.TclError:
+                    # Ignore errors when unbinding non-existent bindings
+                    DEBUG(f"Failed to unbind hotkey {old_hotkey} for {action_key}")
 
         # Clear old bindings
         self.hotkey_bindings.clear()

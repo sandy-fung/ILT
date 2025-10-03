@@ -18,9 +18,17 @@ class HotkeyCapture(ttk.Frame):
         self.current_hotkey = initial_hotkey
         self.on_change = on_change
 
+        # Create container frame for entry and clear button
+        container = ttk.Frame(self)
+        container.pack(fill=tk.BOTH, expand=True)
+
         # Create entry widget
-        self.entry = ttk.Entry(self, width=20, justify='center')
-        self.entry.pack(fill=tk.X, expand=True)
+        self.entry = ttk.Entry(container, width=20, justify='center')
+        self.entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        # Create clear button
+        self.clear_btn = ttk.Button(container, text="✕", width=3, command=self._on_clear)
+        self.clear_btn.pack(side=tk.LEFT, padx=(5, 0))
 
         # Display initial hotkey
         self.update_display()
@@ -41,6 +49,15 @@ class HotkeyCapture(ttk.Frame):
     def _on_focus_out(self, event):
         """Handle focus out - restore hotkey display"""
         self.update_display()
+
+    def _on_clear(self):
+        """Handle clear button click - remove hotkey"""
+        self.current_hotkey = ''
+        self.update_display()
+
+        # Call change callback
+        if self.on_change:
+            self.on_change(self.current_hotkey)
 
     def _on_key_press(self, event):
         """Capture key press event and convert to hotkey format"""
@@ -114,7 +131,7 @@ class HotkeyCapture(ttk.Frame):
     def get_friendly_name(self, hotkey):
         """Convert Tkinter hotkey format to friendly display name"""
         if not hotkey:
-            return ''
+            return 'Not set'
 
         # Remove angle brackets
         hotkey = hotkey.strip('<>')
