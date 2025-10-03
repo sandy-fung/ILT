@@ -1913,9 +1913,12 @@ class UI:
             
 
     def on_cut_image(self, event):
+        if self.input_box and self.window.focus_get() is self.input_box:
+            return
+
         if not self.SHOW_CUT_IMAGE:
             return
-            
+
         print("Cut image event triggered")
         # Check if self.cut_line exists
         if hasattr(self, 'cut_line') and self.cut_line is not None:
@@ -2650,8 +2653,11 @@ class UI:
     # Key events
     def on_lc_press_switch_pen(self, event):
         """Left Ctrl key toggle drawing mode"""
+        if self.input_box and self.window.focus_get() is self.input_box:
+            return
+
         DEBUG("on_lc_press_switch_pen triggered")
-        
+
         # Toggle drawing mode
         if self.bbox_controller:
             self.drawing_mode = self.bbox_controller.toggle_drawing_mode()
@@ -2697,6 +2703,9 @@ class UI:
             self.dispatch(UIEvent.WINDOW_POSITION, {})
 
     def on_delete_key(self, event):
+        if self.input_box and self.window.focus_get() is self.input_box:
+            return
+
         DEBUG("on_delete_key")
         if self.dispatch:
             self.dispatch(UIEvent.DELETE_KEY, {"value": event})
@@ -2710,6 +2719,9 @@ class UI:
             self.dispatch(UIEvent.SELECT_LEFTMOST_BBOX, {})
 
     def on_delete_image_button(self, event=None):
+        if self.input_box and self.window.focus_get() is self.input_box:
+            return
+
         DEBUG("on_delete_image_button")
         if self.dispatch:
             self.dispatch(UIEvent.DELETE_IMAGE,  None)
@@ -2722,8 +2734,10 @@ class UI:
         else:
             DEBUG("Search enter with empty text or dispatch not set")
             
-    def open_search_window(self,event):    
-        
+    def open_search_window(self,event):
+        if self.input_box and self.window.focus_get() is self.input_box:
+            return
+
         win_w, win_h = 600, 100
         root_w = self.window.winfo_width()
         root_h = self.window.winfo_height()
