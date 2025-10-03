@@ -3196,13 +3196,13 @@ class UI:
                 try:
                     self.window.bind(hotkey, handler)
 
-                    # Special case for quick_correction: also bind uppercase
-                    if action_key == 'quick_correction':
-                        # If it's a single letter key, also bind the uppercase version
-                        if hotkey.startswith('<') and hotkey.endswith('>'):
-                            key = hotkey[1:-1]  # Remove < and >
-                            if len(key) == 1 and key.isalpha():
-                                self.window.bind(f'<{key.upper()}>', handler)
+                    # For single letter keys without modifiers, also bind uppercase
+                    if hotkey.startswith('<') and hotkey.endswith('>'):
+                        key = hotkey[1:-1]  # Remove < and >
+                        # Check if it's a single letter without modifiers (no dash)
+                        if len(key) == 1 and key.isalpha() and '-' not in hotkey:
+                            self.window.bind(f'<{key.upper()}>', handler)
+                            DEBUG(f"Also bound uppercase variant <{key.upper()}> for {action_key}")
 
                     # Store binding for later unbinding
                     self.hotkey_bindings[action_key] = hotkey
@@ -3220,12 +3220,12 @@ class UI:
                 try:
                     self.window.unbind(old_hotkey)
 
-                    # Also unbind uppercase variant for quick_correction
-                    if action_key == 'quick_correction':
-                        if old_hotkey.startswith('<') and old_hotkey.endswith('>'):
-                            key = old_hotkey[1:-1]
-                            if len(key) == 1 and key.isalpha():
-                                self.window.unbind(f'<{key.upper()}>')
+                    # Also unbind uppercase variant for single letter keys without modifiers
+                    if old_hotkey.startswith('<') and old_hotkey.endswith('>'):
+                        key = old_hotkey[1:-1]
+                        # Check if it's a single letter without modifiers (no dash)
+                        if len(key) == 1 and key.isalpha() and '-' not in old_hotkey:
+                            self.window.unbind(f'<{key.upper()}>')
                 except tk.TclError:
                     # Ignore errors when unbinding non-existent bindings
                     DEBUG(f"Failed to unbind hotkey {old_hotkey} for {action_key}")
