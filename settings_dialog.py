@@ -34,6 +34,10 @@ class SettingsDialog:
         self.proportional_scaling_var = tk.BooleanVar()
         self.label_font_size_current = str(DEFAULT_LABEL_FONT_SIZE)  # Default font size
 
+        # Timer settings
+        self.timer_enabled_var = tk.BooleanVar()
+        self.timer_default_minutes = 10  # Default timer value
+
         # Hotkey settings
         self.hotkey_captures = {}  # Store HotkeyCapture widgets
         self.current_hotkeys = {}  # Store current hotkey mappings
@@ -126,6 +130,10 @@ class SettingsDialog:
             self.proportional_scaling_var.set(self.current_settings.get('proportional_scaling', False))
             self.label_font_size_current = self.current_settings.get('label_font_size')
             self.min_bbox_width_threshold = self.current_settings.get('min_bbox_width_threshold', DEFAULT_MIN_PLATE_WIDTH)
+
+            # Load timer settings
+            self.timer_enabled_var.set(self.current_settings.get('timer_enabled', False))
+            self.timer_default_minutes = self.current_settings.get('timer_default_minutes', 10)
 
             # Load hotkey settings
             self.current_hotkeys = get_all_hotkeys()
@@ -250,6 +258,31 @@ class SettingsDialog:
         self.min_bbox_width_entry.grid(row=1, column=1, padx=5, pady=10)
         self.min_bbox_width_entry.insert(0, str(threshold_value))
         self.min_bbox_width_entry.config(fg="gray")
+
+        # Timer settings
+        timer_frame = ttk.LabelFrame(ui_tab, text="Timer Settings", padding="10")
+        timer_frame.pack(fill=tk.X, pady=(0, 10))
+
+        # Create a frame to hold checkbox and entry in the same row
+        timer_row = ttk.Frame(timer_frame)
+        timer_row.pack(fill=tk.X, pady=5)
+
+        # Timer enable checkbox
+        timer_checkbox = ttk.Checkbutton(
+            timer_row,
+            text="Enable Timer",
+            variable=self.timer_enabled_var
+        )
+        timer_checkbox.pack(side=tk.LEFT, padx=(0, 10))
+
+        # Timer minutes entry
+        self.timer_minutes_entry = tk.Entry(timer_row, font=("Arial", 12), width=5)
+        self.timer_minutes_entry.pack(side=tk.LEFT, padx=(0, 5))
+        self.timer_minutes_entry.insert(0, str(self.timer_default_minutes))
+        self.timer_minutes_entry.config(fg="gray")
+
+        # Label for "minutes"
+        tk.Label(timer_row, text="minutes", font=("Arial", 11)).pack(side=tk.LEFT)
 
     def create_hotkey_settings_tab(self):
         """Create hotkey settings tab"""
@@ -407,6 +440,8 @@ class SettingsDialog:
             'proportional_scaling': self.proportional_scaling_var.get(),
             'label_font_size': int(self.label_font_size_entry.get()),
             'min_bbox_width_threshold': int(self.min_bbox_width_entry.get()),
+            'timer_enabled': self.timer_enabled_var.get(),
+            'timer_default_minutes': int(self.timer_minutes_entry.get()),
             'hotkeys': self.current_hotkeys.copy()
         }
 

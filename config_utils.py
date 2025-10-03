@@ -382,7 +382,9 @@ def get_all_ui_settings():
         'label_font_size': get_ui_label_font_size_in_config(),
         'show_bbox_dimensions': get_show_bbox_dimensions(),
         'min_bbox_width_threshold': get_min_bbox_width_threshold(),
-        'proportional_scaling': get_proportional_scaling()
+        'proportional_scaling': get_proportional_scaling(),
+        'timer_enabled': get_timer_enabled(),
+        'timer_default_minutes': get_timer_default_minutes()
     }
 
 def get_recent_plates():

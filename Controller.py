@@ -1354,6 +1354,30 @@ class Controller:
             # Extract hotkeys from settings
             hotkeys = settings.pop('hotkeys', None)
 
+            # Extract timer settings
+            timer_enabled = settings.pop('timer_enabled', None)
+            timer_default_minutes = settings.pop('timer_default_minutes', None)
+
+            # Save timer settings
+            if timer_enabled is not None:
+                config_utils.set_timer_enabled(timer_enabled)
+                DEBUG("Saved timer enabled: {}", timer_enabled)
+
+            if timer_default_minutes is not None:
+                config_utils.save_timer_settings(default_minutes=timer_default_minutes)
+                DEBUG("Saved timer default minutes: {}", timer_default_minutes)
+
+            # Handle timer enable/disable
+            if timer_enabled is not None:
+                if timer_enabled:
+                    # Start timer if enabled
+                    self.show_timer_setup_dialog()
+                    INFO("Timer enabled - showing setup dialog")
+                else:
+                    # Stop timer if disabled
+                    self.stop_timer()
+                    INFO("Timer disabled - stopping timer")
+
             # Save UI settings
             config_utils.save_ui_settings(**settings)
 
