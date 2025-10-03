@@ -69,6 +69,7 @@ class UI:
         self.SHOW_BBOX_DIMENSIONS = config_utils.get_show_bbox_dimensions()
         self.MIN_BBOX_WIDTH_THRESHOLD = config_utils.get_min_bbox_width_threshold()
         self.LABEL_FONT_SIZE = config_utils.get_ui_label_font_size_in_config()
+        self.PROPORTIONAL_SCALING = config_utils.get_proportional_scaling()
 
         # Initialize plate memory
         self.recent_plates = deque(maxlen=5)
@@ -2794,7 +2795,7 @@ class UI:
         """Apply UI settings to show/hide components"""
         try:
             DEBUG("Applying UI settings: {}", settings)
-            
+
             # Update internal settings
             self.SHOW_CLASS_ID_BUTTONS = settings.get('show_class_id_buttons', False)
             self.SHOW_TEXT_BOX = settings.get('show_text_box', True)
@@ -2805,6 +2806,7 @@ class UI:
             self.SHOW_BBOX_DIMENSIONS = settings.get('show_bbox_dimensions', False)
             self.MIN_BBOX_WIDTH_THRESHOLD = settings.get('min_bbox_width_threshold', DEFAULT_MIN_PLATE_WIDTH)
             self.LABEL_FONT_SIZE = settings.get('label_font_size', 12)
+            self.PROPORTIONAL_SCALING = settings.get('proportional_scaling', False)
             
             # Update bbox_controller settings for reference box feature
             if self.bbox_controller:

@@ -271,6 +271,13 @@ def get_min_bbox_width_threshold():
     except:
         return DEFAULT_MIN_PLATE_WIDTH  # Default 70 pixels
 
+def get_proportional_scaling():
+    """Get whether to use proportional scaling (with black borders)"""
+    try:
+        return config.getboolean("ImageDisplay", "proportional_scaling")
+    except:
+        return False  # Default to False (stretch to fill canvas)
+
 def get_timer_default_minutes():
     """Get default timer duration in minutes"""
     try:
@@ -328,9 +335,9 @@ def ensure_timer_config():
             config.write(f)
 
 def save_ui_settings(show_class_id_buttons=None, show_text_box=None,
-                    show_preview=None, show_input_box=None, show_classify_frame=None, 
+                    show_preview=None, show_input_box=None, show_classify_frame=None,
                     show_cut_image=None, label_font_size=10, show_bbox_dimensions=None,
-                    min_bbox_width_threshold=None):
+                    min_bbox_width_threshold=None, proportional_scaling=None):
     """Save UI settings to config file"""
     if not config.has_section("UISettings"):
         config.add_section("UISettings")
@@ -353,6 +360,13 @@ def save_ui_settings(show_class_id_buttons=None, show_text_box=None,
         config.set("UISettings", "show_bbox_dimensions", str(show_bbox_dimensions).lower())
     if min_bbox_width_threshold is not None:
         config.set("UISettings", "min_bbox_width_threshold", str(min_bbox_width_threshold))
+
+    # Save proportional_scaling to ImageDisplay section
+    if proportional_scaling is not None:
+        if not config.has_section("ImageDisplay"):
+            config.add_section("ImageDisplay")
+        config.set("ImageDisplay", "proportional_scaling", str(proportional_scaling).lower())
+
     with open(DEFAULT_CONFI_PATH, "w") as f:
         config.write(f)
 
@@ -367,7 +381,8 @@ def get_all_ui_settings():
         'show_cut_image': get_show_cut_image(),
         'label_font_size': get_ui_label_font_size_in_config(),
         'show_bbox_dimensions': get_show_bbox_dimensions(),
-        'min_bbox_width_threshold': get_min_bbox_width_threshold()
+        'min_bbox_width_threshold': get_min_bbox_width_threshold(),
+        'proportional_scaling': get_proportional_scaling()
     }
 
 def get_recent_plates():

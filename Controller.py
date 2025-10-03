@@ -178,16 +178,31 @@ class Controller:
             ERROR("Failed to get canvas size.")
             return
 
-        # Use aspect ratio preserving resize
-        resized, actual_rect = image_utils.resize_image_aspect_ratio(
-            self.original_image, (canvas_width, canvas_height)
-        )
+        # Check if proportional scaling is enabled
+        use_proportional = getattr(self.view, 'PROPORTIONAL_SCALING', False)
 
-        # Extract actual image area information
-        disp_w = actual_rect['width']
-        disp_h = actual_rect['height']
-        ox = actual_rect['x']
-        oy = actual_rect['y']
+        if use_proportional:
+            # Use aspect ratio preserving resize (with black borders)
+            resized, actual_rect = image_utils.resize_image_aspect_ratio(
+                self.original_image, (canvas_width, canvas_height)
+            )
+
+            # Extract actual image area information
+            disp_w = actual_rect['width']
+            disp_h = actual_rect['height']
+            ox = actual_rect['x']
+            oy = actual_rect['y']
+        else:
+            # Use stretch resize (fill entire canvas)
+            resized = image_utils.resize_image(
+                self.original_image, (canvas_width, canvas_height)
+            )
+
+            # No offset, use full canvas size
+            disp_w = canvas_width
+            disp_h = canvas_height
+            ox = 0
+            oy = 0
 
         W, H = self.original_image.size
         sx = float(disp_w) / float(W) if W else 1.0
@@ -1355,6 +1370,11 @@ class Controller:
             if hotkeys and hasattr(self.view, 'rebind_hotkeys'):
                 self.view.rebind_hotkeys()
                 INFO("Hotkeys rebound successfully")
+
+            # Refresh image display if proportional_scaling changed
+            if 'proportional_scaling' in settings and self.original_image is not None:
+                DEBUG("Proportional scaling changed, refreshing image display")
+                self.update_resized_image()
 
             INFO("UI settings updated successfully")
 
