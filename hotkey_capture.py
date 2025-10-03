@@ -18,6 +18,9 @@ class HotkeyCapture(ttk.Frame):
         self.current_hotkey = initial_hotkey
         self.on_change = on_change
 
+        # Track actually pressed modifier keys to avoid false Alt detection
+        self.pressed_modifiers = set()
+
         # Create container frame for entry and clear button
         container = ttk.Frame(self)
         container.pack(fill=tk.BOTH, expand=True)
@@ -40,15 +43,33 @@ class HotkeyCapture(ttk.Frame):
         # Use KeyPress for capturing - it fires before text is inserted
         self.entry.bind('<KeyPress>', self._on_key_press)
 
+        # Track modifier key states to avoid false Alt detection
+        self.entry.bind('<KeyPress>', self._track_modifier_press, add='+')
+        self.entry.bind('<KeyRelease>', self._track_modifier_release, add='+')
+
+    def _track_modifier_press(self, event):
+        """Track when modifier keys are actually pressed"""
+        if event.keysym in ['Alt_L', 'Alt_R', 'Shift_L', 'Shift_R', 'Control_L', 'Control_R']:
+            self.pressed_modifiers.add(event.keysym)
+
+    def _track_modifier_release(self, event):
+        """Track when modifier keys are actually released"""
+        if event.keysym in ['Alt_L', 'Alt_R', 'Shift_L', 'Shift_R', 'Control_L', 'Control_R']:
+            self.pressed_modifiers.discard(event.keysym)
+
     def _on_focus_in(self, event):
         """Handle focus in - show capture prompt"""
         self.entry.delete(0, tk.END)
         self.entry.insert(0, "Press any key...")
         self.entry.config(foreground='gray')
+        # Clear modifier tracking when focus changes
+        self.pressed_modifiers.clear()
 
     def _on_focus_out(self, event):
         """Handle focus out - restore hotkey display"""
         self.update_display()
+        # Clear modifier tracking when focus changes
+        self.pressed_modifiers.clear()
 
     def _on_clear(self):
         """Handle clear button click - remove hotkey"""
@@ -73,7 +94,8 @@ class HotkeyCapture(ttk.Frame):
             modifiers.append('Shift')
         if event.state & 0x0004:  # Control
             modifiers.append('Control')
-        if event.state & 0x0008 or event.state & 0x0080:  # Alt
+        # Use actual key tracking for Alt to avoid false positives from event.state
+        if 'Alt_L' in self.pressed_modifiers or 'Alt_R' in self.pressed_modifiers:
             modifiers.append('Alt')
 
         # Get the key symbol
