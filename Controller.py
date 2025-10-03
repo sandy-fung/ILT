@@ -1335,14 +1335,27 @@ class Controller:
         try:
             settings = event_data.get("settings", {})
             DEBUG("Applying new UI settings: {}", settings)
-            
+
+            # Extract hotkeys from settings
+            hotkeys = settings.pop('hotkeys', None)
+
             # Save UI settings
             config_utils.save_ui_settings(**settings)
-            
+
+            # Save hotkey settings separately
+            if hotkeys:
+                config_utils.save_hotkeys(hotkeys)
+                DEBUG("Saved hotkey settings: {}", hotkeys)
+
             # Apply settings to UI
             if hasattr(self.view, 'apply_ui_settings'):
                 self.view.apply_ui_settings(settings)
-            
+
+            # Rebind hotkeys if they were changed
+            if hotkeys and hasattr(self.view, 'rebind_hotkeys'):
+                self.view.rebind_hotkeys()
+                INFO("Hotkeys rebound successfully")
+
             INFO("UI settings updated successfully")
 
             self.update_label_display()

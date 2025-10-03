@@ -397,3 +397,67 @@ def save_recent_plates(plates_list):
         ERROR("Failed to save recent plates: {}", e)
         return False
 
+
+# Hotkey configuration functions
+DEFAULT_HOTKEYS = {
+    'previous_image': '<Left>',
+    'next_image': '<Right>',
+    'switch_pen': '<Control_L>',
+    'delete': '<Delete>',
+    'search': '<Control-f>',
+    'quick_correction': '<t>',
+    'cut_image': '<Shift-C>',
+    'delete_image': '',  # Default unset - user can configure
+}
+
+# Friendly names for hotkey actions
+HOTKEY_ACTION_NAMES = {
+    'previous_image': 'Previous Image',
+    'next_image': 'Next Image',
+    'switch_pen': 'Switch Pen/Drawing Mode',
+    'delete': 'Delete Selected Bbox',
+    'search': 'Open Search Window',
+    'quick_correction': 'Quick Correction',
+    'cut_image': 'Cut Image',
+    'delete_image': 'Delete Current Image',
+}
+
+def get_default_hotkeys():
+    """Get default hotkey mappings"""
+    return DEFAULT_HOTKEYS.copy()
+
+def get_hotkey(action_name):
+    """Get hotkey for specific action"""
+    try:
+        hotkey = config.get("Hotkeys", action_name)
+        return hotkey
+    except:
+        # Return default if not found
+        return DEFAULT_HOTKEYS.get(action_name, '')
+
+def get_all_hotkeys():
+    """Get all hotkey mappings"""
+    hotkeys = {}
+    for action in DEFAULT_HOTKEYS.keys():
+        hotkeys[action] = get_hotkey(action)
+    return hotkeys
+
+def save_hotkeys(hotkey_dict):
+    """Save hotkey mappings to config file"""
+    if not config.has_section("Hotkeys"):
+        config.add_section("Hotkeys")
+
+    for action, hotkey in hotkey_dict.items():
+        config.set("Hotkeys", action, hotkey)
+
+    with open(DEFAULT_CONFI_PATH, "w") as f:
+        config.write(f)
+
+def reset_hotkeys_to_default():
+    """Reset all hotkeys to default values"""
+    save_hotkeys(DEFAULT_HOTKEYS)
+
+def get_hotkey_action_name(action_key):
+    """Get friendly name for hotkey action"""
+    return HOTKEY_ACTION_NAMES.get(action_key, action_key)
+

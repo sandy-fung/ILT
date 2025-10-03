@@ -1,10 +1,12 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 from log_levels import DEBUG, INFO, ERROR
+from hotkey_capture import HotkeyCapture
+from config_utils import get_all_hotkeys, get_default_hotkeys, get_hotkey_action_name
 
 DEFAULT_LABEL_FONT_SIZE = 10
-DIALOG_WIDTH = 450
-DIALOG_HEIGHT = 500
+DIALOG_WIDTH = 550
+DIALOG_HEIGHT = 600
 class SettingsDialog:
     def __init__(self, parent, current_settings, on_confirm_callback):
         """
@@ -30,6 +32,10 @@ class SettingsDialog:
         self.show_cut_image_var = tk.BooleanVar()
         self.show_bbox_dimensions_var = tk.BooleanVar()
         self.label_font_size_current = str(DEFAULT_LABEL_FONT_SIZE)  # Default font size
+
+        # Hotkey settings
+        self.hotkey_captures = {}  # Store HotkeyCapture widgets
+        self.current_hotkeys = {}  # Store current hotkey mappings
 
         self.create_dialog()
 
@@ -119,7 +125,8 @@ class SettingsDialog:
             self.label_font_size_current = self.current_settings.get('label_font_size')
             self.min_bbox_width_threshold = self.current_settings.get('min_bbox_width_threshold', DEFAULT_MIN_PLATE_WIDTH)
 
-
+            # Load hotkey settings
+            self.current_hotkeys = get_all_hotkeys()
 
             DEBUG("Loaded current settings into dialog")
 
@@ -134,119 +141,249 @@ class SettingsDialog:
             main_frame = ttk.Frame(self.dialog, padding="10")
             main_frame.pack(fill=tk.BOTH, expand=True)
 
-            # Compact title
-            title_label = ttk.Label(
-                main_frame,
-                text="UI Configuration",
-                font=('Arial', 11, 'bold')
-            )
-            title_label.pack(anchor=tk.W, pady=(0, 10))
+            # Create notebook for tabs
+            self.notebook = ttk.Notebook(main_frame)
+            self.notebook.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
 
-            # Settings frame with minimal padding
-            settings_frame = ttk.LabelFrame(main_frame, text="Display Options", padding="10")
-            settings_frame.pack(fill=tk.X, pady=(0, 10))
+            # Bind tab change event to prevent auto-focus
+            self.notebook.bind('<<NotebookTabChanged>>', self._on_tab_changed)
 
-            # Compact checkboxes
-            checkbox1 = ttk.Checkbutton(
-                settings_frame,
-                text="Show Class ID Buttons (0-9, A-Z)",
-                variable=self.show_class_id_buttons_var
-            )
-            checkbox1.pack(anchor=tk.W, pady=2)
+            # Create tabs
+            self.create_ui_settings_tab()
+            self.create_hotkey_settings_tab()
 
-            checkbox2 = ttk.Checkbutton(
-                settings_frame,
-                text="Show Text Box",
-                variable=self.show_text_box_var
-            )
-            checkbox2.pack(anchor=tk.W, pady=2)
-
-            checkbox3 = ttk.Checkbutton(
-                settings_frame,
-                text="Show Preview Panel",
-                variable=self.show_preview_var
-            )
-            checkbox3.pack(anchor=tk.W, pady=2)
-
-            checkbox4 = ttk.Checkbutton(
-                settings_frame,
-                text="Show Input Box",
-                variable=self.show_input_box_var
-            )
-            checkbox4.pack(anchor=tk.W, pady=2)
-            
-            checkbox5 = ttk.Checkbutton(
-                settings_frame,
-                text="Show classification panel",
-                variable=self.show_classify_frame_var
-            )
-            checkbox5.pack(anchor=tk.W, pady=2)
-            
-            checkbox6 = ttk.Checkbutton(
-                settings_frame,
-                text="Show Cut Image Button",
-                variable=self.show_cut_image_var
-            )
-            checkbox6.pack(anchor=tk.W, pady=2)
-            
-            checkbox7 = ttk.Checkbutton(
-                settings_frame,
-                text="Show Bbox Dimensions",
-                variable=self.show_bbox_dimensions_var
-            )
-            checkbox7.pack(anchor=tk.W, pady=2)
-            
-            # font size for label ascci
-            font_frame = ttk.LabelFrame(main_frame, text="", padding="10")
-            font_frame.pack(fill=tk.X, pady=(0, 10))
-            font_describe = tk.Label(font_frame, text="label text size", font=("Arial", 11))
-            font_describe.grid(row=0, column=0, padx=5, pady=10)
-            size = self.current_settings.get('label_font_size')
-            self.label_font_size_entry = tk.Entry(font_frame, font=("Arial", 12))
-            self.label_font_size_entry.grid(row=0, column=1, padx=5, pady=10)
-            self.label_font_size_entry.insert(0, str(size))
-            self.label_font_size_entry.config(fg="gray")
-
-            # self.label_font_size_entry.delete(0, tk.END)
-            # size =  self.current_settings.get('label_font_size', DEFAULT_LABEL_FONT_SIZE)
-            # self.label_font_size_entry.insert(0, str(size))
-            # self.label_font_size_entry.config(fg="gray")
-            
-            # Minimum bbox width threshold
-            threshold_describe = tk.Label(font_frame, text="Min bbox width (pixels)", font=("Arial", 11))
-            threshold_describe.grid(row=1, column=0, padx=5, pady=10)
-            threshold_value = self.current_settings.get('min_bbox_width_threshold', DEFAULT_MIN_PLATE_WIDTH)
-            self.min_bbox_width_entry = tk.Entry(font_frame, font=("Arial", 12))
-            self.min_bbox_width_entry.grid(row=1, column=1, padx=5, pady=10)
-            self.min_bbox_width_entry.insert(0, str(threshold_value))
-            self.min_bbox_width_entry.config(fg="gray")
-
-            # Button frame
-            button_frame = ttk.Frame(main_frame)
-            button_frame.pack(fill=tk.X, pady=(10, 0))
-
-            # Buttons
-            cancel_btn = ttk.Button(
-                button_frame,
-                text="Cancel",
-                command=self.on_cancel
-            )
-            cancel_btn.pack(side=tk.RIGHT, padx=(10, 0))
-
-            confirm_btn = ttk.Button(
-                button_frame,
-                text="Save",
-                command=self.on_confirm
-            )
-            confirm_btn.pack(side=tk.RIGHT)
-
-            # Set default button
-            confirm_btn.focus_set()
+            # Button frame at bottom
+            self.create_button_frame(main_frame)
 
             DEBUG("UI elements created successfully")
 
         except Exception as e:
             ERROR("Error creating UI elements: {}", e)
+
+    def create_ui_settings_tab(self):
+        """Create UI settings tab"""
+        from ILT_UI import DEFAULT_MIN_PLATE_WIDTH
+
+        # Create tab frame
+        ui_tab = ttk.Frame(self.notebook, padding="10")
+        self.notebook.add(ui_tab, text="UI Settings")
+
+        # Settings frame with minimal padding
+        settings_frame = ttk.LabelFrame(ui_tab, text="Display Options", padding="10")
+        settings_frame.pack(fill=tk.X, pady=(0, 10))
+
+        # Compact checkboxes
+        checkbox1 = ttk.Checkbutton(
+            settings_frame,
+            text="Show Class ID Buttons (0-9, A-Z)",
+            variable=self.show_class_id_buttons_var
+        )
+        checkbox1.pack(anchor=tk.W, pady=2)
+
+        checkbox2 = ttk.Checkbutton(
+            settings_frame,
+            text="Show Text Box",
+            variable=self.show_text_box_var
+        )
+        checkbox2.pack(anchor=tk.W, pady=2)
+
+        checkbox3 = ttk.Checkbutton(
+            settings_frame,
+            text="Show Preview Panel",
+            variable=self.show_preview_var
+        )
+        checkbox3.pack(anchor=tk.W, pady=2)
+
+        checkbox4 = ttk.Checkbutton(
+            settings_frame,
+            text="Show Input Box",
+            variable=self.show_input_box_var
+        )
+        checkbox4.pack(anchor=tk.W, pady=2)
+
+        checkbox5 = ttk.Checkbutton(
+            settings_frame,
+            text="Show classification panel",
+            variable=self.show_classify_frame_var
+        )
+        checkbox5.pack(anchor=tk.W, pady=2)
+
+        checkbox6 = ttk.Checkbutton(
+            settings_frame,
+            text="Show Cut Image Button",
+            variable=self.show_cut_image_var
+        )
+        checkbox6.pack(anchor=tk.W, pady=2)
+
+        checkbox7 = ttk.Checkbutton(
+            settings_frame,
+            text="Show Bbox Dimensions",
+            variable=self.show_bbox_dimensions_var
+        )
+        checkbox7.pack(anchor=tk.W, pady=2)
+
+        # font size for label ascci
+        font_frame = ttk.LabelFrame(ui_tab, text="", padding="10")
+        font_frame.pack(fill=tk.X, pady=(0, 10))
+        font_describe = tk.Label(font_frame, text="label text size", font=("Arial", 11))
+        font_describe.grid(row=0, column=0, padx=5, pady=10)
+        size = self.current_settings.get('label_font_size')
+        self.label_font_size_entry = tk.Entry(font_frame, font=("Arial", 12))
+        self.label_font_size_entry.grid(row=0, column=1, padx=5, pady=10)
+        self.label_font_size_entry.insert(0, str(size))
+        self.label_font_size_entry.config(fg="gray")
+
+        # Minimum bbox width threshold
+        threshold_describe = tk.Label(font_frame, text="Min bbox width (pixels)", font=("Arial", 11))
+        threshold_describe.grid(row=1, column=0, padx=5, pady=10)
+        threshold_value = self.current_settings.get('min_bbox_width_threshold', DEFAULT_MIN_PLATE_WIDTH)
+        self.min_bbox_width_entry = tk.Entry(font_frame, font=("Arial", 12))
+        self.min_bbox_width_entry.grid(row=1, column=1, padx=5, pady=10)
+        self.min_bbox_width_entry.insert(0, str(threshold_value))
+        self.min_bbox_width_entry.config(fg="gray")
+
+    def create_hotkey_settings_tab(self):
+        """Create hotkey settings tab"""
+        hotkey_tab = ttk.Frame(self.notebook, padding="10")
+        self.notebook.add(hotkey_tab, text="Hotkeys")
+
+        # Create scrollable frame
+        canvas = tk.Canvas(hotkey_tab, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(hotkey_tab, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Info label
+        info_label = ttk.Label(
+            scrollable_frame,
+            text="Click on a hotkey field and press the desired key combination",
+            font=('Arial', 9, 'italic'),
+            foreground='gray'
+        )
+        info_label.pack(pady=(0, 10))
+
+        # Create hotkey configuration frame
+        hotkeys_frame = ttk.LabelFrame(scrollable_frame, text="Hotkey Bindings", padding="10")
+        hotkeys_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+
+        # Create hotkey capture widgets for each action
+        for action_key, hotkey in self.current_hotkeys.items():
+            action_name = get_hotkey_action_name(action_key)
+
+            # Create row frame
+            row_frame = ttk.Frame(hotkeys_frame)
+            row_frame.pack(fill=tk.X, pady=5)
+
+            # Action label
+            label = ttk.Label(row_frame, text=action_name, width=30, anchor='w')
+            label.pack(side=tk.LEFT, padx=(0, 10))
+
+            # Hotkey capture widget
+            capture = HotkeyCapture(
+                row_frame,
+                initial_hotkey=hotkey,
+                on_change=lambda h, a=action_key: self.on_hotkey_change(a, h)
+            )
+            capture.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+            # Store reference
+            self.hotkey_captures[action_key] = capture
+
+        # Reset button
+        reset_frame = ttk.Frame(scrollable_frame)
+        reset_frame.pack(fill=tk.X, pady=(10, 0))
+
+        reset_btn = ttk.Button(
+            reset_frame,
+            text="Reset to Defaults",
+            command=self.reset_hotkeys
+        )
+        reset_btn.pack(side=tk.RIGHT)
+
+        # Pack scrollable elements
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Ensure no entry has focus when tab is created
+        hotkey_tab.focus_set()
+
+    def on_hotkey_change(self, action_key, new_hotkey):
+        """Handle hotkey change and check for conflicts"""
+        # Update current hotkeys
+        old_hotkey = self.current_hotkeys.get(action_key)
+        self.current_hotkeys[action_key] = new_hotkey
+
+        # Check for conflicts
+        conflicts = []
+        for other_action, other_hotkey in self.current_hotkeys.items():
+            if other_action != action_key and other_hotkey == new_hotkey and new_hotkey:
+                conflicts.append(get_hotkey_action_name(other_action))
+
+        if conflicts:
+            # Show warning
+            conflict_msg = f"Warning: This hotkey is already used by:\n" + "\n".join(f"- {c}" for c in conflicts)
+            messagebox.showwarning("Hotkey Conflict", conflict_msg, parent=self.dialog)
+
+            # Revert to old hotkey
+            self.current_hotkeys[action_key] = old_hotkey
+            self.hotkey_captures[action_key].set_hotkey(old_hotkey)
+
+        DEBUG("Hotkey for {} changed to {}", action_key, new_hotkey)
+
+    def reset_hotkeys(self):
+        """Reset all hotkeys to default values"""
+        try:
+            default_hotkeys = get_default_hotkeys()
+
+            for action_key, hotkey in default_hotkeys.items():
+                self.current_hotkeys[action_key] = hotkey
+                if action_key in self.hotkey_captures:
+                    self.hotkey_captures[action_key].set_hotkey(hotkey)
+
+            INFO("Hotkeys reset to defaults")
+
+        except Exception as e:
+            ERROR("Error resetting hotkeys: {}", e)
+
+    def _on_tab_changed(self, event):
+        """Handle notebook tab change to prevent auto-focus on hotkey entries"""
+        # Get current tab
+        current_tab = self.notebook.select()
+        # Get the tab widget
+        tab_widget = self.notebook.nametowidget(current_tab)
+        # Set focus to the tab itself instead of any child widget
+        tab_widget.focus_set()
+
+    def create_button_frame(self, parent):
+        """Create button frame with Save and Cancel buttons"""
+        # Button frame
+        button_frame = ttk.Frame(parent)
+        button_frame.pack(fill=tk.X, pady=(10, 0))
+
+        # Buttons
+        cancel_btn = ttk.Button(
+            button_frame,
+            text="Cancel",
+            command=self.on_cancel
+        )
+        cancel_btn.pack(side=tk.RIGHT, padx=(10, 0))
+
+        confirm_btn = ttk.Button(
+            button_frame,
+            text="Save",
+            command=self.on_confirm
+        )
+        confirm_btn.pack(side=tk.RIGHT)
+
+        # Set default button
+        confirm_btn.focus_set()
 
     def get_settings(self):
         """Get current settings from dialog"""
@@ -259,7 +396,8 @@ class SettingsDialog:
             'show_cut_image': self.show_cut_image_var.get(),
             'show_bbox_dimensions': self.show_bbox_dimensions_var.get(),
             'label_font_size': int(self.label_font_size_entry.get()),
-            'min_bbox_width_threshold': int(self.min_bbox_width_entry.get())
+            'min_bbox_width_threshold': int(self.min_bbox_width_entry.get()),
+            'hotkeys': self.current_hotkeys.copy()
         }
 
     def on_confirm(self):

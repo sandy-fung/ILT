@@ -2708,7 +2708,7 @@ class UI:
         if self.dispatch:
             self.dispatch(UIEvent.SELECT_LEFTMOST_BBOX, {})
 
-    def on_delete_image_button(self):
+    def on_delete_image_button(self, event=None):
         DEBUG("on_delete_image_button")
         if self.dispatch:
             self.dispatch(UIEvent.DELETE_IMAGE,  None)
@@ -3130,32 +3130,23 @@ class UI:
 
     # Bind key and mouse with events
     def setup_events(self):
-        self.window.bind("<Left>", self.previous_image)
-        self.window.bind("<Right>", self.next_image)
+        # Store current hotkey bindings for rebinding
+        self.hotkey_bindings = {}
 
-        # Ctrl key event binding
-        self.window.bind("<Control_L>", self.on_lc_press_switch_pen)
+        # Bind configurable hotkeys
+        self.bind_configurable_hotkeys()
 
+        # Bind non-configurable events
+        # Right Ctrl key release (companion to Control_L)
         self.window.bind("<Control_R>", self.on_rc_press)
         self.window.bind("<KeyRelease-Control_R>", self.on_rc_release)
 
-        #Windows changes posiotion or size
+        # Windows changes position or size
         self.window.bind("<Configure>", self.on_win_configure)
 
-        # Delete key event binding
-        self.window.bind("<Delete>", self.on_delete_key)
-
+        # Clear focus on window click
         self.window.bind("<Button-1>", self._clear_focus)
-        
-        # Searching file event binding
-        self.window.bind("<Control-f>", self.open_search_window)
-        
-        # Quick correction hotkey (T key)
-        self.window.bind("<t>", self.on_t_key)
-        self.window.bind("<T>", self.on_t_key)
 
-        self.window.bind("<Shift-C>", self.on_cut_image)
-        
         # Mouse event binding (support drawing functionality)
         self.canvas.bind("<Button-1>", self.on_mouse_press)
         self.canvas.bind("<ButtonRelease-1>", self.on_mouse_release)
@@ -3163,6 +3154,64 @@ class UI:
         self.canvas.bind("<Motion>", self.on_mouse_motion)
         self.canvas.bind("<Button-3>", self.on_mouse_click_right)
         self.canvas.bind("<Configure>", self.on_canvas_resize)
+
+    def bind_configurable_hotkeys(self):
+        """Bind hotkeys from configuration"""
+        # Get hotkeys from config
+        hotkeys = config_utils.get_all_hotkeys()
+
+        # Map action keys to handler methods
+        action_handlers = {
+            'previous_image': self.previous_image,
+            'next_image': self.next_image,
+            'switch_pen': self.on_lc_press_switch_pen,
+            'delete': self.on_delete_key,
+            'search': self.open_search_window,
+            'quick_correction': self.on_t_key,
+            'cut_image': self.on_cut_image,
+            'delete_image': self.on_delete_image_button,
+        }
+
+        # Bind each hotkey to its handler
+        for action_key, hotkey in hotkeys.items():
+            if action_key in action_handlers and hotkey:
+                handler = action_handlers[action_key]
+                self.window.bind(hotkey, handler)
+
+                # Special case for quick_correction: also bind uppercase
+                if action_key == 'quick_correction':
+                    # If it's a single letter key, also bind the uppercase version
+                    if hotkey.startswith('<') and hotkey.endswith('>'):
+                        key = hotkey[1:-1]  # Remove < and >
+                        if len(key) == 1 and key.isalpha():
+                            self.window.bind(f'<{key.upper()}>', handler)
+
+                # Store binding for later unbinding
+                self.hotkey_bindings[action_key] = hotkey
+
+                DEBUG(f"Bound hotkey {hotkey} to {action_key}")
+
+    def rebind_hotkeys(self):
+        """Unbind old hotkeys and rebind with new configuration"""
+        # Unbind old hotkeys
+        for action_key, old_hotkey in self.hotkey_bindings.items():
+            if old_hotkey:
+                self.window.unbind(old_hotkey)
+
+                # Also unbind uppercase variant for quick_correction
+                if action_key == 'quick_correction':
+                    if old_hotkey.startswith('<') and old_hotkey.endswith('>'):
+                        key = old_hotkey[1:-1]
+                        if len(key) == 1 and key.isalpha():
+                            self.window.unbind(f'<{key.upper()}>')
+
+        # Clear old bindings
+        self.hotkey_bindings.clear()
+
+        # Bind new hotkeys
+        self.bind_configurable_hotkeys()
+
+        INFO("Hotkeys rebound successfully")
         
 
     def select_folder(self, title):
