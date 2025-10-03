@@ -103,8 +103,8 @@ class HotkeyCapture(ttk.Frame):
 
         # Skip if only modifier key is pressed
         if key in ['Shift_L', 'Shift_R', 'Control_L', 'Control_R', 'Alt_L', 'Alt_R']:
-            # Allow Control_L as a standalone hotkey (for switch pen functionality)
-            if key == 'Control_L' and not modifiers:
+            # Allow certain modifiers as standalone hotkeys
+            if key in ['Control_L', 'Shift_L', 'Shift_R'] and not modifiers:
                 self.current_hotkey = f'<{key}>'
                 self.update_display()
                 if self.on_change:
