@@ -31,6 +31,7 @@ class SettingsDialog:
         self.show_classify_frame_var = tk.BooleanVar()
         self.show_cut_image_var = tk.BooleanVar()
         self.show_bbox_dimensions_var = tk.BooleanVar()
+        self.show_tilt_angle_var = tk.BooleanVar()
         self.proportional_scaling_var = tk.BooleanVar()
         self.label_font_size_current = str(DEFAULT_LABEL_FONT_SIZE)  # Default font size
 
@@ -127,6 +128,7 @@ class SettingsDialog:
             self.show_classify_frame_var.set(self.current_settings.get('show_classify_frame', True))
             self.show_cut_image_var.set(self.current_settings.get('show_cut_image', True))
             self.show_bbox_dimensions_var.set(self.current_settings.get('show_bbox_dimensions', False))
+            self.show_tilt_angle_var.set(self.current_settings.get('show_tilt_angle', False))
             self.proportional_scaling_var.set(self.current_settings.get('proportional_scaling', False))
             self.label_font_size_current = self.current_settings.get('label_font_size')
             self.min_bbox_width_threshold = self.current_settings.get('min_bbox_width_threshold', DEFAULT_MIN_PLATE_WIDTH)
@@ -234,10 +236,17 @@ class SettingsDialog:
 
         checkbox8 = ttk.Checkbutton(
             settings_frame,
+            text="Show Plate Tilt Angle",
+            variable=self.show_tilt_angle_var
+        )
+        checkbox8.pack(anchor=tk.W, pady=2)
+
+        checkbox9 = ttk.Checkbutton(
+            settings_frame,
             text="Proportional Scaling (with black borders)",
             variable=self.proportional_scaling_var
         )
-        checkbox8.pack(anchor=tk.W, pady=2)
+        checkbox9.pack(anchor=tk.W, pady=2)
 
         # font size for label ascci
         font_frame = ttk.LabelFrame(ui_tab, text="", padding="10")
@@ -437,6 +446,7 @@ class SettingsDialog:
             'show_classify_frame': self.show_classify_frame_var.get(),
             'show_cut_image': self.show_cut_image_var.get(),
             'show_bbox_dimensions': self.show_bbox_dimensions_var.get(),
+            'show_tilt_angle': self.show_tilt_angle_var.get(),
             'proportional_scaling': self.proportional_scaling_var.get(),
             'label_font_size': int(self.label_font_size_entry.get()),
             'min_bbox_width_threshold': int(self.min_bbox_width_entry.get()),

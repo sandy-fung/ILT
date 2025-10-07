@@ -263,6 +263,13 @@ def get_show_bbox_dimensions():
     except:
         return False  # Default to False
 
+def get_show_tilt_angle():
+    """Get whether to show plate tilt angle"""
+    try:
+        return config.getboolean("UISettings", "show_tilt_angle")
+    except:
+        return False  # Default to False
+
 def get_min_bbox_width_threshold():
     from ILT_UI import DEFAULT_MIN_PLATE_WIDTH
     """Get minimum bbox width threshold for warning"""
@@ -337,7 +344,7 @@ def ensure_timer_config():
 def save_ui_settings(show_class_id_buttons=None, show_text_box=None,
                     show_preview=None, show_input_box=None, show_classify_frame=None,
                     show_cut_image=None, label_font_size=10, show_bbox_dimensions=None,
-                    min_bbox_width_threshold=None, proportional_scaling=None):
+                    min_bbox_width_threshold=None, proportional_scaling=None, show_tilt_angle=None):
     """Save UI settings to config file"""
     if not config.has_section("UISettings"):
         config.add_section("UISettings")
@@ -360,6 +367,8 @@ def save_ui_settings(show_class_id_buttons=None, show_text_box=None,
         config.set("UISettings", "show_bbox_dimensions", str(show_bbox_dimensions).lower())
     if min_bbox_width_threshold is not None:
         config.set("UISettings", "min_bbox_width_threshold", str(min_bbox_width_threshold))
+    if show_tilt_angle is not None:
+        config.set("UISettings", "show_tilt_angle", str(show_tilt_angle).lower())
 
     # Save proportional_scaling to ImageDisplay section
     if proportional_scaling is not None:
@@ -384,7 +393,8 @@ def get_all_ui_settings():
         'min_bbox_width_threshold': get_min_bbox_width_threshold(),
         'proportional_scaling': get_proportional_scaling(),
         'timer_enabled': get_timer_enabled(),
-        'timer_default_minutes': get_timer_default_minutes()
+        'timer_default_minutes': get_timer_default_minutes(),
+        'show_tilt_angle': get_show_tilt_angle()
     }
 
 def get_recent_plates():

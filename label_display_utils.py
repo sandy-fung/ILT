@@ -636,3 +636,81 @@ def check_labels_horizontal_overlap(labels):
         if is_overlap(box1, box2):
             has_problem = True
     return has_problem
+
+
+def calculate_plate_tilt_angle(labels):
+    """
+    Calculate the tilt angle of license plate based on bbox centers using linear regression.
+
+    Args:
+        labels (list): List of LabelObject instances
+
+    Returns:
+        tuple: (angle_degrees, line_start, line_end)
+               - angle_degrees (float): tilt angle in degrees (positive=right tilt, negative=left tilt)
+               - line_start (tuple): (x_ratio, y_ratio) start point of regression line
+               - line_end (tuple): (x_ratio, y_ratio) end point of regression line
+               Returns (None, None, None) if calculation fails
+    """
+    if not labels or len(labels) < 2:
+        DEBUG("Not enough labels for tilt calculation (need at least 2)")
+        return None, None, None
+
+    try:
+        # Import numpy through cv2 dependency
+        import numpy as np
+
+        # Extract center points (in ratio coordinates)
+        x_points = np.array([label.cx_ratio for label in labels])
+        y_points = np.array([label.cy_ratio for label in labels])
+
+        # Linear regression: y = mx + b (least squares method)
+        # Calculate slope (m) and intercept (b)
+        n = len(x_points)
+        x_mean = np.mean(x_points)
+        y_mean = np.mean(y_points)
+
+        numerator = np.sum((x_points - x_mean) * (y_points - y_mean))
+        denominator = np.sum((x_points - x_mean) ** 2)
+
+        if abs(denominator) < 1e-10:
+            # Vertical line case - all points have same x
+            DEBUG("Vertical line detected - cannot calculate tilt angle")
+            return None, None, None
+
+        slope = numerator / denominator
+        intercept = y_mean - slope * x_mean
+
+        # Convert slope to angle in degrees
+        # arctan gives angle in radians, convert to degrees
+        # Negate to match visual intuition (image Y-axis points downward)
+        angle_radians = np.arctan(slope)
+        angle_degrees = -np.degrees(angle_radians)
+
+        # Calculate line endpoints for visualization
+        # Use min and max x values from labels
+        x_min = np.min(x_points)
+        x_max = np.max(x_points)
+
+        # Extend line slightly beyond data points for better visualization
+        x_range = x_max - x_min
+        x_start = max(0, x_min - x_range * 0.1)
+        x_end = min(1.0, x_max + x_range * 0.1)
+
+        y_start = slope * x_start + intercept
+        y_end = slope * x_end + intercept
+
+        # Clamp y values to [0, 1]
+        y_start = max(0, min(1.0, y_start))
+        y_end = max(0, min(1.0, y_end))
+
+        line_start = (x_start, y_start)
+        line_end = (x_end, y_end)
+
+        DEBUG("Calculated tilt angle: {:.2f}° (slope: {:.4f})", angle_degrees, slope)
+
+        return angle_degrees, line_start, line_end
+
+    except Exception as e:
+        ERROR("Error calculating tilt angle: {}", e)
+        return None, None, None

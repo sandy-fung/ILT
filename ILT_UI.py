@@ -67,6 +67,7 @@ class UI:
         self.SHOW_CLASSIFY_FRAME= config_utils.get_show_classify_frame()
         self.SHOW_CUT_IMAGE = config_utils.get_show_cut_image()
         self.SHOW_BBOX_DIMENSIONS = config_utils.get_show_bbox_dimensions()
+        self.SHOW_TILT_ANGLE = config_utils.get_show_tilt_angle()
         self.MIN_BBOX_WIDTH_THRESHOLD = config_utils.get_min_bbox_width_threshold()
         self.LABEL_FONT_SIZE = config_utils.get_ui_label_font_size_in_config()
         self.PROPORTIONAL_SCALING = config_utils.get_proportional_scaling()
@@ -388,6 +389,13 @@ class UI:
             command = lambda: self.dispatch(UIEvent.QUICK_CORRECT, {}) if self.dispatch else None
         )
         self.quick_correct_button.grid(row = 0, column = 3, sticky = "w", padx = (10, 0))
+
+        # Add tilt angle display label
+        self.tilt_angle_label = tk.Label(
+            self.hint_frame, bg = "#FAFAFA", text = "N/A",
+            fg = "#8E8E79", font = ("Segoe UI", 11)
+        )
+        self.tilt_angle_label.grid(row = 0, column = 4, sticky = "w", padx = (10, 0))
 
     def create_preview_area(self):
         if not self.SHOW_PREVIEW:
@@ -2154,6 +2162,40 @@ class UI:
             DEBUG("Drew label: class_id={}, coords=({:.1f},{:.1f},{:.1f},{:.1f})",
                   label.class_id, x1, y1, x2, y2)
 
+        # Draw tilt angle regression line if enabled
+        if self.SHOW_TILT_ANGLE and labels and len(labels) >= 2:
+            angle, line_start, line_end = label_display_utils.calculate_plate_tilt_angle(labels)
+            if line_start and line_end:
+                # Clear previous guideline
+                self.canvas.delete("tilt_guideline")
+
+                # Get context for coordinate conversion
+                if not self._ctx:
+                    img_w = self.canvas_width
+                    img_h = self.canvas_height
+                    ox = oy = 0.0
+                    disp_w = self.canvas_width
+                    disp_h = self.canvas_height
+                else:
+                    img_w = self._ctx["img_w"]; img_h = self._ctx["img_h"]
+                    ox = self._ctx["ox"]; oy = self._ctx["oy"]
+                    disp_w = self._ctx["disp_w"]
+                    disp_h = self._ctx["disp_h"]
+
+                # Convert ratio coordinates to canvas pixel coordinates
+                x1_line = line_start[0] * disp_w + ox
+                y1_line = line_start[1] * disp_h + oy
+                x2_line = line_end[0] * disp_w + ox
+                y2_line = line_end[1] * disp_h + oy
+
+                # Draw regression line
+                self.canvas.create_line(
+                    x1_line, y1_line, x2_line, y2_line,
+                    fill="#CCCCCC", width=2, dash=(10, 5),
+                    tags="tilt_guideline"
+                )
+                DEBUG("Drew tilt guideline: ({:.1f},{:.1f}) to ({:.1f},{:.1f})",
+                      x1_line, y1_line, x2_line, y2_line)
 
 
 # Update text and index labels
@@ -2804,6 +2846,7 @@ class UI:
             self.SHOW_CLASSIFY_FRAME = settings.get('show_classify_frame', False)
             self.SHOW_CUT_IMAGE = settings.get('show_cut_image', True)
             self.SHOW_BBOX_DIMENSIONS = settings.get('show_bbox_dimensions', False)
+            self.SHOW_TILT_ANGLE = settings.get('show_tilt_angle', False)
             self.MIN_BBOX_WIDTH_THRESHOLD = settings.get('min_bbox_width_threshold', DEFAULT_MIN_PLATE_WIDTH)
             self.LABEL_FONT_SIZE = settings.get('label_font_size', 12)
             self.PROPORTIONAL_SCALING = settings.get('proportional_scaling', False)
@@ -3280,7 +3323,28 @@ class UI:
             self.selection_status_label.config(text=status_text, fg="#C00C0C")
         else:
             self.selection_status_label.config(text="未選中任何框", fg="#8E8E79")
-    
+
+    def update_tilt_angle_display(self, angle=None):
+        """
+        Update tilt angle display
+
+        Args:
+            angle (float): Tilt angle in degrees, None if no angle available
+        """
+        if not self.SHOW_TILT_ANGLE:
+            self.tilt_angle_label.config(text="")
+            return
+
+        if angle is None:
+            self.tilt_angle_label.config(text="N/A", fg="#8E8E79")
+        else:
+            # Format angle with sign
+            if angle >= 0:
+                angle_text = f"+{angle:.1f}°"
+            else:
+                angle_text = f"{angle:.1f}°"
+            self.tilt_angle_label.config(text=angle_text, fg="#2D2D2D")
+
     def update_dragging_status_display(self, is_dragging=False, dragged_label=None):
         """
         更新拖曳狀態顯示
