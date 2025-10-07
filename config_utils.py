@@ -419,10 +419,10 @@ def save_recent_plates(plates_list):
 DEFAULT_HOTKEYS = {
     'previous_image': '<Left>',
     'next_image': '<Right>',
-    'switch_pen': '<Control_L>',
-    'delete': '<Delete>',
-    'search': '<Control-f>',
-    'quick_correction': '<t>',
+    'toggle_drawing_mode': '<Control_L>',
+    'delete_bbox': '<Delete>',
+    'search_file': '<Control-f>',
+    'quick_correct': '<t>',
     'cut_image': '<Shift-C>',
     'delete_image': '',  # Default unset - user can configure
 }
@@ -431,12 +431,12 @@ DEFAULT_HOTKEYS = {
 HOTKEY_ACTION_NAMES = {
     'previous_image': 'Previous Image',
     'next_image': 'Next Image',
-    'switch_pen': 'Switch Pen/Drawing Mode',
-    'delete': 'Delete Selected Bbox',
-    'search': 'Open Search Window',
-    'quick_correction': 'Quick Correction',
+    'toggle_drawing_mode': 'Toggle Drawing Mode',
+    'delete_bbox': 'Delete Bbox',
+    'search_file': 'Search File',
+    'quick_correct': 'Quick Correct',
     'cut_image': 'Cut Image',
-    'delete_image': 'Delete Current Image',
+    'delete_image': 'Delete Image',
 }
 
 def get_default_hotkeys():

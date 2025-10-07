@@ -372,8 +372,8 @@ class Controller:
             DEBUG("entry_value:", event_data.get("value"))
             DEBUG("do L-CTRL EVENT")
 
-        elif event_type == UIEvent.DRAWING_MODE_TOGGLE:
-            DEBUG("Controller: Drawing mode toggle.")
+        elif event_type == UIEvent.TOGGLE_DRAWING_MODE:
+            DEBUG("Controller: Toggle drawing mode.")
             self.drawing_mode = event_data.get("drawing_mode", False)
             DEBUG("Drawing mode set to: {}", self.drawing_mode)
 
@@ -387,16 +387,14 @@ class Controller:
             DEBUG("entry_value:", event_data.get("value"))
             DEBUG("do R-CTRL RELEASE EVENT")
 
-        elif event_type == UIEvent.RIGHT_PRESS:
-            DEBUG("Controller: Right pressed.")
+        elif event_type == UIEvent.NEXT_IMAGE:
+            DEBUG("Controller: Next image.")
             DEBUG("entry_value:", event_data.get("value"))
-            DEBUG("do R-Press EVENT")
             self.next_image()
 
-        elif event_type == UIEvent.LEFT_PRESS:
-            DEBUG("Controller: Left pressed.")
+        elif event_type == UIEvent.PREVIOUS_IMAGE:
+            DEBUG("Controller: Previous image.")
             DEBUG("entry_value:", event_data.get("value"))
-            DEBUG("do L-Press EVENT")
             self.previous_image()
 
         elif event_type == UIEvent.MOUSE_LEFT_CLICK:
@@ -409,10 +407,9 @@ class Controller:
             self.handle_mouse_right_click(event_data)
 
 
-        elif event_type == UIEvent.RESELECT_BT_CLICK:
-            DEBUG("Controller: Reselect button clicked.")
+        elif event_type == UIEvent.SELECT_FOLDERS:
+            DEBUG("Controller: Select folders.")
             DEBUG("entry_value:", event_data.get("value"))
-            DEBUG("do RESELECT EVENT")
 
             try :
                 self.select_folders()
@@ -420,15 +417,10 @@ class Controller:
                 ERROR("Error selecting folders:", e)
                 self.view.show_error(e)
 
-        elif event_type == UIEvent.CROP_BT_CLICK:
-            DEBUG("Controller: Crop button clicked.")
+        elif event_type == UIEvent.CROP_ALL:
+            DEBUG("Controller: Crop all.")
             # DEBUG("entry_value:", event_data.get("value"))
             self.handle_crop_all()
-
-        elif event_type == UIEvent.ADD_BT_CLICK:
-            DEBUG("Controller: Add button clicked.")
-            DEBUG("entry_value:", event_data.get("value"))
-            DEBUG("do ADD EVENT")
 
         elif event_type == UIEvent.CLASS_ID_CHANGE:
             DEBUG("Controller: Class ID changed.")
@@ -448,8 +440,8 @@ class Controller:
             self.handle_mouse_drag(event_data)
 
 
-        elif event_type == UIEvent.DELETE_KEY:
-            DEBUG("Controller: Delete key pressed.")
+        elif event_type == UIEvent.DELETE_BBOX:
+            DEBUG("Controller: Delete bbox action triggered.")
             self.delete_selected_label()
 
         elif event_type == UIEvent.DELETE_IMAGE:
@@ -505,12 +497,12 @@ class Controller:
             DEBUG("Input text:", input_text)
             self.apply_input_text_to_labels(input_text)
             
-        elif event_type == UIEvent.SELECT_LEFTMOST_BBOX:
-            DEBUG("Controller: Select leftmost bbox clicked.")
+        elif event_type == UIEvent.QUICK_CORRECT:
+            DEBUG("Controller: Quick correct.")
             self.select_leftmost_bbox_and_trigger_input()
-            
-        elif event_type == UIEvent.CONFIGURATION_BT_CLICK:
-            DEBUG("Controller: Configuration button clicked.")
+
+        elif event_type == UIEvent.OPEN_SETTINGS:
+            DEBUG("Controller: Open settings.")
             self.handle_configuration_button()
             
         elif event_type == UIEvent.BATCH_SORT:

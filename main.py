@@ -14,7 +14,7 @@ def main():
         if controller:
             controller.handle_event(event_type, event_data)
 
-        elif event_type == UIEvent.RESELECT_BT_CLICK:
+        elif event_type == UIEvent.SELECT_FOLDERS:
             try:
                 controller = Controller(ui)
                 #controller.handle_event(UIEvent.WINDOW_READY, {})

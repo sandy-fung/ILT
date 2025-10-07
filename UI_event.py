@@ -4,8 +4,8 @@ class UIEvent(Enum):
     LEFT_CTRL_PRESS = auto()
     RIGHT_CTRL_PRESS = auto()
     RIGHT_CTRL_RELEASE = auto()
-    RIGHT_PRESS = auto()
-    LEFT_PRESS = auto()
+    NEXT_IMAGE = auto()
+    PREVIOUS_IMAGE = auto()
 
     MOUSE_LEFT_CLICK = auto()
     MOUSE_RIGHT_CLICK = auto()
@@ -13,9 +13,9 @@ class UIEvent(Enum):
     MOUSE_LEFT_RELEASE = auto()
     MOUSE_DRAG = auto()
 
-    DRAWING_MODE_TOGGLE = auto()
+    TOGGLE_DRAWING_MODE = auto()
 
-    DELETE_KEY = auto()
+    DELETE_BBOX = auto()
     DELETE_IMAGE = auto()
     MOVE_IMAGE = auto()
     MOVE_IMAGE_CLASSIFIED = auto()
@@ -23,15 +23,13 @@ class UIEvent(Enum):
     CUT_IMAGE = auto()
     VERTICAL_LINE_PRESS = auto()
 
-    RESELECT_BT_CLICK = auto()
-    CROP_BT_CLICK = auto()
-    ADD_BT_CLICK = auto()
-    CONFIGURATION_BT_CLICK = auto()
+    SELECT_FOLDERS = auto()
+    CROP_ALL = auto()
+    OPEN_SETTINGS = auto()
     CLASS_ID_CHANGE = auto()
     INPUT_ENTER = auto()
-    SELECT_LEFTMOST_BBOX = auto()
+    QUICK_CORRECT = auto()
     BATCH_SORT = auto()
-    TIMER_BT_CLICK = auto()
     
     # Settings dialog events
     SETTINGS_DIALOG_CONFIRM = auto()

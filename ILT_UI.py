@@ -98,48 +98,39 @@ class UI:
         self.toolbar =  tk.Frame(self.window, bg = "#F4F4F4")
         self.toolbar.pack(side = "top", fill = "x")
 
-        self.reselect_button = tk.Button(
+        self.select_folders_button = tk.Button(
             self.toolbar, bg = "#F4F4F4",
             width = 16, height = 1,
             text = "Reselect Folders", font=("Segoe UI", 10), fg = "#0C0CC0",
             relief = "flat", bd = 2,
             command = self.on_bt_click_reselect
         )
-        self.reselect_button.pack(side = "left", padx = 5)
+        self.select_folders_button.pack(side = "left", padx = 5)
         
-        self.crop_button = tk.Button(
+        self.crop_all_button = tk.Button(
             self.toolbar, bg = "#F4F4F4",
             width = 4, height = 1,
             text = "Crop", font=("Segoe UI", 10), fg = "#0C0CC0",
             relief = "flat", bd = 2,
             command = self.on_bt_click_crop
         )
-        self.crop_button.pack(side = "left")
-        
-        self.add_button = tk.Button(
-            self.toolbar, bg = "#F4F4F4",
-            width = 4, height = 1,
-            text = "Add", font=("Segoe UI", 10), fg = "#0C0CC0",
-            relief = "flat", bd = 2,
-            command = self.on_bt_click_add
-        )
-        self.add_button.pack(side = "left", padx = 5)
+        self.crop_all_button.pack(side = "left")
 
-        self.del_button = tk.Button(
+        self.delete_image_button = tk.Button(
             self.toolbar, bg = "#F4F4F4",
             width = 4, height = 1,
             text="Delete", font=("Segoe UI", 10), fg = "#0C0CC0",
             relief = "flat", bd = 2,
-            command = self.on_delete_image_button)
-        self.del_button.pack(side = "left", padx = 5)
+            command = self.delete_image)
+        self.delete_image_button.pack(side = "left", padx = 5)
         
-        self.mov_button = tk.Button(
+        self.move_button = tk.Button(
             self.toolbar, bg = "#F4F4F4",
             width = 8, height = 1,
             text="Move to", font=("Segoe UI", 10), fg = "#0C0CC0",
             relief = "flat", bd = 2,
             command = self.show_move_menu)
-        self.mov_button.pack(side = "left", padx = 5)
+        self.move_button.pack(side = "left", padx = 5)
         
         # 建立 move to  menu
         self.move_menu = tk.Menu(self.window, tearoff=0)
@@ -155,22 +146,22 @@ class UI:
         )
         self.batch_sort_button.pack(side = "left", padx = 5)
 
-        self.configuration_button = tk.Button(
+        self.settings_button = tk.Button(
             self.toolbar, bg = "#F4F4F4",
             width = 12, height = 1,
             text = "Configuration", fg = "#0C0CC0",
             relief = "flat", bd = 2,
             command = self.on_configuration_click
         )
-        self.configuration_button.pack(side = "left", padx = 5)
+        self.settings_button.pack(side = "left", padx = 5)
 
-        self.info_button = tk.Button(
+        self.show_info_button = tk.Button(
             self.toolbar, bg = "#F4F4F4",
             width = 4, height = 1,
             text="Info", font=("Segoe UI", 10), fg = "#0C0CC0",
             relief = "flat", bd = 2,
             command = self.show_info_dialog)
-        self.info_button.pack(side = "left", padx =0)
+        self.show_info_button.pack(side = "left", padx =0)
         
         # Timer display label (shows countdown when active)
         self.timer_label = tk.Label(
@@ -390,13 +381,13 @@ class UI:
         )
         self.selection_status_label.grid(row = 0, column = 1, sticky = "nw", padx = (20, 20))
         
-        # Add select leftmost bbox button
-        self.select_leftmost_button = tk.Button(
+        # Add quick correct button
+        self.quick_correct_button = tk.Button(
             self.hint_frame, bg = "#E0E0E0", text = "快速校正車牌字元(熱鍵: T)",
             fg = "#2D2D2D", font = ("Segoe UI", 10),
-            command = lambda: self.dispatch(UIEvent.SELECT_LEFTMOST_BBOX, {}) if self.dispatch else None
+            command = lambda: self.dispatch(UIEvent.QUICK_CORRECT, {}) if self.dispatch else None
         )
-        self.select_leftmost_button.grid(row = 0, column = 3, sticky = "w", padx = (10, 0))
+        self.quick_correct_button.grid(row = 0, column = 3, sticky = "w", padx = (10, 0))
 
     def create_preview_area(self):
         if not self.SHOW_PREVIEW:
@@ -1912,7 +1903,7 @@ class UI:
             self.dispatch(UIEvent.CANVAS_RESIZE, {})
             
 
-    def on_cut_image(self, event):
+    def cut_image(self, event):
         if self.input_box and self.window.focus_get() is self.input_box:
             return
 
@@ -1925,7 +1916,7 @@ class UI:
             # Get the position of the cut line
             position = self.cut_line.get_x()
             self.dispatch(UIEvent.CUT_IMAGE, {"position": position})
-            
+
             # Add your logic here to handle the cut line position
         else:
             print("Cut line does not exist.")
@@ -2534,28 +2525,23 @@ class UI:
 
     def show_move_menu(self):
         # 取得按鈕在畫面中的位置
-        x = self.mov_button.winfo_rootx()
-        y = self.mov_button.winfo_rooty() + self.mov_button.winfo_height()
+        x = self.move_button.winfo_rootx()
+        y = self.move_button.winfo_rooty() + self.move_button.winfo_height()
         self.move_menu.tk_popup(x, y)
         
     def on_bt_click_reselect(self):
         DEBUG("on_bt_click_reselect")
         if self.dispatch:
-            self.dispatch(UIEvent.RESELECT_BT_CLICK, {})
+            self.dispatch(UIEvent.SELECT_FOLDERS, {})
 
     def on_bt_click_crop(self):
         DEBUG("on_bt_click_crop")
         if self.dispatch:
-            self.dispatch(UIEvent.CROP_BT_CLICK, {})
-
-    def on_bt_click_add(self):
-        DEBUG("on_bt_click_add")
-        if self.dispatch:
-            self.dispatch(UIEvent.ADD_BT_CLICK, {})        
+            self.dispatch(UIEvent.CROP_ALL, {})
 
     def on_cut_image_button_click(self):
         DEBUG("on_cut_image_button_click")
-        self.on_cut_image(None)
+        self.cut_image(None)
             
     # Mouse events
     def on_mouse_click_right(self, event):
@@ -2651,25 +2637,25 @@ class UI:
             self.bbox_controller.update_crosshair_position(event.x, event.y)
 
     # Key events
-    def on_lc_press_switch_pen(self, event):
-        """Left Ctrl key toggle drawing mode"""
+    def toggle_drawing_mode(self, event):
+        """Toggle drawing mode"""
         if self.input_box and self.window.focus_get() is self.input_box:
             return
 
-        DEBUG("on_lc_press_switch_pen triggered")
+        DEBUG("toggle_drawing_mode triggered")
 
         # Toggle drawing mode
         if self.bbox_controller:
             self.drawing_mode = self.bbox_controller.toggle_drawing_mode()
             DEBUG("Drawing mode toggled to: {}", self.drawing_mode)
-            
+
             # Update status display
             self.update_drawing_mode_display()
         else:
             ERROR("bbox_controller is None!")
-        
+
         if self.dispatch:
-            self.dispatch(UIEvent.DRAWING_MODE_TOGGLE, {"value": event, "drawing_mode": self.drawing_mode})
+            self.dispatch(UIEvent.TOGGLE_DRAWING_MODE, {"value": event, "drawing_mode": self.drawing_mode})
 
     def on_rc_press(self, event):
         DEBUG("on_rc_press")
@@ -2702,27 +2688,27 @@ class UI:
         if self.dispatch:
             self.dispatch(UIEvent.WINDOW_POSITION, {})
 
-    def on_delete_key(self, event):
+    def delete_bbox(self, event):
         if self.input_box and self.window.focus_get() is self.input_box:
             return
 
-        DEBUG("on_delete_key")
+        DEBUG("delete_bbox")
         if self.dispatch:
-            self.dispatch(UIEvent.DELETE_KEY, {"value": event})
+            self.dispatch(UIEvent.DELETE_BBOX, {"value": event})
     
-    def on_t_key(self, event):
+    def quick_correct(self, event):
         if self.input_box and self.window.focus_get() is self.input_box:
             return
-        
-        DEBUG("on_t_key - Quick correction hotkey pressed")
+
+        DEBUG("quick_correct - Quick correction hotkey pressed")
         if self.dispatch:
-            self.dispatch(UIEvent.SELECT_LEFTMOST_BBOX, {})
+            self.dispatch(UIEvent.QUICK_CORRECT, {})
 
-    def on_delete_image_button(self, event=None):
+    def delete_image(self, event=None):
         if self.input_box and self.window.focus_get() is self.input_box:
             return
 
-        DEBUG("on_delete_image_button")
+        DEBUG("delete_image")
         if self.dispatch:
             self.dispatch(UIEvent.DELETE_IMAGE,  None)
        
@@ -2734,7 +2720,7 @@ class UI:
         else:
             DEBUG("Search enter with empty text or dispatch not set")
             
-    def open_search_window(self,event):
+    def search_file(self,event):
         if self.input_box and self.window.focus_get() is self.input_box:
             return
 
@@ -2787,7 +2773,7 @@ class UI:
         """Handle configuration button click"""
         DEBUG("on_configuration_click")
         if self.dispatch:
-            self.dispatch(UIEvent.CONFIGURATION_BT_CLICK, None)
+            self.dispatch(UIEvent.OPEN_SETTINGS, None)
     
 
     def on_text_modified(self, event):
@@ -3091,7 +3077,7 @@ class UI:
                 
                 # Bind keyboard shortcut if not already bound
                 if not hasattr(self, '_cut_image_bound') or not self._cut_image_bound:
-                    self.window.bind("<Shift-C>", self.on_cut_image)
+                    self.window.bind("<Shift-C>", self.cut_image)
                     self._cut_image_bound = True
                         
             else:
@@ -3131,18 +3117,18 @@ class UI:
     def next_image(self, event):
         if self.input_box and self.window.focus_get() is self.input_box:
             return
-        
+
         DEBUG("next_image")
         if self.dispatch:
-            self.dispatch(UIEvent.RIGHT_PRESS, {"value": event})
+            self.dispatch(UIEvent.NEXT_IMAGE, {"value": event})
 
     def previous_image(self, event):
         if self.input_box and self.window.focus_get() is self.input_box:
             return
-        
+
         DEBUG("previous_image")
         if self.dispatch:
-            self.dispatch(UIEvent.LEFT_PRESS, {"value": event})
+            self.dispatch(UIEvent.PREVIOUS_IMAGE, {"value": event})
 
     # Bind key and mouse with events
     def setup_events(self):
@@ -3180,12 +3166,12 @@ class UI:
         action_handlers = {
             'previous_image': self.previous_image,
             'next_image': self.next_image,
-            'switch_pen': self.on_lc_press_switch_pen,
-            'delete': self.on_delete_key,
-            'search': self.open_search_window,
-            'quick_correction': self.on_t_key,
-            'cut_image': self.on_cut_image,
-            'delete_image': self.on_delete_image_button,
+            'toggle_drawing_mode': self.toggle_drawing_mode,
+            'delete_bbox': self.delete_bbox,
+            'search_file': self.search_file,
+            'quick_correct': self.quick_correct,
+            'cut_image': self.cut_image,
+            'delete_image': self.delete_image,
         }
 
         # Bind each hotkey to its handler
@@ -3268,7 +3254,7 @@ class UI:
     def delete_from_context_menu(self):
         """從右鍵菜單觸發刪除"""
         if self.dispatch:
-            self.dispatch(UIEvent.DELETE_KEY, {"value": None})
+            self.dispatch(UIEvent.DELETE_BBOX, {"value": None})
     
     def cancel_current_drawing(self):
         """Cancel current drawing"""
