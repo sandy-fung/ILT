@@ -133,6 +133,10 @@ class BBoxController:
         self.draw_start_x = x
         self.draw_start_y = y
         DEBUG("Started drawing at ({}, {})", x, y)
+
+        # Hide cursor to avoid obstructing view during drawing
+        self.canvas.config(cursor="none")
+
         return True
 
     def update_preview(self, x, y):
@@ -200,6 +204,9 @@ class BBoxController:
         x, y = self._clamp_to_image_area(x, y)
 
         self.is_drawing = False
+
+        # Restore cursor to pencil when drawing finishes
+        self.canvas.config(cursor="pencil")
 
         # Clear preview box and reference box
         if self.current_preview_id:
@@ -296,6 +303,10 @@ class BBoxController:
         """Cancel current drawing"""
         if self.is_drawing:
             self.is_drawing = False
+
+            # Restore cursor to pencil when drawing is cancelled
+            self.canvas.config(cursor="pencil")
+
             if self.current_preview_id:
                 self.canvas.delete(self.current_preview_id)
                 self.current_preview_id = None
