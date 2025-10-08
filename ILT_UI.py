@@ -2302,8 +2302,12 @@ class UI:
         if not selected_label or not hasattr(selected_label, 'line_index'):
             DEBUG("No valid label selected.")
             return
-        
+
         line_index = selected_label.line_index
+        if line_index is None:
+            DEBUG("Label line_index is None, skipping highlight")
+            return
+
         DEBUG("Highlighting line_index {}", line_index)
         start = f"{line_index + 1}.0"
         end = f"{line_index + 1}.end"

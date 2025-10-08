@@ -673,11 +673,10 @@ class Controller:
             self.current_labels.append(new_label)
             DEBUG("Added new bbox: cx={:.6f}, cy={:.6f}, w={:.6f}, h={:.6f}", cx, cy, w_ratio, h_ratio)
 
-            # 重新排序標籤
-            if len(self.current_labels) > 1:
-                original_count = len(self.current_labels)
-                self.current_labels, plate_count = label_display_utils.sort_labels_by_position(self.current_labels)
-                DEBUG("Re-sorted {} labels after adding new bbox", original_count)
+            # 重新排序標籤 (確保所有 label 都有正確的 line_index)
+            original_count = len(self.current_labels)
+            self.current_labels, plate_count = label_display_utils.sort_labels_by_position(self.current_labels)
+            DEBUG("Re-sorted {} labels after adding new bbox", original_count)
             self.refresh()
 
         except Exception as e:
