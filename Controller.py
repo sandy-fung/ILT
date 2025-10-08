@@ -1068,44 +1068,36 @@ class Controller:
             return False
         
     def select_leftmost_bbox_and_trigger_input(self):
-        """Select the leftmost bbox and trigger input enter event"""
+        """Clear selection and apply input text to all labels"""
         if not self.current_labels:
-            DEBUG("No labels to select")
+            DEBUG("No labels to apply input to")
             return
-            
+
         bbox_ctrl = self.view.bbox_controller
         if not bbox_ctrl:
             DEBUG("No bbox controller available")
             return
-            
-        # Find leftmost label (minimum cx_ratio)
-        leftmost_label = min(self.current_labels, key=lambda label: label.cx_ratio)
-        DEBUG("Found leftmost label with cx_ratio: {}", leftmost_label.cx_ratio)
-        
+
         # Clear current selection
         bbox_ctrl.clear_selection(self.current_labels)
-        
-        # Select the leftmost label
-        leftmost_label.set_selected(True)
-        bbox_ctrl.selected_label = leftmost_label
-        
-        # Update display
+
+        # Update display to show no selection
         self.update_label_display()
-        self.view.update_selection_status_display(leftmost_label)
-        
+        self.view.update_selection_status_display(None)
+
         # Get text from input box and trigger input enter
         if self.view.input_box:
             input_text = self.view.input_box.get().strip()
             if input_text and input_text != "請輸入車牌號碼":
-                DEBUG("Triggering input enter with text: {}", input_text)
-                self.apply_input_text_to_labels(input_text)
+                DEBUG("Triggering quick correct with text: {}", input_text)
+                self.apply_input_text_to_labels(input_text, is_quick_correct=True)
                 self.view.window.focus_set()
             else:
                 DEBUG("Input box is empty or has placeholder text")
         else:
             DEBUG("Input box not available")
     
-    def apply_input_text_to_labels(self, input_text):
+    def apply_input_text_to_labels(self, input_text, is_quick_correct=False):
         DEBUG("Current labels count : {}", len(self.current_labels))
 
         class_ids = char_handler.convert_text_to_class_ids(input_text)
@@ -1123,7 +1115,7 @@ class Controller:
                     self.view.show_error("輸入長度超過剩餘標籤數量，請重新輸入")
                     ERROR("Input length exceeds remaining labels count. Input: {}, Remaining: {}", len(class_ids), len(self.current_labels) - start_idx)
                     return
-                
+
                 for i, cid in enumerate(class_ids):
                     self.current_labels[start_idx + i].class_id = cid
 
@@ -1144,14 +1136,23 @@ class Controller:
 
         if not char_handler.is_same_length_as_labels(class_ids, len(self.current_labels)):
             self.view.show_error("輸入長度與標籤數量不符，請重新輸入")
-            
+
             if hasattr(self.view, "focus_input_box"):
                 self.view.focus_input_box()
-                
+
             return
-        
-        for i, cid in enumerate(class_ids):
-            self.current_labels[i].class_id = cid
+
+        # Quick correct mode: sort all labels by visual order (cx_ratio)
+        if is_quick_correct:
+            DEBUG("Quick correct mode: sorting labels by X position")
+            sorted_labels = sorted(self.current_labels, key=lambda l: l.cx_ratio)
+
+            for i, cid in enumerate(class_ids):
+                sorted_labels[i].class_id = cid
+        else:
+            # Normal mode: use current_labels order (grouped by plate)
+            for i, cid in enumerate(class_ids):
+                self.current_labels[i].class_id = cid
 
         self.save_current_labels()
         self.update_label_display()
