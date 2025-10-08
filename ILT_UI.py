@@ -364,8 +364,64 @@ class UI:
         self.hint_frame = tk.Frame(self.right_bottom_frame, bg = "#FAFAFA")
         self.hint_frame.pack(side = "top", expand = True, fill = "x")
 
-        self.index_label = tk.Label(self.hint_frame, bg = "#FAFAFA", text = " : ", fg = "#C0C00C", font = ("Segoe UI", 11))
-        self.index_label.grid(row = 0, column = 2, sticky = "nwse")
+        # Create container frame for page number display
+        self.index_frame = tk.Frame(self.hint_frame, bg = "#FAFAFA")
+        self.index_frame.grid(row = 0, column = 2, sticky = "nwse")
+
+        # Button to jump to first page
+        self.jump_first_button = tk.Button(
+            self.index_frame,
+            text = "⏮",
+            bg = "#FAFAFA",
+            fg = "#C0C00C",
+            font = ("Segoe UI", 14),
+            relief = "solid",
+            bd = 0,
+            padx = 3,
+            pady = 1,
+            cursor = "hand2",
+            command = lambda: self.dispatch(UIEvent.JUMP_TO_FIRST, {}) if self.dispatch else None
+        )
+        self.jump_first_button.pack(side = "left", padx = (0, 3))
+
+        # Entry for current page number (editable)
+        self.index_entry = tk.Entry(
+            self.index_frame,
+            bg = "#FAFAFA",
+            fg = "#C0C00C",
+            font = ("Segoe UI", 11),
+            width = 5,
+            justify = "right",
+            relief = "solid",
+            bd = 0,
+            highlightthickness = 1,
+            highlightcolor = "#C0C00C",
+            highlightbackground = "#D0D0D0"
+        )
+        self.index_entry.pack(side = "left")
+        self.index_entry.bind("<Return>", lambda e: self.on_index_entry_enter())
+
+        # Label for total pages (read-only)
+        self.index_total_label = tk.Label(self.index_frame, bg = "#FAFAFA", fg = "#C0C00C", font = ("Segoe UI", 11), text = "/0")
+        self.index_total_label.pack(side = "left")
+
+        # Button to jump to last page
+        self.jump_last_button = tk.Button(
+            self.index_frame,
+            text = "⏭",
+            bg = "#FAFAFA",
+            fg = "#C0C00C",
+            font = ("Segoe UI", 14),
+            relief = "solid",
+            bd = 0,
+            padx = 3,
+            pady = 1,
+            cursor = "hand2",
+            command = lambda: self.dispatch(UIEvent.JUMP_TO_LAST, {}) if self.dispatch else None
+        )
+        self.jump_last_button.pack(side = "left", padx = (3, 0))
+
+        self.total_pages = 0  # Store total pages for validation
 
 
     # Add drawing mode status display
@@ -2220,8 +2276,14 @@ class UI:
 
     def update_index_label(self, index, path):
         DEBUG("update_index_label")
-        self.index_label.config(text = f"{index + 1} : {len(path)}")
-        DEBUG("Index label updated with index: {}", index)
+        # Update total pages for validation
+        self.total_pages = len(path)
+        # Update current page entry (editable)
+        self.index_entry.delete(0, tk.END)
+        self.index_entry.insert(0, f"{index + 1}")
+        # Update total pages label (read-only)
+        self.index_total_label.config(text = f"/{len(path)}")
+        DEBUG("Index display updated: {}/{}", index + 1, len(path))
 
     def update_path_label(self, path):
         self.path_label.config(text = f"{path}")
@@ -2765,7 +2827,38 @@ class UI:
             self.dispatch(UIEvent.SEARCH_FILE, {"filename": filename})
         else:
             DEBUG("Search enter with empty text or dispatch not set")
-            
+
+    def on_index_entry_enter(self):
+        """Handle Enter key press in index entry to jump to page"""
+        page_text = self.index_entry.get().strip()
+        if not page_text:
+            DEBUG("Index entry is empty")
+            return
+
+        try:
+            # Parse input - support "X/Y" format or just "X"
+            if "/" in page_text:
+                # Extract number before "/"
+                page_num = int(page_text.split("/")[0].strip())
+            else:
+                # Direct number input
+                page_num = int(page_text)
+
+            DEBUG("Jump to page request: {}", page_num)
+
+            # Validate range (1-based input)
+            if page_num < 1 or page_num > self.total_pages:
+                self.show_error(f"頁數必須在 1 到 {self.total_pages} 之間")
+                return
+
+            # Trigger jump event
+            if self.dispatch:
+                self.dispatch(UIEvent.JUMP_TO_PAGE, {"page": page_num})
+
+        except ValueError:
+            DEBUG("Invalid page number input: {}", page_text)
+            self.show_error("請輸入有效的頁數")
+
     def search_file(self,event):
         if self.input_box and self.window.focus_get() is self.input_box:
             return
@@ -3379,7 +3472,7 @@ class UI:
             self.window.after(3000, lambda: self.update_selection_status_display())
 
     def _clear_focus(self, event):
-        if event.widget not in (self.input_box, self.label_text_box):
+        if event.widget not in (self.input_box, self.label_text_box, self.index_entry):
             self.window.focus_set()
 
     def run(self):

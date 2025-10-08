@@ -20,6 +20,9 @@ class UIEvent(Enum):
     MOVE_IMAGE = auto()
     MOVE_IMAGE_CLASSIFIED = auto()
     SEARCH_FILE = auto()
+    JUMP_TO_PAGE = auto()
+    JUMP_TO_FIRST = auto()
+    JUMP_TO_LAST = auto()
     CUT_IMAGE = auto()
     VERTICAL_LINE_PRESS = auto()
 

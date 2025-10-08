@@ -354,7 +354,63 @@ class Controller:
             # 在第一張時顯示提示並執行自動批次排序
             self.view.show_warning("Reach the Beginning")
             self.auto_batch_sort_labels()
-    
+
+    def jump_to_page(self, page_num):
+        """Jump to specified page (1-based)"""
+        DEBUG("Jump to page: {}", page_num)
+
+        # Convert to 0-based index
+        target_index = page_num - 1
+
+        # Validate range
+        if target_index < 0 or target_index >= len(self.images):
+            self.view.show_error(f"頁數超出範圍：{page_num}")
+            ERROR("Page number out of range: {}", page_num)
+            return
+
+        # Update index
+        self.image_index = target_index
+        config_utils.save_image_index(self.image_index)
+
+        # Refresh image and labels (same as next/previous image)
+        self.on_fresh_image_label()
+
+        INFO("Jumped to page {}", page_num)
+
+    def jump_to_first(self):
+        """Jump to first page"""
+        DEBUG("Jump to first page")
+
+        if len(self.images) == 0:
+            self.view.show_warning("沒有圖片可跳轉")
+            return
+
+        # Update index to first page (0)
+        self.image_index = 0
+        config_utils.save_image_index(self.image_index)
+
+        # Refresh image and labels
+        self.on_fresh_image_label()
+
+        INFO("Jumped to first page")
+
+    def jump_to_last(self):
+        """Jump to last page"""
+        DEBUG("Jump to last page")
+
+        if len(self.images) == 0:
+            self.view.show_warning("沒有圖片可跳轉")
+            return
+
+        # Update index to last page
+        self.image_index = len(self.images) - 1
+        config_utils.save_image_index(self.image_index)
+
+        # Refresh image and labels
+        self.on_fresh_image_label()
+
+        INFO("Jumped to last page")
+
     def window_ready(self):
         INFO("Controller: Window is ready.")
         self.on_fresh_image_label()
@@ -482,7 +538,23 @@ class Controller:
                     self.view.show_error(f"not found: {search_term}")
             else:
                 self.view.show_error("請輸入搜尋關鍵字")
-        
+
+        elif event_type == UIEvent.JUMP_TO_PAGE:
+            DEBUG("Controller: Jump to page.")
+            page_num = event_data.get("page", 0)
+            if page_num > 0:
+                self.jump_to_page(page_num)
+            else:
+                self.view.show_error("無效的頁數")
+
+        elif event_type == UIEvent.JUMP_TO_FIRST:
+            DEBUG("Controller: Jump to first page.")
+            self.jump_to_first()
+
+        elif event_type == UIEvent.JUMP_TO_LAST:
+            DEBUG("Controller: Jump to last page.")
+            self.jump_to_last()
+
         elif event_type == UIEvent.CUT_IMAGE:
             DEBUG("Controller: Cut image button pressed.")
             x_position = event_data.get("position", "")
