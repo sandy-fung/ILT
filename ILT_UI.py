@@ -2307,8 +2307,13 @@ class UI:
         self.label_text_box.edit_modified(False)
         self.label_text_box.bind("<<Modified>>", self.on_text_modified)
 
-    def update_console(self, content=None):
-        """Update console text box with scan results"""
+    def update_console(self, content=None, plate_data=None):
+        """Update console text box with scan results
+
+        Args:
+            content (str): Formatted text content to display
+            plate_data (list): List of tuples (plate_text, page_num, filename) for clickable lines
+        """
         if not self.SHOW_TEXT_BOX or self.console_text_box is None:
             DEBUG("Console is not shown or not initialized.")
             return
@@ -2318,6 +2323,53 @@ class UI:
         if content is None:
             content = ""
         self.console_text_box.insert(tk.END, content)
+
+        # Add clickable tags for data lines
+        if plate_data:
+            # Find the line number where data starts (after header lines)
+            lines = content.split('\n')
+            data_start_line = None
+            for i, line in enumerate(lines, start=1):
+                if line.startswith('-' * 70):
+                    data_start_line = i + 1  # Data starts after separator line
+                    break
+
+            if data_start_line:
+                for idx, (plate_text, page_num, filename) in enumerate(plate_data):
+                    line_num = data_start_line + idx
+                    tag_name = f"clickable_{line_num}"
+
+                    # Add tag for this line
+                    start_pos = f"{line_num}.0"
+                    end_pos = f"{line_num}.end"
+                    self.console_text_box.tag_add(tag_name, start_pos, end_pos)
+
+                    # Configure tag appearance (clickable style)
+                    self.console_text_box.tag_config(
+                        tag_name,
+                        foreground="#00ffff",  # Cyan for clickable items
+                        underline=True
+                    )
+
+                    # Bind click event
+                    self.console_text_box.tag_bind(
+                        tag_name,
+                        "<Button-1>",
+                        lambda event, page=page_num, line=line_num: self.on_console_line_click(event, page, line)
+                    )
+
+                    # Change cursor on hover
+                    self.console_text_box.tag_bind(
+                        tag_name,
+                        "<Enter>",
+                        lambda event: self.console_text_box.config(cursor="hand2")
+                    )
+                    self.console_text_box.tag_bind(
+                        tag_name,
+                        "<Leave>",
+                        lambda event: self.console_text_box.config(cursor="")
+                    )
+
         self.console_text_box.config(state="disabled")
 
         # Switch to console tab
@@ -2963,6 +3015,50 @@ class UI:
         DEBUG("on_bt_click_scan_plates")
         if self.dispatch:
             self.dispatch(UIEvent.SCAN_UNIQUE_PLATES, {})
+
+    def on_console_line_click(self, event, page_num, line_num):
+        """Handle click on console line to jump to corresponding page
+
+        Args:
+            event: Tkinter event object
+            page_num (int): Page number to jump to (1-based)
+            line_num (int): Line number in console text box (1-based)
+        """
+        DEBUG("Console line clicked: jumping to page {}, highlighting line {}", page_num, line_num)
+
+        # Highlight the clicked line for visual feedback
+        if self.console_text_box:
+            try:
+                # Temporarily enable text box to modify tags
+                self.console_text_box.config(state="normal")
+
+                # Clear previous highlight
+                self.console_text_box.tag_remove("console_selected", "1.0", tk.END)
+
+                # Add highlight to clicked line
+                start_pos = f"{line_num}.0"
+                end_pos = f"{line_num}.end"
+                self.console_text_box.tag_add("console_selected", start_pos, end_pos)
+
+                # Configure highlight style (yellow background, black text)
+                self.console_text_box.tag_config(
+                    "console_selected",
+                    background="#ffff00",
+                    foreground="#000000"
+                )
+
+                # Raise tag priority so it appears above clickable style
+                self.console_text_box.tag_raise("console_selected")
+
+                # Restore disabled state
+                self.console_text_box.config(state="disabled")
+
+            except Exception as e:
+                ERROR("Error highlighting console line: {}", e)
+
+        # Dispatch jump event
+        if self.dispatch:
+            self.dispatch(UIEvent.JUMP_TO_PAGE, {"page": page_num})
 
     def on_configuration_click(self):
         """Handle configuration button click"""

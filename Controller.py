@@ -1099,10 +1099,17 @@ class Controller:
             output_lines.append("")
             output_lines.append("=" * 70)
 
+            # Prepare plate data for clickable lines
+            plate_data = []
+            if unique_plates:
+                for plate_text, locations in sorted_unique:
+                    idx, filename = locations[0]
+                    plate_data.append((plate_text, idx, filename))
+
             # Update console display
             output_text = '\n'.join(output_lines)
             if hasattr(self.view, 'update_console'):
-                self.view.update_console(output_text)
+                self.view.update_console(output_text, plate_data=plate_data)
 
             INFO("掃描完成: 找到 {} 個單次出現的車牌", len(unique_plates))
 
