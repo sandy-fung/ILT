@@ -270,6 +270,22 @@ def get_show_tilt_angle():
     except:
         return False  # Default to False
 
+def get_preview_zoom_scale():
+    """Get preview zoom scale factor"""
+    try:
+        return config.getfloat("UISettings", "preview_zoom_scale")
+    except:
+        return 1.0  # Default to 1x (original size)
+
+def save_preview_zoom_scale(scale):
+    """Save preview zoom scale factor"""
+    if not config.has_section("UISettings"):
+        config.add_section("UISettings")
+    config.set("UISettings", "preview_zoom_scale", str(scale))
+
+    with open(DEFAULT_CONFI_PATH, "w") as f:
+        config.write(f)
+
 def get_min_bbox_width_threshold():
     from ILT_UI import DEFAULT_MIN_PLATE_WIDTH
     """Get minimum bbox width threshold for warning"""

@@ -507,6 +507,42 @@ class UI:
         self.crop_container.pack(side = "left", fill = "both", expand = True)
         tk.Label(self.crop_container, text="Crop", bg="#FAFAFA", fg="#2d2d2d",
                 font=("Segoe UI", 11, "bold")).pack(side="top", pady=5)
+
+        # Create zoom scale buttons toolbar
+        zoom_toolbar = tk.Frame(self.crop_container, bg="#FAFAFA")
+        zoom_toolbar.pack(side="top", pady=(0, 5))
+
+        tk.Label(zoom_toolbar, text="縮放:", bg="#FAFAFA", fg="#666666",
+                font=("Segoe UI", 9, "bold")).pack(side="left", padx=(8, 5))
+
+        # Store zoom buttons for state management
+        self.preview_zoom_buttons = {}
+        zoom_scales = [1.0, 1.5, 2.0, 3.0, 3.5]
+        zoom_labels = ["x1", "x1.5", "x2", "x3", "x3.5"]
+
+        for scale, label in zip(zoom_scales, zoom_labels):
+            btn = tk.Button(
+                zoom_toolbar,
+                text=label,
+                width=5,
+                font=("Segoe UI", 9),
+                relief="flat",
+                bg="#F5F5F5",
+                fg="#555555",
+                activebackground="#E8E8E8",
+                activeforeground="#333333",
+                bd=1,
+                highlightthickness=0,
+                cursor="hand2",
+                command=lambda s=scale: self.on_preview_zoom_changed(s)
+            )
+            btn.pack(side="left", padx=2)
+            self.preview_zoom_buttons[scale] = btn
+
+            # Add hover effects
+            btn.bind("<Enter>", lambda e, b=btn: b.config(bg="#E8E8E8") if b.cget("relief") == "flat" else None)
+            btn.bind("<Leave>", lambda e, b=btn: b.config(bg="#F5F5F5") if b.cget("relief") == "flat" else None)
+
         self._create_canvas_with_scrollbars("crop", parent_override=self.crop_container)
 
         # Right: Original
@@ -527,7 +563,11 @@ class UI:
         self.original_photo_image = None
         self.pending_original_image = None
         self.original_image_labels = []  # List of LabelObject instances for original image
-        
+
+        # Initialize preview zoom scale
+        self.preview_zoom_scale = config_utils.get_preview_zoom_scale()
+        self._update_zoom_button_states()
+
         # Schedule placeholder text after window is rendered
         if self.preview_canvas:
             self.preview_canvas.after_idle(self._add_preview_placeholder)
@@ -787,40 +827,54 @@ class UI:
 
     def update_preview(self, original_image):
         """Update preview with the full original image
-        
+
         Args:
             original_image: PIL Image object
         """
         if not self.SHOW_PREVIEW or self.preview_canvas is None:
             return
-            
+
         from PIL import Image, ImageTk
-        
+        import image_utils
+
         # Clear magnifier cache when preview updates
         self.clear_magnifier_cache()
-        
+
         # Clear previous preview
         self.preview_canvas.delete("all")
-        
+
         # Get original image dimensions
         img_width, img_height = original_image.size
-        
-        # Convert to PhotoImage for Tkinter (original size)
-        self.preview_photo_image = ImageTk.PhotoImage(original_image)
-        
-        # Display on preview canvas at original size
+
+        # Apply zoom scale
+        zoom_scale = getattr(self, 'preview_zoom_scale', 1.0)
+        scaled_width = int(img_width * zoom_scale)
+        scaled_height = int(img_height * zoom_scale)
+
+        # Resize image if zoom scale is not 1.0
+        if abs(zoom_scale - 1.0) > 0.01:
+            scaled_image = image_utils.resize_image(original_image, (scaled_width, scaled_height))
+            self.preview_photo_image = ImageTk.PhotoImage(scaled_image)
+        else:
+            # Use original size
+            self.preview_photo_image = ImageTk.PhotoImage(original_image)
+
+        # Display on preview canvas
         self.preview_canvas.create_image(0, 0, anchor = "nw", image = self.preview_photo_image, tags = "preview_image")
-        
-        # Update scroll region to match original image size
-        self.preview_canvas.config(scrollregion = (0, 0, img_width, img_height))
-        
+
+        # Update scroll region to match scaled image size
+        self.preview_canvas.config(scrollregion = (0, 0, scaled_width, scaled_height))
+
         # Get canvas dimensions for info text positioning
         self.preview_canvas.update_idletasks()
         canvas_width = self.preview_canvas.winfo_width()
         canvas_height = self.preview_canvas.winfo_height()
-        
+
         # Add info text at visible position
-        info_text = f"原始尺寸: {img_width}×{img_height}"
+        if abs(zoom_scale - 1.0) > 0.01:
+            info_text = f"原始: {img_width}×{img_height} | 縮放: {zoom_scale}x ({scaled_width}×{scaled_height})"
+        else:
+            info_text = f"原始尺寸: {img_width}×{img_height}"
         self.preview_canvas.create_text(
             10, canvas_height - 5,
             text = info_text,
@@ -829,9 +883,61 @@ class UI:
             anchor = "sw",
             tags = ("info_text", "overlay")
         )
-        
-        DEBUG("Preview updated with original size image: {}×{}", img_width, img_height)
-    
+
+        DEBUG("Preview updated with {}x zoom: original {}×{} -> scaled {}×{}",
+              zoom_scale, img_width, img_height, scaled_width, scaled_height)
+
+    def _update_zoom_button_states(self):
+        """Update zoom button visual states to show current selection"""
+        if not hasattr(self, 'preview_zoom_buttons'):
+            return
+
+        for scale, btn in self.preview_zoom_buttons.items():
+            if abs(scale - self.preview_zoom_scale) < 0.01:  # Float comparison tolerance
+                # Selected state - darker blue with white text for better contrast
+                btn.config(
+                    relief="flat",
+                    bg="#2E7BD4",
+                    fg="#FFFFFF",
+                    font=("Segoe UI", 9, "bold"),
+                    bd=1,
+                    highlightthickness=1,
+                    highlightbackground="#2E7BD4"
+                )
+            else:
+                # Unselected state - flat style with neutral color
+                btn.config(
+                    relief="flat",
+                    bg="#F5F5F5",
+                    fg="#555555",
+                    font=("Segoe UI", 9),
+                    bd=1,
+                    highlightthickness=0
+                )
+
+    def on_preview_zoom_changed(self, scale):
+        """Handle preview zoom scale button click
+
+        Args:
+            scale: New zoom scale factor (1.0, 1.5, 2.0, 3.0, 3.5)
+        """
+        DEBUG("Preview zoom scale changed to: {}x", scale)
+
+        # Update zoom scale
+        self.preview_zoom_scale = scale
+
+        # Update button states
+        self._update_zoom_button_states()
+
+        # Save to config
+        config_utils.save_preview_zoom_scale(scale)
+
+        # Refresh preview display if image is loaded
+        if self.original_image:
+            self.update_preview(self.original_image)
+
+        INFO("Preview zoom scale set to {}x", scale)
+
     def update_original_preview(self, original_image):
         """Update original preview tab with auto-scaled original image
         
@@ -1332,12 +1438,14 @@ class UI:
             img_width, img_height = image.size
             
             if canvas_type == "crop":
-                # Crop canvas: image is displayed at original size, account for scrolling
+                # Crop canvas: image may be zoomed, account for scrolling and zoom scale
                 canvas_x_scroll = canvas.canvasx(canvas_x)
                 canvas_y_scroll = canvas.canvasy(canvas_y)
-                # Direct mapping since no scaling
-                img_x = int(canvas_x_scroll)
-                img_y = int(canvas_y_scroll)
+
+                # Apply inverse zoom scale to get original image coordinates
+                zoom_scale = getattr(self, 'preview_zoom_scale', 1.0)
+                img_x = int(canvas_x_scroll / zoom_scale)
+                img_y = int(canvas_y_scroll / zoom_scale)
             else:
                 # Original canvas: image is scaled and centered
                 if hasattr(self, 'original_preview_scale') and hasattr(self, 'original_preview_offset'):
