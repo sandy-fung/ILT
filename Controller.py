@@ -274,12 +274,13 @@ class Controller:
         # Labels are already parsed and drawn in update_resized_image()
 
     def update_tilt_angle(self):
-        """Update tilt angle display (similar to load_label for textbox)"""
+        """Update tilt angle and IoU display (similar to load_label for textbox)"""
         if self.view.SHOW_TILT_ANGLE and self.current_labels and len(self.current_labels) >= 2:
             angle, _, _ = label_display_utils.calculate_plate_tilt_angle(self.current_labels)
-            self.view.update_tilt_angle_display(angle)
+            iou = label_display_utils.calculate_average_iou(self.current_labels)
+            self.view.update_tilt_angle_display(angle, iou)
         else:
-            self.view.update_tilt_angle_display(None)
+            self.view.update_tilt_angle_display(None, None)
 
     def parse_current_labels(self):
         """Parse current image's label file and store LabelObject instances"""
@@ -1127,15 +1128,16 @@ class Controller:
         if self.current_labels:
             self.view.draw_labels_on_canvas(self.current_labels)
 
-            # Update tilt angle display if enabled
+            # Update tilt angle and IoU display if enabled
             if self.view.SHOW_TILT_ANGLE and len(self.current_labels) >= 2:
                 angle, _, _ = label_display_utils.calculate_plate_tilt_angle(self.current_labels)
-                self.view.update_tilt_angle_display(angle)
+                iou = label_display_utils.calculate_average_iou(self.current_labels)
+                self.view.update_tilt_angle_display(angle, iou)
             else:
-                self.view.update_tilt_angle_display(None)
+                self.view.update_tilt_angle_display(None, None)
         else:
             self.view.clear_all_labels_canvas()
-            self.view.update_tilt_angle_display(None)
+            self.view.update_tilt_angle_display(None, None)
 
         # Update text box display
         self.load_label(self.labels_path)

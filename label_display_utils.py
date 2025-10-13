@@ -714,3 +714,67 @@ def calculate_plate_tilt_angle(labels):
     except Exception as e:
         ERROR("Error calculating tilt angle: {}", e)
         return None, None, None
+
+
+def calculate_average_iou(labels):
+    """
+    Calculate average IoU (Intersection over Union) between adjacent bounding boxes.
+
+    This function calculates the IoU for each pair of adjacent labels (i, i+1)
+    and returns the average. Useful for detecting overlapping annotations.
+
+    Args:
+        labels (list): List of LabelObject instances
+
+    Returns:
+        float: Average IoU value (0.0 to 1.0), or None if calculation fails
+               - 0.0: No overlap (good spacing)
+               - < 0.3: Acceptable slight overlap
+               - >= 0.3: Significant overlap (potential issue)
+    """
+    if not labels or len(labels) < 2:
+        DEBUG("Not enough labels for IoU calculation (need at least 2)")
+        return None
+
+    # Convert labels to boxes with area
+    boxes = [
+        yolo_to_box(l.cx_ratio, l.cy_ratio, l.w_ratio, l.h_ratio)
+        for l in labels if l.w_ratio > 0 and l.h_ratio > 0
+    ]
+
+    if len(boxes) < 2:
+        DEBUG("Not enough valid boxes for IoU calculation")
+        return None
+
+    def calc_iou(b1, b2):
+        """Calculate IoU between two boxes"""
+        # Calculate intersection coordinates
+        x1 = max(b1[0], b2[0])
+        y1 = max(b1[1], b2[1])
+        x2 = min(b1[2], b2[2])
+        y2 = min(b1[3], b2[3])
+
+        # Calculate intersection area
+        inter = max(0.0, x2 - x1) * max(0.0, y2 - y1)
+        if inter <= 0.0:
+            return 0.0
+
+        # Calculate union area
+        union = b1[4] + b2[4] - inter
+        return inter / union if union > 0 else 0.0
+
+    # Calculate IoU for adjacent pairs
+    total_iou = 0.0
+    count = 0
+    for i in range(len(boxes) - 1):
+        iou = calc_iou(boxes[i], boxes[i + 1])
+        total_iou += iou
+        count += 1
+        DEBUG("IoU between box {} and {}: {:.4f}", i, i + 1, iou)
+
+    if count == 0:
+        return None
+
+    avg_iou = total_iou / count
+    DEBUG("Average IoU: {:.4f} (from {} pairs)", avg_iou, count)
+    return float(avg_iou)

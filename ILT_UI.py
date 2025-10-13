@@ -486,6 +486,13 @@ class UI:
         )
         self.tilt_angle_label.grid(row = 0, column = 4, sticky = "w", padx = (10, 0))
 
+        # Add IoU display label
+        self.iou_label = tk.Label(
+            self.hint_frame, bg = "#FAFAFA", text = "IoU: N/A",
+            fg = "#8E8E79", font = ("Segoe UI", 11)
+        )
+        self.iou_label.grid(row = 0, column = 5, sticky = "w", padx = (10, 0))
+
     def create_preview_area(self):
         if not self.SHOW_PREVIEW:
             DEBUG("Preview area is not shown as per configuration.")
@@ -3756,26 +3763,57 @@ class UI:
         else:
             self.selection_status_label.config(text="未選中任何框", fg="#8E8E79")
 
-    def update_tilt_angle_display(self, angle=None):
+    def update_tilt_angle_display(self, angle=None, iou=None):
         """
-        Update tilt angle display
+        Update tilt angle and IoU display with independent color coding
 
         Args:
             angle (float): Tilt angle in degrees, None if no angle available
+            iou (float): Average IoU value (0.0 to 1.0), None if no IoU available
         """
         if not self.SHOW_TILT_ANGLE:
             self.tilt_angle_label.config(text="")
+            self.iou_label.config(text="")
             return
 
+        # === Update tilt angle label ===
         if angle is None:
-            self.tilt_angle_label.config(text="N/A", fg="#8E8E79")
+            angle_text = "N/A"
+            angle_color = "#8E8E79"  # Gray for N/A
         else:
             # Format angle with sign
             if angle >= 0:
                 angle_text = f"+{angle:.1f}°"
             else:
                 angle_text = f"{angle:.1f}°"
-            self.tilt_angle_label.config(text=angle_text, fg="#2D2D2D")
+
+            # Color coding based on angle magnitude
+            abs_angle = abs(angle)
+            if abs_angle < 2.0:
+                angle_color = "#00AA00"  # Green for good alignment
+            elif abs_angle < 5.0:
+                angle_color = "#FFA500"  # Orange for slight tilt
+            else:
+                angle_color = "#C00C0C"  # Red for significant tilt
+
+        self.tilt_angle_label.config(text=angle_text, fg=angle_color)
+
+        # === Update IoU label ===
+        if iou is None:
+            iou_text = "IoU: N/A"
+            iou_color = "#8E8E79"  # Gray for N/A
+        else:
+            iou_text = f"IoU: {iou:.2f}"
+
+            # Color coding based on IoU value
+            if iou < 0.1:
+                iou_color = "#00AA00"  # Green for good spacing
+            elif iou < 0.3:
+                iou_color = "#FFA500"  # Orange for slight overlap
+            else:
+                iou_color = "#C00C0C"  # Red for significant overlap
+
+        self.iou_label.config(text=iou_text, fg=iou_color)
 
     def update_dragging_status_display(self, is_dragging=False, dragged_label=None):
         """
