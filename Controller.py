@@ -589,7 +589,11 @@ class Controller:
         elif event_type == UIEvent.BATCH_SORT:
             DEBUG("Controller: Batch sort button clicked.")
             self.batch_sort_all_labels()
-            
+
+        elif event_type == UIEvent.SCAN_UNIQUE_PLATES:
+            DEBUG("Controller: Scan unique plates button clicked.")
+            self.scan_unique_plates()
+
         elif event_type == UIEvent.SETTINGS_DIALOG_CONFIRM:
             DEBUG("Controller: Settings dialog confirmed.")
             self.handle_settings_confirm(event_data)
@@ -1002,6 +1006,109 @@ class Controller:
         except Exception as e:
             ERROR("自動批次排序過程中發生錯誤: {}", e)
             self.view.show_error(f"自動批次排序失敗: {e}")
+
+    def scan_unique_plates(self):
+        """Scan label folder and find plates that appear only once"""
+        if not self.label_folder_path or not os.path.exists(self.label_folder_path):
+            self.view.show_error("標籤資料夾路徑無效")
+            return
+
+        try:
+            # 掃描標籤資料夾中的所有 .txt 檔案
+            label_files = sorted([f for f in os.listdir(self.label_folder_path)
+                                 if f.lower().endswith('.txt')])
+
+            if not label_files:
+                self.view.show_warning("標籤資料夾中未找到任何 .txt 檔案")
+                return
+
+            INFO("開始掃描 {} 個標籤檔案以找出單次出現的車牌", len(label_files))
+
+            # Dictionary to store plate occurrences: {plate_text: [(file_index, filename), ...]}
+            plate_occurrences = {}
+            total_plates = 0
+
+            # Scan all label files
+            for idx, label_file in enumerate(label_files, start=1):
+                label_file_path = os.path.join(self.label_folder_path, label_file)
+
+                try:
+                    # Parse label file
+                    labels = label_display_utils.parse_label_file(label_file_path)
+
+                    if not labels:
+                        continue
+
+                    # Group labels by plate
+                    plate_groups = label_display_utils.group_labels_by_plate(labels)
+
+                    # Convert each plate to text
+                    for plate_labels in plate_groups:
+                        # Sort labels by X position within plate
+                        sorted_plate = sorted(plate_labels, key=lambda l: l.cx_ratio)
+
+                        # Convert class_id to characters
+                        plate_chars = []
+                        for label in sorted_plate:
+                            char = wlm.get_label(label.class_id)
+                            if char:
+                                plate_chars.append(char)
+
+                        # Combine into plate text
+                        plate_text = ''.join(plate_chars)
+
+                        if plate_text:  # Only count non-empty plates
+                            if plate_text not in plate_occurrences:
+                                plate_occurrences[plate_text] = []
+                            plate_occurrences[plate_text].append((idx, label_file))
+                            total_plates += 1
+
+                except Exception as e:
+                    ERROR("處理檔案 {} 時發生錯誤: {}", label_file, e)
+
+            # Filter plates that appear only once
+            unique_plates = {plate: locations for plate, locations in plate_occurrences.items()
+                           if len(locations) == 1}
+
+            # Format output
+            output_lines = []
+            output_lines.append("=" * 70)
+            output_lines.append("單次出現車牌掃描結果".center(70))
+            output_lines.append("=" * 70)
+            output_lines.append(f"掃描檔案數: {len(label_files)}")
+            output_lines.append(f"總車牌數: {total_plates}")
+            output_lines.append(f"單次出現車牌數: {len(unique_plates)}")
+            output_lines.append("")
+
+            if unique_plates:
+                output_lines.append(f"{'車牌號碼':<20} {'圖片編號':<10} {'檔案名稱':<30}")
+                output_lines.append("-" * 70)
+
+                # Sort by image index
+                sorted_unique = sorted(unique_plates.items(),
+                                     key=lambda x: x[1][0][0])
+
+                for plate_text, locations in sorted_unique:
+                    idx, filename = locations[0]
+                    # Remove .txt extension from filename
+                    display_name = filename[:-4] if filename.endswith('.txt') else filename
+                    output_lines.append(f"{plate_text:<20} #{idx:<9} {display_name:<30}")
+            else:
+                output_lines.append("未找到單次出現的車牌")
+
+            output_lines.append("")
+            output_lines.append("=" * 70)
+
+            # Update console display
+            output_text = '\n'.join(output_lines)
+            if hasattr(self.view, 'update_console'):
+                self.view.update_console(output_text)
+
+            INFO("掃描完成: 找到 {} 個單次出現的車牌", len(unique_plates))
+
+        except Exception as e:
+            ERROR("掃描單次車牌過程中發生錯誤: {}", e)
+            self.view.show_error(f"掃描失敗: {e}")
 
     def update_label_display(self):
         """Update label display"""

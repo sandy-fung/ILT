@@ -147,6 +147,15 @@ class UI:
         )
         self.batch_sort_button.pack(side = "left", padx = 5)
 
+        self.scan_plates_button = tk.Button(
+            self.toolbar, bg = "#F4F4F4",
+            width = 10, height = 1,
+            text = "Scan Plates", font=("Segoe UI", 10), fg = "#0C0CC0",
+            relief = "flat", bd = 2,
+            command = self.on_bt_click_scan_plates
+        )
+        self.scan_plates_button.pack(side = "left", padx = 5)
+
         self.settings_button = tk.Button(
             self.toolbar, bg = "#F4F4F4",
             width = 12, height = 1,
@@ -339,22 +348,46 @@ class UI:
             self.input_box = None
             self.plate_memory_frame = None
 
-        # Initialize text box if enabled
+        # Initialize text box if enabled - using Notebook for tab switching
         if self.SHOW_TEXT_BOX:
+            # Create Notebook (tab control)
+            self.text_notebook = ttk.Notebook(self.text_frame)
+            self.text_notebook.pack(side="top", fill="both", expand=True, padx=20, pady=10)
+
+            # Tab 1: Labels (original text box)
+            self.labels_tab = tk.Frame(self.text_notebook, bg="#FAFAFA")
+            self.text_notebook.add(self.labels_tab, text="Labels")
+
             self.label_text_box = tk.Text(
-                self.text_frame,
-                height = 15, bg = "#FAFAFA",
-                font = ("Segoe UI", 11), fg = "#2d2d2d",
-                relief = "sunken",
-                wrap = "word"
+                self.labels_tab,
+                height=15, bg="#FAFAFA",
+                font=("Segoe UI", 11), fg="#2d2d2d",
+                relief="sunken",
+                wrap="word"
             )
-            self.label_text_box.tag_configure("left", justify = "left")
-            self.label_text_box.pack(side = "top", fill = "x", expand = True, padx = 20, pady = 10)
+            self.label_text_box.tag_configure("left", justify="left")
+            self.label_text_box.pack(fill="both", expand=True)
             self.label_text_box.bind("<<Modified>>", self.on_text_modified)
+
+            # Tab 2: Console (for scan results)
+            self.console_tab = tk.Frame(self.text_notebook, bg="#FAFAFA")
+            self.text_notebook.add(self.console_tab, text="Console")
+
+            self.console_text_box = tk.Text(
+                self.console_tab,
+                height=15, bg="#2d2d2d",
+                font=("Consolas", 10), fg="#00ff00",
+                relief="sunken",
+                wrap="none",
+                state="disabled"  # Read-only
+            )
+            self.console_text_box.pack(fill="both", expand=True)
 
         else:
             DEBUG("Text box is not shown as per configuration.")
             self.label_text_box = None
+            self.console_text_box = None
+            self.text_notebook = None
 
         self.path_label = tk.Label(self.text_frame, bg = "#FAFAFA", font = ("Segoe UI", 11), fg = "#C0C00C", anchor = "w", justify = "left", wraplength = 700)
         self.path_label.bind("<Button-1>", self._on_copy_file_name_text)
@@ -2274,6 +2307,23 @@ class UI:
         self.label_text_box.edit_modified(False)
         self.label_text_box.bind("<<Modified>>", self.on_text_modified)
 
+    def update_console(self, content=None):
+        """Update console text box with scan results"""
+        if not self.SHOW_TEXT_BOX or self.console_text_box is None:
+            DEBUG("Console is not shown or not initialized.")
+            return
+
+        self.console_text_box.config(state="normal")
+        self.console_text_box.delete("1.0", tk.END)
+        if content is None:
+            content = ""
+        self.console_text_box.insert(tk.END, content)
+        self.console_text_box.config(state="disabled")
+
+        # Switch to console tab
+        if self.text_notebook:
+            self.text_notebook.select(self.console_tab)
+
     def update_index_label(self, index, path):
         DEBUG("update_index_label")
         # Update total pages for validation
@@ -2908,6 +2958,12 @@ class UI:
         if self.dispatch:
             self.dispatch(UIEvent.BATCH_SORT, {})
 
+    def on_bt_click_scan_plates(self):
+        """Handle scan plates button click"""
+        DEBUG("on_bt_click_scan_plates")
+        if self.dispatch:
+            self.dispatch(UIEvent.SCAN_UNIQUE_PLATES, {})
+
     def on_configuration_click(self):
         """Handle configuration button click"""
         DEBUG("on_configuration_click")
@@ -3034,40 +3090,63 @@ class UI:
             ERROR("Error toggling class ID buttons: {}", e)
     
     def toggle_text_box(self, show):
-        """Toggle text box visibility"""
+        """Toggle text box visibility (now using Notebook)"""
         try:
             if show:
-                # If we want to show but label_text_box doesn't exist, create it
-                if not hasattr(self, 'label_text_box') or self.label_text_box is None:
-                    DEBUG("Creating text box for show operation")
+                # If we want to show but text_notebook doesn't exist, create it
+                if not hasattr(self, 'text_notebook') or self.text_notebook is None:
+                    DEBUG("Creating text notebook for show operation")
                     if hasattr(self, 'text_frame'):
+                        # Create Notebook (tab control)
+                        self.text_notebook = ttk.Notebook(self.text_frame)
+
+                        # Tab 1: Labels
+                        self.labels_tab = tk.Frame(self.text_notebook, bg="#FAFAFA")
+                        self.text_notebook.add(self.labels_tab, text="Labels")
+
                         self.label_text_box = tk.Text(
-                            self.text_frame,
-                            height=15, bg="white",
-                            font=("Segoe UI", 11), fg="#8E8E79",
+                            self.labels_tab,
+                            height=15, bg="#FAFAFA",
+                            font=("Segoe UI", 11), fg="#2d2d2d",
                             relief="sunken",
                             wrap="word"
                         )
                         self.label_text_box.tag_configure("left", justify="left")
-                
-                # Show the text box
-                if hasattr(self, 'label_text_box') and self.label_text_box:
+                        self.label_text_box.pack(fill="both", expand=True)
+                        self.label_text_box.bind("<<Modified>>", self.on_text_modified)
+
+                        # Tab 2: Console
+                        self.console_tab = tk.Frame(self.text_notebook, bg="#FAFAFA")
+                        self.text_notebook.add(self.console_tab, text="Console")
+
+                        self.console_text_box = tk.Text(
+                            self.console_tab,
+                            height=15, bg="#2d2d2d",
+                            font=("Consolas", 10), fg="#00ff00",
+                            relief="sunken",
+                            wrap="none",
+                            state="disabled"
+                        )
+                        self.console_text_box.pack(fill="both", expand=True)
+
+                # Show the notebook
+                if hasattr(self, 'text_notebook') and self.text_notebook:
                     try:
                         # Check if already packed by trying to get pack_info
-                        self.label_text_box.pack_info()
+                        self.text_notebook.pack_info()
                     except tk.TclError:
                         # Not packed, so pack it
-                        self.label_text_box.pack(side="top", fill="x", padx=20, pady=10)
-                        DEBUG("Text box shown")
+                        self.text_notebook.pack(side="top", fill="both", expand=True, padx=20, pady=10)
+                        DEBUG("Text notebook shown")
             else:
-                # Hide the text box if it exists
-                if hasattr(self, 'label_text_box') and self.label_text_box:
+                # Hide the notebook if it exists
+                if hasattr(self, 'text_notebook') and self.text_notebook:
                     try:
                         # Check if packed by trying to get pack_info
-                        self.label_text_box.pack_info()
+                        self.text_notebook.pack_info()
                         # If we get here, it's packed, so forget it
-                        self.label_text_box.pack_forget()
-                        DEBUG("Text box hidden")
+                        self.text_notebook.pack_forget()
+                        DEBUG("Text notebook hidden")
                     except tk.TclError:
                         # Already not packed
                         pass

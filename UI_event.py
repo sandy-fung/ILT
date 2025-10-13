@@ -33,7 +33,8 @@ class UIEvent(Enum):
     INPUT_ENTER = auto()
     QUICK_CORRECT = auto()
     BATCH_SORT = auto()
-    
+    SCAN_UNIQUE_PLATES = auto()
+
     # Settings dialog events
     SETTINGS_DIALOG_CONFIRM = auto()
     SETTINGS_DIALOG_CANCEL = auto()
