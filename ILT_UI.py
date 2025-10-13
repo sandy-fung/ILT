@@ -546,6 +546,10 @@ class UI:
         self.preview_magnifier_drag_start_x = 0
         self.preview_magnifier_drag_start_y = 0
         self.preview_magnifier_selection_rect = None
+
+        # Initialize preview click marker state (for showing clicked position on main canvas)
+        self.preview_click_marker_lines = []
+        self.preview_click_marker_visible = False
     
     def _create_canvas_with_scrollbars(self, canvas_type, parent_override=None):
         """Create a canvas with scrollbars for the specified type (crop or original)"""
@@ -1055,14 +1059,17 @@ class UI:
         if width < 5 and height < 5:
             # Small movement - treat as click, use original magnifier logic
             self.show_magnifier_tooltip(event.x, event.y, canvas_type)
+
+            # Show position marker on main canvas
+            self._show_click_position_on_main_canvas(event.x, event.y, canvas_type)
         else:
             # Any drag - always use the actual dragged region size
             self.show_magnifier_for_region(
-                self.preview_magnifier_drag_start_x, 
+                self.preview_magnifier_drag_start_x,
                 self.preview_magnifier_drag_start_y,
                 event.x, event.y, canvas_type
             )
-        
+
         # Reset drag state
         self.preview_magnifier_dragging = False
         
@@ -1136,13 +1143,166 @@ class UI:
                 self.magnifier_tooltip.destroy()
                 self.magnifier_tooltip = None
                 DEBUG("Magnifier tooltip hidden")
-                
+
                 # Dispatch magnifier hide event
                 if self.dispatch:
                     self.dispatch(UIEvent.MAGNIFIER_HIDE, {})
             except:
                 pass
-                
+
+    def show_preview_click_marker(self, canvas_x, canvas_y):
+        """Show a crosshair marker on main canvas at the specified position
+
+        Uses double border design (black outer + bright green inner) for maximum visibility.
+
+        Args:
+            canvas_x, canvas_y: Coordinates on main canvas where to show marker
+        """
+        # Hide existing marker first
+        self.hide_preview_click_marker()
+
+        # Get canvas dimensions
+        canvas_width = self.canvas.winfo_width()
+        canvas_height = self.canvas.winfo_height()
+
+        if canvas_width <= 1 or canvas_height <= 1:
+            DEBUG("Canvas not ready yet, skipping marker display")
+            return
+
+        # Marker configuration
+        line_length = 50
+        outer_width = 6
+        inner_width = 3
+        outer_color = "#000000"  # Black
+        inner_color = "#00FF00"  # Bright green
+        circle_radius = 6
+
+        # Outer layer (black) - horizontal
+        h_outer = self.canvas.create_line(
+            canvas_x - line_length, canvas_y,
+            canvas_x + line_length, canvas_y,
+            fill=outer_color, width=outer_width,
+            tags="preview_click_marker"
+        )
+        # Outer layer (black) - vertical
+        v_outer = self.canvas.create_line(
+            canvas_x, canvas_y - line_length,
+            canvas_x, canvas_y + line_length,
+            fill=outer_color, width=outer_width,
+            tags="preview_click_marker"
+        )
+
+        # Inner layer (bright green) - horizontal
+        h_inner = self.canvas.create_line(
+            canvas_x - line_length, canvas_y,
+            canvas_x + line_length, canvas_y,
+            fill=inner_color, width=inner_width,
+            tags="preview_click_marker"
+        )
+        # Inner layer (bright green) - vertical
+        v_inner = self.canvas.create_line(
+            canvas_x, canvas_y - line_length,
+            canvas_x, canvas_y + line_length,
+            fill=inner_color, width=inner_width,
+            tags="preview_click_marker"
+        )
+
+        # Center circle with double border
+        circle_outer = self.canvas.create_oval(
+            canvas_x - circle_radius, canvas_y - circle_radius,
+            canvas_x + circle_radius, canvas_y + circle_radius,
+            outline=outer_color, width=3, tags="preview_click_marker"
+        )
+        circle_inner = self.canvas.create_oval(
+            canvas_x - circle_radius + 1, canvas_y - circle_radius + 1,
+            canvas_x + circle_radius - 1, canvas_y + circle_radius - 1,
+            outline=inner_color, width=2, tags="preview_click_marker"
+        )
+
+        # Store marker IDs
+        marker_ids = [h_outer, v_outer, h_inner, v_inner, circle_outer, circle_inner]
+        self.preview_click_marker_lines = marker_ids
+        self.preview_click_marker_visible = True
+
+        # Ensure marker is on top
+        self.canvas.tag_raise("preview_click_marker")
+
+        DEBUG("Preview click marker shown at ({}, {})", canvas_x, canvas_y)
+
+    def hide_preview_click_marker(self):
+        """Hide preview click marker from main canvas"""
+        if self.preview_click_marker_visible and self.preview_click_marker_lines:
+            for line_id in self.preview_click_marker_lines:
+                try:
+                    self.canvas.delete(line_id)
+                except:
+                    pass
+            self.preview_click_marker_lines = []
+            self.preview_click_marker_visible = False
+            DEBUG("Preview click marker hidden")
+
+        # Also delete by tags as a safety measure
+        self.canvas.delete("preview_click_marker")
+
+    def _show_click_position_on_main_canvas(self, preview_canvas_x, preview_canvas_y, canvas_type="crop"):
+        """Convert preview canvas click to main canvas position and show marker
+
+        Args:
+            preview_canvas_x, preview_canvas_y: Click position on preview canvas
+            canvas_type: Either "crop" or "original"
+        """
+        try:
+            # Step 1: Convert preview canvas coordinates to original image pixel coordinates
+            img_x, img_y = self.canvas_to_image_coords(preview_canvas_x, preview_canvas_y, canvas_type)
+            if img_x is None or img_y is None:
+                DEBUG("Invalid preview canvas coordinates for marker display")
+                return
+
+            # Step 2: Get original image dimensions
+            image = self.original_image if canvas_type == "crop" else self.original_image_for_preview
+            if not image:
+                DEBUG("No image available for coordinate conversion")
+                return
+
+            img_width, img_height = image.size
+
+            # Step 3: Convert to YOLO ratio coordinates
+            cx_ratio = img_x / img_width
+            cy_ratio = img_y / img_height
+
+            DEBUG("Preview click at image coords ({}, {}) = YOLO ratio ({:.4f}, {:.4f})",
+                  img_x, img_y, cx_ratio, cy_ratio)
+
+            # Step 4: Convert YOLO ratio to main canvas coordinates
+            if not self._ctx:
+                DEBUG("No image context available, cannot show marker")
+                return
+
+            img_w = self._ctx["img_w"]
+            img_h = self._ctx["img_h"]
+            sx = self._ctx["sx"]
+            sy = self._ctx["sy"]
+            ox = self._ctx["ox"]
+            oy = self._ctx["oy"]
+            disp_w = self._ctx["disp_w"]
+            disp_h = self._ctx["disp_h"]
+
+            # Convert YOLO ratio to display coordinates
+            display_x = cx_ratio * disp_w
+            display_y = cy_ratio * disp_h
+
+            # Apply offset for black borders
+            main_canvas_x = display_x + ox
+            main_canvas_y = display_y + oy
+
+            DEBUG("Main canvas position: ({:.1f}, {:.1f})", main_canvas_x, main_canvas_y)
+
+            # Step 5: Show marker on main canvas
+            self.show_preview_click_marker(main_canvas_x, main_canvas_y)
+
+        except Exception as e:
+            ERROR("Failed to show click position on main canvas: {}", str(e))
+
     def canvas_to_image_coords(self, canvas_x, canvas_y, canvas_type="crop"):
         """Convert preview canvas coordinates to original image coordinates
         

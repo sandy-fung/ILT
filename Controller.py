@@ -219,7 +219,11 @@ class Controller:
             })
 
         self.view.update_image_canvas(self.image)
-        
+
+        # Clear preview click marker when switching images
+        if hasattr(self.view, 'hide_preview_click_marker'):
+            self.view.hide_preview_click_marker()
+
         # Set original image reference in UI for preview functionality
         if hasattr(self.view, 'set_original_image'):
             self.view.set_original_image(self.original_image)
