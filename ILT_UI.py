@@ -539,9 +539,9 @@ class UI:
             btn.pack(side="left", padx=2)
             self.preview_zoom_buttons[scale] = btn
 
-            # Add hover effects
-            btn.bind("<Enter>", lambda e, b=btn: b.config(bg="#E8E8E8") if b.cget("relief") == "flat" else None)
-            btn.bind("<Leave>", lambda e, b=btn: b.config(bg="#F5F5F5") if b.cget("relief") == "flat" else None)
+            # Add hover effects - only apply to unselected buttons (check background color)
+            btn.bind("<Enter>", lambda e, b=btn: b.config(bg="#E8E8E8") if b.cget("bg") == "#F5F5F5" else None)
+            btn.bind("<Leave>", lambda e, b=btn: b.config(bg="#F5F5F5") if b.cget("bg") == "#E8E8E8" else None)
 
         self._create_canvas_with_scrollbars("crop", parent_override=self.crop_container)
 
@@ -1206,11 +1206,46 @@ class UI:
             if img_x is None or img_y is None:
                 DEBUG("Invalid coordinates for magnification")
                 return
-                
-            # Extract magnified region from original image using configured parameters
+
+            # Calculate effective zoom factor by compounding preview zoom scale
+            # For crop canvas, multiply by preview zoom scale to match user's visual expectation
+            # For original canvas, use magnifier zoom factor only (original canvas has no zoom scale)
+            if canvas_type == "crop":
+                preview_scale = getattr(self, 'preview_zoom_scale', 1.0)
+                effective_zoom = self.magnifier_zoom_factor * preview_scale
+                DEBUG("Click magnifier with preview scale {}x × magnifier {}x = {}x total",
+                      preview_scale, self.magnifier_zoom_factor, effective_zoom)
+            else:
+                effective_zoom = self.magnifier_zoom_factor
+
+            # Apply screen size limits to prevent tooltip from exceeding screen
+            try:
+                screen_width = self.window.winfo_screenwidth() if hasattr(self.window, 'winfo_screenwidth') else 1920
+                screen_height = self.window.winfo_screenheight() if hasattr(self.window, 'winfo_screenheight') else 1080
+            except:
+                screen_width, screen_height = 1920, 1080
+
+            # Use 80% of screen size as maximum window size
+            max_window_width = int(screen_width * 0.8)
+            max_window_height = int(screen_height * 0.8)
+
+            # Calculate screen limits based on region size
+            region_size = self.magnifier_region_size
+            width_scale = max_window_width / region_size
+            height_scale = max_window_height / region_size
+
+            # Apply screen limits
+            effective_zoom = min(effective_zoom, width_scale, height_scale)
+
+            # Ensure minimum zoom (don't make images smaller than original)
+            effective_zoom = max(1.0, effective_zoom)
+
+            DEBUG("Final effective zoom after screen limits: {}x", effective_zoom)
+
+            # Extract magnified region from original image using effective zoom factor
             magnified_image = self.extract_magnified_region(
-                img_x, img_y, 
-                zoom_factor=self.magnifier_zoom_factor,
+                img_x, img_y,
+                zoom_factor=effective_zoom,
                 region_size=self.magnifier_region_size,
                 canvas_type=canvas_type
             )
@@ -1416,13 +1451,14 @@ class UI:
         except Exception as e:
             ERROR("Failed to show click position on main canvas: {}", str(e))
 
-    def canvas_to_image_coords(self, canvas_x, canvas_y, canvas_type="crop"):
+    def canvas_to_image_coords(self, canvas_x, canvas_y, canvas_type="crop", clamp_to_bounds=False):
         """Convert preview canvas coordinates to original image coordinates
-        
+
         Args:
             canvas_x, canvas_y: Coordinates on preview canvas
             canvas_type: Either "crop" or "original"
-            
+            clamp_to_bounds: If True, clamp out-of-bounds coordinates to image boundaries instead of returning None
+
         Returns:
             tuple: (img_x, img_y) in original image coordinates, or (None, None) if invalid
         """
@@ -1462,14 +1498,16 @@ class UI:
                 else:
                     return None, None
             
-            # Check if coordinates are within image bounds
-            if img_x < 0 or img_y < 0 or img_x >= img_width or img_y >= img_height:
-                return None, None
-            
-            # Clamp to image bounds
-            img_x = max(0, min(img_width - 1, img_x))
-            img_y = max(0, min(img_height - 1, img_y))
-            
+            # Handle out-of-bounds coordinates based on clamp_to_bounds parameter
+            if clamp_to_bounds:
+                # Clamp coordinates to image bounds
+                img_x = max(0, min(img_width - 1, img_x))
+                img_y = max(0, min(img_height - 1, img_y))
+            else:
+                # Return None if coordinates are out of bounds
+                if img_x < 0 or img_y < 0 or img_x >= img_width or img_y >= img_height:
+                    return None, None
+
             return img_x, img_y
             
         except Exception as e:
@@ -1903,20 +1941,13 @@ class UI:
             right = max(x1, x2)
             bottom = max(y1, y2)
             
-            # Convert canvas coordinates to image coordinates
-            img_left, img_top = self.canvas_to_image_coords(left, top, canvas_type)
-            img_right, img_bottom = self.canvas_to_image_coords(right, bottom, canvas_type)
-            
+            # Convert canvas coordinates to image coordinates with clamping to handle out-of-bounds drags
+            img_left, img_top = self.canvas_to_image_coords(left, top, canvas_type, clamp_to_bounds=True)
+            img_right, img_bottom = self.canvas_to_image_coords(right, bottom, canvas_type, clamp_to_bounds=True)
+
             if img_left is None or img_top is None or img_right is None or img_bottom is None:
                 DEBUG("Invalid coordinates for region magnification")
                 return
-            
-            # Ensure image coordinates are in bounds
-            img_width, img_height = image.size
-            img_left = max(0, min(img_width, img_left))
-            img_top = max(0, min(img_height, img_top))
-            img_right = max(0, min(img_width, img_right))
-            img_bottom = max(0, min(img_height, img_bottom))
             
             # Extract the selected region from original image
             region_width = abs(img_right - img_left)
@@ -1945,11 +1976,20 @@ class UI:
             # Calculate scaling factors based on screen limits
             width_scale = max_window_width / region_width
             height_scale = max_window_height / region_height
-            
-            # Use the configured zoom factor as the preferred scaling, but don't exceed screen limits
-            preferred_zoom = self.magnifier_zoom_factor
+
+            # For crop canvas, multiply by preview zoom scale to compound the magnification
+            # For original canvas, use magnifier zoom factor only (original canvas has no zoom scale)
+            if canvas_type == "crop":
+                preview_scale = getattr(self, 'preview_zoom_scale', 1.0)
+                preferred_zoom = self.magnifier_zoom_factor * preview_scale
+                DEBUG("Magnifying with preview scale {}x × magnifier {}x = {}x total",
+                      preview_scale, self.magnifier_zoom_factor, preferred_zoom)
+            else:
+                preferred_zoom = self.magnifier_zoom_factor
+
+            # Don't exceed screen limits
             zoom_factor = min(preferred_zoom, width_scale, height_scale)
-            
+
             # Ensure minimum zoom (don't make images smaller than original)
             zoom_factor = max(1.0, zoom_factor)
             
