@@ -68,6 +68,8 @@ class UI:
         self.SHOW_CUT_IMAGE = config_utils.get_show_cut_image()
         self.SHOW_BBOX_DIMENSIONS = config_utils.get_show_bbox_dimensions()
         self.SHOW_TILT_ANGLE = config_utils.get_show_tilt_angle()
+        self.ANGLE_COLOR_ASSIST = config_utils.get_angle_color_assist()
+        self.IOU_COLOR_ASSIST = config_utils.get_iou_color_assist()
         self.MIN_BBOX_WIDTH_THRESHOLD = config_utils.get_min_bbox_width_threshold()
         self.LABEL_FONT_SIZE = config_utils.get_ui_label_font_size_in_config()
         self.PROPORTIONAL_SCALING = config_utils.get_proportional_scaling()
@@ -479,19 +481,29 @@ class UI:
         )
         self.quick_correct_button.grid(row = 0, column = 3, sticky = "w", padx = (10, 0))
 
-        # Add tilt angle display label
-        self.tilt_angle_label = tk.Label(
-            self.hint_frame, bg = "#FAFAFA", text = "N/A",
-            fg = "#8E8E79", font = ("Segoe UI", 11)
+        # Add tilt angle display button (clickable to toggle color assist)
+        self.tilt_angle_button = tk.Button(
+            self.hint_frame,
+            bg = "#D0F0D0" if self.ANGLE_COLOR_ASSIST else "#E0E0E0",
+            text = "N/A",
+            fg = "#8E8E79",
+            font = ("Segoe UI", 10),
+            relief = tk.FLAT,
+            command = self.toggle_angle_color_assist
         )
-        self.tilt_angle_label.grid(row = 0, column = 4, sticky = "w", padx = (10, 0))
+        self.tilt_angle_button.grid(row = 0, column = 4, sticky = "w", padx = (10, 0))
 
-        # Add IoU display label
-        self.iou_label = tk.Label(
-            self.hint_frame, bg = "#FAFAFA", text = "IoU: N/A",
-            fg = "#8E8E79", font = ("Segoe UI", 11)
+        # Add IoU display button (clickable to toggle color assist)
+        self.iou_button = tk.Button(
+            self.hint_frame,
+            bg = "#D0F0D0" if self.IOU_COLOR_ASSIST else "#E0E0E0",
+            text = "IoU: N/A",
+            fg = "#8E8E79",
+            font = ("Segoe UI", 10),
+            relief = tk.FLAT,
+            command = self.toggle_iou_color_assist
         )
-        self.iou_label.grid(row = 0, column = 5, sticky = "w", padx = (10, 0))
+        self.iou_button.grid(row = 0, column = 5, sticky = "w", padx = (10, 0))
 
     def create_preview_area(self):
         if not self.SHOW_PREVIEW:
@@ -2499,8 +2511,13 @@ class UI:
                         color = "#0CC00C"
                         tags = ("label_box",)
                 else:
-                    # When SHOW_BBOX_DIMENSIONS is disabled, use IoU-based color
-                    color = iou_color
+                    # When SHOW_BBOX_DIMENSIONS is disabled, check if IoU color assist is enabled
+                    if self.IOU_COLOR_ASSIST:
+                        # Use IoU-based color
+                        color = iou_color
+                    else:
+                        # Use default green color
+                        color = "#0CC00C"
                     tags = ("label_box",)
                 width = 3
                 dash = None
@@ -2607,13 +2624,18 @@ class UI:
                 x2_line = line_end[0] * disp_w + ox
                 y2_line = line_end[1] * disp_h + oy
 
-                # Calculate angle-based color for guideline
-                angle_color = self._get_angle_color(angle)
+                # Determine guideline color based on angle color assist setting
+                if self.ANGLE_COLOR_ASSIST:
+                    # Use angle-based color
+                    guideline_color = self._get_angle_color(angle)
+                else:
+                    # Use default gray color
+                    guideline_color = "#CCCCCC"
 
-                # Draw regression line with angle-based color
+                # Draw regression line
                 self.canvas.create_line(
                     x1_line, y1_line, x2_line, y2_line,
-                    fill=angle_color, width=2, dash=(10, 5),
+                    fill=guideline_color, width=2, dash=(10, 5),
                     tags="tilt_guideline"
                 )
                 DEBUG("Drew tilt guideline: ({:.1f},{:.1f}) to ({:.1f},{:.1f})",
@@ -3943,7 +3965,7 @@ class UI:
             return "#8E8E79"  # Gray for N/A
         elif iou < 0.1:
             return "#00AA00"  # Green for good spacing
-        elif iou < 0.25:
+        elif iou < 0.2:
             return "#FFA500"  # Orange for slight overlap
         else:
             return "#C00C0C"  # Red for significant overlap
@@ -3969,20 +3991,46 @@ class UI:
             else:
                 return "#C00C0C"  # Red for significant tilt
 
+    def toggle_angle_color_assist(self):
+        """Toggle angle-based color assist for tilt guideline"""
+        self.ANGLE_COLOR_ASSIST = not self.ANGLE_COLOR_ASSIST
+        config_utils.save_angle_color_assist(self.ANGLE_COLOR_ASSIST)
+
+        # Update button appearance
+        bg_color = "#D0F0D0" if self.ANGLE_COLOR_ASSIST else "#E0E0E0"
+        self.tilt_angle_button.config(bg=bg_color)
+
+        # Redraw labels to apply color change
+        if self.current_labels:
+            self.draw_labels_on_canvas(self.current_labels)
+
+    def toggle_iou_color_assist(self):
+        """Toggle IoU-based color assist for bbox"""
+        self.IOU_COLOR_ASSIST = not self.IOU_COLOR_ASSIST
+        config_utils.save_iou_color_assist(self.IOU_COLOR_ASSIST)
+
+        # Update button appearance
+        bg_color = "#D0F0D0" if self.IOU_COLOR_ASSIST else "#E0E0E0"
+        self.iou_button.config(bg=bg_color)
+
+        # Redraw labels to apply color change
+        if self.current_labels:
+            self.draw_labels_on_canvas(self.current_labels)
+
     def update_tilt_angle_display(self, angle=None, iou=None):
         """
-        Update tilt angle and IoU display with independent color coding
+        Update tilt angle and IoU button display with independent color coding
 
         Args:
             angle (float): Tilt angle in degrees, None if no angle available
             iou (float): Average IoU value (0.0 to 1.0), None if no IoU available
         """
         if not self.SHOW_TILT_ANGLE:
-            self.tilt_angle_label.config(text="")
-            self.iou_label.config(text="")
+            self.tilt_angle_button.config(text="")
+            self.iou_button.config(text="")
             return
 
-        # === Update tilt angle label ===
+        # === Update tilt angle button ===
         if angle is None:
             angle_text = "N/A"
             angle_color = "#8E8E79"  # Gray for N/A
@@ -4002,9 +4050,11 @@ class UI:
             else:
                 angle_color = "#C00C0C"  # Red for significant tilt
 
-        self.tilt_angle_label.config(text=angle_text, fg=angle_color)
+        # Set text color for value, background color for assist status
+        angle_bg = "#D0F0D0" if self.ANGLE_COLOR_ASSIST else "#E0E0E0"
+        self.tilt_angle_button.config(text=angle_text, fg=angle_color, bg=angle_bg)
 
-        # === Update IoU label ===
+        # === Update IoU button ===
         if iou is None:
             iou_text = "IoU: N/A"
             iou_color = "#8E8E79"  # Gray for N/A
@@ -4019,7 +4069,9 @@ class UI:
             else:
                 iou_color = "#C00C0C"  # Red for significant overlap
 
-        self.iou_label.config(text=iou_text, fg=iou_color)
+        # Set text color for value, background color for assist status
+        iou_bg = "#D0F0D0" if self.IOU_COLOR_ASSIST else "#E0E0E0"
+        self.iou_button.config(text=iou_text, fg=iou_color, bg=iou_bg)
 
     def update_dragging_status_display(self, is_dragging=False, dragged_label=None):
         """

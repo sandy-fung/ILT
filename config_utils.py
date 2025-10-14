@@ -270,6 +270,38 @@ def get_show_tilt_angle():
     except:
         return False  # Default to False
 
+def get_angle_color_assist():
+    """Get whether to enable angle-based color assist for tilt guideline"""
+    try:
+        return config.getboolean("UISettings", "angle_color_assist")
+    except:
+        return True  # Default to True
+
+def save_angle_color_assist(enabled):
+    """Save angle color assist setting"""
+    if not config.has_section("UISettings"):
+        config.add_section("UISettings")
+    config.set("UISettings", "angle_color_assist", str(enabled))
+
+    with open(DEFAULT_CONFI_PATH, "w") as f:
+        config.write(f)
+
+def get_iou_color_assist():
+    """Get whether to enable IoU-based color assist for bbox"""
+    try:
+        return config.getboolean("UISettings", "iou_color_assist")
+    except:
+        return True  # Default to True
+
+def save_iou_color_assist(enabled):
+    """Save IoU color assist setting"""
+    if not config.has_section("UISettings"):
+        config.add_section("UISettings")
+    config.set("UISettings", "iou_color_assist", str(enabled))
+
+    with open(DEFAULT_CONFI_PATH, "w") as f:
+        config.write(f)
+
 def get_preview_zoom_scale():
     """Get preview zoom scale factor"""
     try:
