@@ -3937,9 +3937,9 @@ class UI:
 
             # Color coding based on angle magnitude
             abs_angle = abs(angle)
-            if abs_angle < 2.0:
+            if abs_angle < 3.0:
                 angle_color = "#00AA00"  # Green for good alignment
-            elif abs_angle < 5.0:
+            elif abs_angle < 11.0:
                 angle_color = "#FFA500"  # Orange for slight tilt
             else:
                 angle_color = "#C00C0C"  # Red for significant tilt
