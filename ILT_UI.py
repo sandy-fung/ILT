@@ -1111,12 +1111,9 @@ class UI:
         canvas = self.preview_canvas if canvas_type == "crop" else self.original_canvas
         if not self.SHOW_PREVIEW or canvas is None:
             return
-            
+
         DEBUG("Mouse left {} canvas", canvas_type)
         canvas.config(cursor="")
-        
-        # Hide magnifier tooltip if visible
-        self.hide_magnifier_tooltip()
         
     def on_preview_left_press(self, event, canvas_type="crop"):
         """Handle left mouse press on preview canvas - start drag selection for magnifier"""
@@ -1269,7 +1266,10 @@ class UI:
             self.magnifier_tooltip = tk.Toplevel(self.window)
             self.magnifier_tooltip.wm_overrideredirect(True)  # Remove window decorations
             self.magnifier_tooltip.configure(bg="black", bd=2, relief="solid")
-            
+
+            # Bind mouse enter event to close the magnifier when cursor moves over it
+            self.magnifier_tooltip.bind("<Enter>", lambda e: self.hide_magnifier_tooltip())
+
             # Create label for magnified image
             tooltip_label = tk.Label(self.magnifier_tooltip, image=magnified_image, bg="black")
             tooltip_label.pack()
@@ -2022,7 +2022,10 @@ class UI:
             self.magnifier_tooltip = tk.Toplevel(self.window)
             self.magnifier_tooltip.wm_overrideredirect(True)  # Remove window decorations
             self.magnifier_tooltip.configure(bg="black", bd=2, relief="solid")
-            
+
+            # Bind mouse enter event to close the magnifier when cursor moves over it
+            self.magnifier_tooltip.bind("<Enter>", lambda e: self.hide_magnifier_tooltip())
+
             # Create label for magnified region
             tooltip_label = tk.Label(self.magnifier_tooltip, image=photo_image, bg="black")
             tooltip_label.pack()
