@@ -2382,8 +2382,18 @@ class UI:
         """Draw label bounding boxes on canvas with resize handles"""
         # Store current labels for access by other methods (like cursor updates)
         self.current_labels = labels
-        
-        # Clear all previous label-related items              
+
+        # Calculate angle and IoU for color coding
+        angle = None
+        iou = None
+        if self.SHOW_TILT_ANGLE and labels and len(labels) >= 2:
+            angle, _, _ = label_display_utils.calculate_plate_tilt_angle(labels)
+            iou = label_display_utils.calculate_average_iou(labels)
+
+        # Calculate IoU-based color for bbox (when SHOW_BBOX_DIMENSIONS is disabled)
+        iou_color = self._get_iou_color(iou)
+
+        # Clear all previous label-related items
         self.canvas.delete("label_box")
         self.canvas.delete("label_box_selected")
         self.canvas.delete("label_box_dragging")
@@ -2472,20 +2482,25 @@ class UI:
                 tags = ("label_box", "label_box_dragging")
                 dash = (5, 5)  # Dashed line pattern
             elif hasattr(label, 'selected') and label.selected:
-                # Selected: red color with thicker border
-                color = "#C00C0C"  # Red
+                # Selected: gold color with thicker border (distinct from IoU/angle red)
+                color = "#FFD700"  # Gold
                 width = 3
                 tags = ("label_box", "label_box_selected")
                 dash = None
             else:
-                if actual_bbox_width < self.MIN_BBOX_WIDTH_THRESHOLD:
-                    # Warning style: orange/red color for small bbox
-                    color = "#FF8B2C"  # OrangeRed color for warning
-                    tags = ("label_box", "label_box_warning")
-
+                if self.SHOW_BBOX_DIMENSIONS:
+                    # When SHOW_BBOX_DIMENSIONS is enabled, use width-based color logic
+                    if actual_bbox_width < self.MIN_BBOX_WIDTH_THRESHOLD:
+                        # Warning style: orange/red color for small bbox
+                        color = "#FF8B2C"  # OrangeRed color for warning
+                        tags = ("label_box", "label_box_warning")
+                    else:
+                        # Not selected: green color
+                        color = "#0CC00C"
+                        tags = ("label_box",)
                 else:
-                    # Not selected: green color
-                    color = "#0CC00C"
+                    # When SHOW_BBOX_DIMENSIONS is disabled, use IoU-based color
+                    color = iou_color
                     tags = ("label_box",)
                 width = 3
                 dash = None
@@ -2592,10 +2607,13 @@ class UI:
                 x2_line = line_end[0] * disp_w + ox
                 y2_line = line_end[1] * disp_h + oy
 
-                # Draw regression line
+                # Calculate angle-based color for guideline
+                angle_color = self._get_angle_color(angle)
+
+                # Draw regression line with angle-based color
                 self.canvas.create_line(
                     x1_line, y1_line, x2_line, y2_line,
-                    fill="#CCCCCC", width=2, dash=(10, 5),
+                    fill=angle_color, width=2, dash=(10, 5),
                     tags="tilt_guideline"
                 )
                 DEBUG("Drew tilt guideline: ({:.1f},{:.1f}) to ({:.1f},{:.1f})",
@@ -3910,6 +3928,46 @@ class UI:
             self.selection_status_label.config(text=status_text, fg="#C00C0C")
         else:
             self.selection_status_label.config(text="未選中任何框", fg="#8E8E79")
+
+    def _get_iou_color(self, iou):
+        """
+        Get color based on IoU value (consistent with update_tilt_angle_display)
+
+        Args:
+            iou (float): Average IoU value (0.0 to 1.0), None if no IoU available
+
+        Returns:
+            str: Color hex code
+        """
+        if iou is None:
+            return "#8E8E79"  # Gray for N/A
+        elif iou < 0.1:
+            return "#00AA00"  # Green for good spacing
+        elif iou < 0.25:
+            return "#FFA500"  # Orange for slight overlap
+        else:
+            return "#C00C0C"  # Red for significant overlap
+
+    def _get_angle_color(self, angle):
+        """
+        Get color based on angle value (consistent with update_tilt_angle_display)
+
+        Args:
+            angle (float): Tilt angle in degrees, None if no angle available
+
+        Returns:
+            str: Color hex code
+        """
+        if angle is None:
+            return "#8E8E79"  # Gray for N/A
+        else:
+            abs_angle = abs(angle)
+            if abs_angle < 3.0:
+                return "#00AA00"  # Green for good alignment
+            elif abs_angle < 11.0:
+                return "#FFA500"  # Orange for slight tilt
+            else:
+                return "#C00C0C"  # Red for significant tilt
 
     def update_tilt_angle_display(self, angle=None, iou=None):
         """
