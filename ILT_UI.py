@@ -3105,9 +3105,10 @@ class UI:
             self.input_box.insert(0, plate_text)
             self.input_box.config(fg="#2D2D2D")
 
-            # Focus the input box
-            self.input_box.focus_set()
             DEBUG("Filled input box with plate from memory: {}", plate_text)
+
+            # Trigger quick correct using existing method
+            self.quick_correct(None)
 
     def add_plate_to_memory_from_controller(self, plate_text):
         """Public method for Controller to add plates to memory"""
