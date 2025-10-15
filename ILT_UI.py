@@ -21,6 +21,24 @@ DEFAULT_W = 1920
 DEFAULT_H = 1080
 DEFAULT_MIN_PLATE_WIDTH    = 70
 class UI:
+    # Color threshold definitions (Single Source of Truth)
+    # Format: (threshold_value, color_hex, description_template)
+    ANGLE_COLOR_THRESHOLDS = [
+        (3.0, "#00AA00", "|角度| < {:.1f}° (對齊良好)"),
+        (11.0, "#FFA500", "{:.1f}° ≤ |角度| < {:.1f}° (輕微傾斜)"),
+        (float('inf'), "#C00C0C", "|角度| ≥ {:.1f}° (明顯傾斜)")
+    ]
+    ANGLE_NA_COLOR = "#8E8E79"
+    ANGLE_NA_TEXT = "N/A (資料不足)"
+
+    IOU_COLOR_THRESHOLDS = [
+        (0.1, "#00AA00", "IoU < {:.2f} (間距良好)"),
+        (0.2, "#FFA500", "{:.2f} ≤ IoU < {:.2f} (輕微重疊)"),
+        (float('inf'), "#C00C0C", "IoU ≥ {:.2f} (明顯重疊)")
+    ]
+    IOU_NA_COLOR = "#8E8E79"
+    IOU_NA_TEXT = "N/A (資料不足)"
+
     def __init__(self):
         self.dispatch = None
         width, height = config_utils.get_window_size()
@@ -1392,32 +1410,66 @@ class UI:
                 pass
 
     def _get_angle_tooltip_content(self):
-        """Generate angle color threshold tooltip content dynamically
+        """Generate angle color threshold tooltip content dynamically from ANGLE_COLOR_THRESHOLDS
 
         Returns:
             List of tuples (color_hex, text) for tooltip display
         """
-        # Extract thresholds from _get_angle_color logic
-        return [
-            ("#00AA00", "|角度| < 3.0° (對齊良好)"),
-            ("#FFA500", "3.0° ≤ |角度| < 11.0° (輕微傾斜)"),
-            ("#C00C0C", "|角度| ≥ 11.0° (明顯傾斜)"),
-            ("#8E8E79", "N/A (資料不足)")
-        ]
+        content = []
+        prev_threshold = None
+
+        for threshold, color, desc_template in self.ANGLE_COLOR_THRESHOLDS:
+            # Skip inf threshold (it's the last catch-all)
+            if threshold == float('inf'):
+                # For the last range, use previous threshold as lower bound
+                if prev_threshold is not None:
+                    text = desc_template.format(prev_threshold)
+                    content.append((color, text))
+            else:
+                # For ranges with upper bound
+                if prev_threshold is None:
+                    # First range: no lower bound
+                    text = desc_template.format(threshold)
+                else:
+                    # Middle ranges: both bounds
+                    text = desc_template.format(prev_threshold, threshold)
+                content.append((color, text))
+                prev_threshold = threshold
+
+        # Add N/A entry
+        content.append((self.ANGLE_NA_COLOR, self.ANGLE_NA_TEXT))
+        return content
 
     def _get_iou_tooltip_content(self):
-        """Generate IoU color threshold tooltip content dynamically
+        """Generate IoU color threshold tooltip content dynamically from IOU_COLOR_THRESHOLDS
 
         Returns:
             List of tuples (color_hex, text) for tooltip display
         """
-        # Extract thresholds from _get_iou_color logic
-        return [
-            ("#00AA00", "IoU < 0.1 (間距良好)"),
-            ("#FFA500", "0.1 ≤ IoU < 0.2 (輕微重疊)"),
-            ("#C00C0C", "IoU ≥ 0.2 (明顯重疊)"),
-            ("#8E8E79", "N/A (資料不足)")
-        ]
+        content = []
+        prev_threshold = None
+
+        for threshold, color, desc_template in self.IOU_COLOR_THRESHOLDS:
+            # Skip inf threshold (it's the last catch-all)
+            if threshold == float('inf'):
+                # For the last range, use previous threshold as lower bound
+                if prev_threshold is not None:
+                    text = desc_template.format(prev_threshold)
+                    content.append((color, text))
+            else:
+                # For ranges with upper bound
+                if prev_threshold is None:
+                    # First range: no lower bound
+                    text = desc_template.format(threshold)
+                else:
+                    # Middle ranges: both bounds
+                    text = desc_template.format(prev_threshold, threshold)
+                content.append((color, text))
+                prev_threshold = threshold
+
+        # Add N/A entry
+        content.append((self.IOU_NA_COLOR, self.IOU_NA_TEXT))
+        return content
 
     def show_preview_click_marker(self, canvas_x, canvas_y):
         """Show a crosshair marker on main canvas at the specified position
@@ -4064,7 +4116,7 @@ class UI:
 
     def _get_iou_color(self, iou):
         """
-        Get color based on IoU value (consistent with update_tilt_angle_display)
+        Get color based on IoU value using IOU_COLOR_THRESHOLDS
 
         Args:
             iou (float): Average IoU value (0.0 to 1.0), None if no IoU available
@@ -4073,17 +4125,18 @@ class UI:
             str: Color hex code
         """
         if iou is None:
-            return "#8E8E79"  # Gray for N/A
-        elif iou < 0.1:
-            return "#00AA00"  # Green for good spacing
-        elif iou < 0.2:
-            return "#FFA500"  # Orange for slight overlap
-        else:
-            return "#C00C0C"  # Red for significant overlap
+            return self.IOU_NA_COLOR
+
+        for threshold, color, _ in self.IOU_COLOR_THRESHOLDS:
+            if iou < threshold:
+                return color
+
+        # Fallback (should not reach here due to inf threshold)
+        return self.IOU_COLOR_THRESHOLDS[-1][1]
 
     def _get_angle_color(self, angle):
         """
-        Get color based on angle value (consistent with update_tilt_angle_display)
+        Get color based on angle value using ANGLE_COLOR_THRESHOLDS
 
         Args:
             angle (float): Tilt angle in degrees, None if no angle available
@@ -4092,15 +4145,15 @@ class UI:
             str: Color hex code
         """
         if angle is None:
-            return "#8E8E79"  # Gray for N/A
-        else:
-            abs_angle = abs(angle)
-            if abs_angle < 3.0:
-                return "#00AA00"  # Green for good alignment
-            elif abs_angle < 11.0:
-                return "#FFA500"  # Orange for slight tilt
-            else:
-                return "#C00C0C"  # Red for significant tilt
+            return self.ANGLE_NA_COLOR
+
+        abs_angle = abs(angle)
+        for threshold, color, _ in self.ANGLE_COLOR_THRESHOLDS:
+            if abs_angle < threshold:
+                return color
+
+        # Fallback (should not reach here due to inf threshold)
+        return self.ANGLE_COLOR_THRESHOLDS[-1][1]
 
     def toggle_angle_color_assist(self):
         """Toggle angle-based color assist for tilt guideline"""
@@ -4144,7 +4197,6 @@ class UI:
         # === Update tilt angle button ===
         if angle is None:
             angle_text = "N/A"
-            angle_color = "#8E8E79"  # Gray for N/A
         else:
             # Format angle with sign
             if angle >= 0:
@@ -4152,14 +4204,8 @@ class UI:
             else:
                 angle_text = f"{angle:.1f}°"
 
-            # Color coding based on angle magnitude
-            abs_angle = abs(angle)
-            if abs_angle < 3.0:
-                angle_color = "#00AA00"  # Green for good alignment
-            elif abs_angle < 11.0:
-                angle_color = "#FFA500"  # Orange for slight tilt
-            else:
-                angle_color = "#C00C0C"  # Red for significant tilt
+        # Use centralized color logic from _get_angle_color
+        angle_color = self._get_angle_color(angle)
 
         # Set text color for value, background color for assist status
         angle_bg = "#D0F0D0" if self.ANGLE_COLOR_ASSIST else "#E0E0E0"
@@ -4168,17 +4214,11 @@ class UI:
         # === Update IoU button ===
         if iou is None:
             iou_text = "IoU: N/A"
-            iou_color = "#8E8E79"  # Gray for N/A
         else:
             iou_text = f"IoU: {iou:.2f}"
 
-            # Color coding based on IoU value
-            if iou < 0.1:
-                iou_color = "#00AA00"  # Green for good spacing
-            elif iou < 0.2:
-                iou_color = "#FFA500"  # Orange for slight overlap
-            else:
-                iou_color = "#C00C0C"  # Red for significant overlap
+        # Use centralized color logic from _get_iou_color
+        iou_color = self._get_iou_color(iou)
 
         # Set text color for value, background color for assist status
         iou_bg = "#D0F0D0" if self.IOU_COLOR_ASSIST else "#E0E0E0"
