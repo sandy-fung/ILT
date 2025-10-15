@@ -493,6 +493,10 @@ class UI:
         )
         self.tilt_angle_button.grid(row = 0, column = 4, sticky = "w", padx = (10, 0))
 
+        # Bind hover tooltip for angle button
+        self.tilt_angle_button.bind("<Enter>", lambda e: self._show_threshold_tooltip(e, self._get_angle_tooltip_content()))
+        self.tilt_angle_button.bind("<Leave>", lambda e: self._hide_threshold_tooltip())
+
         # Add IoU display button (clickable to toggle color assist)
         self.iou_button = tk.Button(
             self.hint_frame,
@@ -504,6 +508,10 @@ class UI:
             command = self.toggle_iou_color_assist
         )
         self.iou_button.grid(row = 0, column = 5, sticky = "w", padx = (10, 0))
+
+        # Bind hover tooltip for IoU button
+        self.iou_button.bind("<Enter>", lambda e: self._show_threshold_tooltip(e, self._get_iou_tooltip_content()))
+        self.iou_button.bind("<Leave>", lambda e: self._hide_threshold_tooltip())
 
     def create_preview_area(self):
         if not self.SHOW_PREVIEW:
@@ -592,6 +600,7 @@ class UI:
         
         # Initialize magnifier state
         self.magnifier_tooltip = None
+        self.threshold_tooltip = None
         self.is_dragging_preview = False
         self.is_dragging_original = False
         self.drag_start_x = 0
@@ -1310,6 +1319,105 @@ class UI:
                     self.dispatch(UIEvent.MAGNIFIER_HIDE, {})
             except:
                 pass
+
+    def _show_threshold_tooltip(self, event, content_lines):
+        """Show color threshold tooltip near widget
+
+        Args:
+            event: Tkinter event object with widget reference
+            content_lines: List of tuples (color_hex, text) for each line
+        """
+        # Hide existing tooltip
+        self._hide_threshold_tooltip()
+
+        try:
+            # Create tooltip window
+            self.threshold_tooltip = tk.Toplevel(self.window)
+            self.threshold_tooltip.wm_overrideredirect(True)
+            self.threshold_tooltip.configure(bg="#2B2B2B", relief="solid", bd=1)
+
+            # Create content frame
+            content_frame = tk.Frame(self.threshold_tooltip, bg="#2B2B2B", padx=10, pady=8)
+            content_frame.pack()
+
+            # Add each line with color indicator
+            for color_hex, text in content_lines:
+                line_frame = tk.Frame(content_frame, bg="#2B2B2B")
+                line_frame.pack(anchor="w", pady=2)
+
+                # Color indicator (filled square)
+                color_label = tk.Label(line_frame, text="■", fg=color_hex, bg="#2B2B2B",
+                                      font=("Arial", 12), width=2)
+                color_label.pack(side="left")
+
+                # Text description
+                text_label = tk.Label(line_frame, text=text, fg="#E0E0E0", bg="#2B2B2B",
+                                     font=("Arial", 10), anchor="w")
+                text_label.pack(side="left", padx=(5, 0))
+
+            # Update to get actual size
+            self.threshold_tooltip.update_idletasks()
+
+            # Calculate position near button
+            widget = event.widget
+            x = widget.winfo_rootx()
+            y = widget.winfo_rooty() + widget.winfo_height() + 5
+
+            # Ensure tooltip stays within window bounds
+            tooltip_width = self.threshold_tooltip.winfo_width()
+            tooltip_height = self.threshold_tooltip.winfo_height()
+            window_right = self.window.winfo_rootx() + self.window.winfo_width()
+            window_bottom = self.window.winfo_rooty() + self.window.winfo_height()
+
+            if x + tooltip_width > window_right:
+                x = window_right - tooltip_width - 10
+            if y + tooltip_height > window_bottom:
+                y = widget.winfo_rooty() - tooltip_height - 5
+
+            self.threshold_tooltip.geometry(f"+{x}+{y}")
+
+            DEBUG("Threshold tooltip shown at ({}, {})", x, y)
+
+        except Exception as e:
+            ERROR("Failed to show threshold tooltip: {}", str(e))
+
+    def _hide_threshold_tooltip(self):
+        """Hide color threshold tooltip if visible"""
+        if self.threshold_tooltip:
+            try:
+                self.threshold_tooltip.destroy()
+                self.threshold_tooltip = None
+                DEBUG("Threshold tooltip hidden")
+            except:
+                pass
+
+    def _get_angle_tooltip_content(self):
+        """Generate angle color threshold tooltip content dynamically
+
+        Returns:
+            List of tuples (color_hex, text) for tooltip display
+        """
+        # Extract thresholds from _get_angle_color logic
+        return [
+            ("#00AA00", "|角度| < 3.0° (對齊良好)"),
+            ("#FFA500", "3.0° ≤ |角度| < 11.0° (輕微傾斜)"),
+            ("#C00C0C", "|角度| ≥ 11.0° (明顯傾斜)"),
+            ("#8E8E79", "N/A (資料不足)")
+        ]
+
+    def _get_iou_tooltip_content(self):
+        """Generate IoU color threshold tooltip content dynamically
+
+        Returns:
+            List of tuples (color_hex, text) for tooltip display
+        """
+        # Extract thresholds from _get_iou_color logic
+        return [
+            ("#00AA00", "IoU < 0.1 (間距良好)"),
+            ("#FFA500", "0.1 ≤ IoU < 0.2 (輕微重疊)"),
+            ("#C00C0C", "IoU ≥ 0.2 (明顯重疊)"),
+            ("#8E8E79", "N/A (資料不足)")
+        ]
 
     def show_preview_click_marker(self, canvas_x, canvas_y):
         """Show a crosshair marker on main canvas at the specified position
@@ -4067,7 +4175,7 @@ class UI:
             # Color coding based on IoU value
             if iou < 0.1:
                 iou_color = "#00AA00"  # Green for good spacing
-            elif iou < 0.3:
+            elif iou < 0.2:
                 iou_color = "#FFA500"  # Orange for slight overlap
             else:
                 iou_color = "#C00C0C"  # Red for significant overlap
