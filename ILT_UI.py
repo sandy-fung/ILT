@@ -1182,8 +1182,9 @@ class UI:
             # Small movement - treat as click, use original magnifier logic
             self.show_magnifier_tooltip(event.x, event.y, canvas_type)
 
-            # Show position marker on main canvas
-            self._show_click_position_on_main_canvas(event.x, event.y, canvas_type)
+            # Show position marker on main canvas (only for crop preview)
+            if canvas_type == "crop":
+                self._show_crop_click_position_on_main_canvas(event.x, event.y)
         else:
             # Any drag - always use the actual dragged region size
             self.show_magnifier_for_region(
@@ -1404,22 +1405,21 @@ class UI:
         # Also delete by tags as a safety measure
         self.canvas.delete("preview_click_marker")
 
-    def _show_click_position_on_main_canvas(self, preview_canvas_x, preview_canvas_y, canvas_type="crop"):
-        """Convert preview canvas click to main canvas position and show marker
+    def _show_crop_click_position_on_main_canvas(self, preview_canvas_x, preview_canvas_y):
+        """Convert crop preview canvas click to main canvas position and show marker
 
         Args:
-            preview_canvas_x, preview_canvas_y: Click position on preview canvas
-            canvas_type: Either "crop" or "original"
+            preview_canvas_x, preview_canvas_y: Click position on crop preview canvas
         """
         try:
             # Step 1: Convert preview canvas coordinates to original image pixel coordinates
-            img_x, img_y = self.canvas_to_image_coords(preview_canvas_x, preview_canvas_y, canvas_type)
+            img_x, img_y = self.canvas_to_image_coords(preview_canvas_x, preview_canvas_y, "crop")
             if img_x is None or img_y is None:
                 DEBUG("Invalid preview canvas coordinates for marker display")
                 return
 
             # Step 2: Get original image dimensions
-            image = self.original_image if canvas_type == "crop" else self.original_image_for_preview
+            image = self.original_image
             if not image:
                 DEBUG("No image available for coordinate conversion")
                 return
