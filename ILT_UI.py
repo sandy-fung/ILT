@@ -97,6 +97,13 @@ class UI:
         self.plate_memory_frame = None
         self.plate_memory_buttons = []
 
+        # Initialize preview click marker state
+        self.marker_alpha = 200  # Default alpha value (0-255)
+        self.marker_overlay_image = None  # PIL Image for transparent marker
+        self.marker_canvas_image_id = None  # Canvas image ID for marker overlay
+        self.preview_click_marker_lines = []
+        self.preview_click_marker_visible = False
+
         # Load existing plate memory from config
         self.load_plate_memory_from_config()
 
@@ -581,6 +588,71 @@ class UI:
             btn.bind("<Enter>", lambda e, b=btn: b.config(bg="#E8E8E8") if b.cget("bg") == "#F5F5F5" else None)
             btn.bind("<Leave>", lambda e, b=btn: b.config(bg="#F5F5F5") if b.cget("bg") == "#E8E8E8" else None)
 
+        # Create marker transparency control toolbar
+        marker_toolbar = tk.Frame(self.crop_container, bg="#FAFAFA")
+        marker_toolbar.pack(side="top", pady=(0, 5))
+
+        tk.Label(marker_toolbar, text="標記透明度:", bg="#FAFAFA", fg="#666666",
+                font=("Segoe UI", 9, "bold")).pack(side="left", padx=(8, 5))
+
+        # Decrease button
+        tk.Button(
+            marker_toolbar,
+            text="-",
+            command=lambda: self.adjust_marker_alpha(-1),
+            bg="#E0E0E0",
+            fg="#333333",
+            font=("Segoe UI", 9, "bold"),
+            width=2,
+            relief="raised",
+            bd=1,
+            highlightthickness=0
+        ).pack(side="left", padx=(0, 2))
+
+        # Transparency slider (0-255)
+        self.marker_alpha_slider = tk.Scale(
+            marker_toolbar,
+            from_=0,
+            to=255,
+            orient=tk.HORIZONTAL,
+            length=150,
+            showvalue=0,  # Hide default value display
+            bg="#FAFAFA",
+            fg="#555555",
+            highlightthickness=0,
+            troughcolor="#E0E0E0",
+            activebackground="#4A90E2",
+            command=self.on_marker_alpha_changed
+        )
+        self.marker_alpha_slider.set(self.marker_alpha)
+        self.marker_alpha_slider.pack(side="left", padx=5)
+
+        # Increase button
+        tk.Button(
+            marker_toolbar,
+            text="+",
+            command=lambda: self.adjust_marker_alpha(1),
+            bg="#E0E0E0",
+            fg="#333333",
+            font=("Segoe UI", 9, "bold"),
+            width=2,
+            relief="raised",
+            bd=1,
+            highlightthickness=0
+        ).pack(side="left", padx=(2, 5))
+
+        # Value display label
+        self.marker_alpha_label = tk.Label(
+            marker_toolbar,
+            text=f"{self.marker_alpha} ({int(self.marker_alpha/255*100)}%)",
+            bg="#FAFAFA",
+            fg="#333333",
+            font=("Segoe UI", 9),
+            width=12,
+            anchor="w"
+        )
+        self.marker_alpha_label.pack(side="left", padx=5)
+
         self._create_canvas_with_scrollbars("crop", parent_override=self.crop_container)
 
         # Right: Original
@@ -633,10 +705,6 @@ class UI:
         self.preview_magnifier_drag_start_y = 0
         self.preview_magnifier_selection_rect = None
 
-        # Initialize preview click marker state (for showing clicked position on main canvas)
-        self.preview_click_marker_lines = []
-        self.preview_click_marker_visible = False
-    
     def _create_canvas_with_scrollbars(self, canvas_type, parent_override=None):
         """Create a canvas with scrollbars for the specified type (crop or original)"""
         if parent_override is not None:
@@ -976,6 +1044,48 @@ class UI:
             self.update_preview(self.original_image)
 
         INFO("Preview zoom scale set to {}x", scale)
+
+    def adjust_marker_alpha(self, delta):
+        """Adjust marker alpha value by specified delta
+
+        Args:
+            delta: Amount to adjust alpha (positive or negative)
+        """
+        # Get current value
+        current_alpha = self.marker_alpha_slider.get()
+
+        # Calculate new value
+        new_alpha = int(current_alpha) + delta
+
+        # Clamp to valid range [0, 255]
+        new_alpha = max(0, min(255, new_alpha))
+
+        # Update slider (this will trigger on_marker_alpha_changed callback)
+        self.marker_alpha_slider.set(new_alpha)
+
+        DEBUG("Marker alpha adjusted by {}: {} -> {}", delta, current_alpha, new_alpha)
+
+    def on_marker_alpha_changed(self, value):
+        """Handle marker transparency slider change
+
+        Args:
+            value: New alpha value (0-255) from slider
+        """
+        # Convert to int (slider returns string)
+        alpha = int(float(value))
+        self.marker_alpha = alpha
+
+        # Update value display label
+        percentage = int(alpha / 255 * 100)
+        self.marker_alpha_label.config(text=f"{alpha} ({percentage}%)")
+
+        DEBUG("Marker alpha changed to: {} ({}%)", alpha, percentage)
+
+        # If marker is currently visible, redraw it with new alpha
+        if self.preview_click_marker_visible and hasattr(self, '_last_marker_pos'):
+            canvas_x, canvas_y = self._last_marker_pos
+            self.show_preview_click_marker(canvas_x, canvas_y)
+            DEBUG("Marker redrawn with new alpha: {}", alpha)
 
     def update_original_preview(self, original_image):
         """Update original preview tab with auto-scaled original image
@@ -1474,11 +1584,14 @@ class UI:
     def show_preview_click_marker(self, canvas_x, canvas_y):
         """Show a crosshair marker on main canvas at the specified position
 
-        Uses double border design (black outer + bright green inner) for maximum visibility.
+        Uses PIL to create a transparent overlay with double border design
+        (black outer + bright green inner) for maximum visibility.
 
         Args:
             canvas_x, canvas_y: Coordinates on main canvas where to show marker
         """
+        from PIL import Image, ImageDraw, ImageTk
+
         # Hide existing marker first
         self.hide_preview_click_marker()
 
@@ -1490,75 +1603,107 @@ class UI:
             DEBUG("Canvas not ready yet, skipping marker display")
             return
 
+        # Store position for potential redraw when alpha changes
+        self._last_marker_pos = (canvas_x, canvas_y)
+
         # Marker configuration
         line_length = 50
         outer_width = 6
         inner_width = 3
-        outer_color = "#000000"  # Black
-        inner_color = "#00FF00"  # Bright green
         circle_radius = 6
+        alpha = self.marker_alpha
 
-        # Outer layer (black) - horizontal
-        h_outer = self.canvas.create_line(
-            canvas_x - line_length, canvas_y,
-            canvas_x + line_length, canvas_y,
-            fill=outer_color, width=outer_width,
-            tags="preview_click_marker"
-        )
-        # Outer layer (black) - vertical
-        v_outer = self.canvas.create_line(
-            canvas_x, canvas_y - line_length,
-            canvas_x, canvas_y + line_length,
-            fill=outer_color, width=outer_width,
-            tags="preview_click_marker"
-        )
+        # Create RGBA colors with transparency
+        outer_color = (0, 0, 0, alpha)  # Black with alpha
+        inner_color = (0, 255, 0, alpha)  # Bright green with alpha
 
-        # Inner layer (bright green) - horizontal
-        h_inner = self.canvas.create_line(
-            canvas_x - line_length, canvas_y,
-            canvas_x + line_length, canvas_y,
-            fill=inner_color, width=inner_width,
-            tags="preview_click_marker"
+        # Create transparent RGBA image
+        marker_image = Image.new('RGBA', (canvas_width, canvas_height), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(marker_image)
+
+        # Draw outer layer (black) - horizontal line
+        draw.line(
+            [(canvas_x - line_length, canvas_y), (canvas_x + line_length, canvas_y)],
+            fill=outer_color,
+            width=outer_width
         )
-        # Inner layer (bright green) - vertical
-        v_inner = self.canvas.create_line(
-            canvas_x, canvas_y - line_length,
-            canvas_x, canvas_y + line_length,
-            fill=inner_color, width=inner_width,
-            tags="preview_click_marker"
+        # Draw outer layer (black) - vertical line
+        draw.line(
+            [(canvas_x, canvas_y - line_length), (canvas_x, canvas_y + line_length)],
+            fill=outer_color,
+            width=outer_width
         )
 
-        # Center circle with double border
-        circle_outer = self.canvas.create_oval(
-            canvas_x - circle_radius, canvas_y - circle_radius,
-            canvas_x + circle_radius, canvas_y + circle_radius,
-            outline=outer_color, width=3, tags="preview_click_marker"
+        # Draw inner layer (bright green) - horizontal line
+        draw.line(
+            [(canvas_x - line_length, canvas_y), (canvas_x + line_length, canvas_y)],
+            fill=inner_color,
+            width=inner_width
         )
-        circle_inner = self.canvas.create_oval(
-            canvas_x - circle_radius + 1, canvas_y - circle_radius + 1,
-            canvas_x + circle_radius - 1, canvas_y + circle_radius - 1,
-            outline=inner_color, width=2, tags="preview_click_marker"
+        # Draw inner layer (bright green) - vertical line
+        draw.line(
+            [(canvas_x, canvas_y - line_length), (canvas_x, canvas_y + line_length)],
+            fill=inner_color,
+            width=inner_width
         )
 
-        # Store marker IDs
-        marker_ids = [h_outer, v_outer, h_inner, v_inner, circle_outer, circle_inner]
-        self.preview_click_marker_lines = marker_ids
+        # Draw center circle with double border
+        # Outer circle (black)
+        draw.ellipse(
+            [canvas_x - circle_radius, canvas_y - circle_radius,
+             canvas_x + circle_radius, canvas_y + circle_radius],
+            outline=outer_color,
+            width=3
+        )
+        # Inner circle (bright green)
+        draw.ellipse(
+            [canvas_x - circle_radius + 1, canvas_y - circle_radius + 1,
+             canvas_x + circle_radius - 1, canvas_y + circle_radius - 1],
+            outline=inner_color,
+            width=2
+        )
+
+        # Convert PIL Image to PhotoImage
+        self.marker_overlay_image = ImageTk.PhotoImage(marker_image)
+
+        # Display on canvas
+        self.marker_canvas_image_id = self.canvas.create_image(
+            0, 0,
+            anchor='nw',
+            image=self.marker_overlay_image,
+            tags="preview_click_marker"
+        )
+
         self.preview_click_marker_visible = True
 
         # Ensure marker is on top
         self.canvas.tag_raise("preview_click_marker")
 
-        DEBUG("Preview click marker shown at ({}, {})", canvas_x, canvas_y)
+        DEBUG("Preview click marker shown at ({}, {}) with alpha {}", canvas_x, canvas_y, alpha)
 
     def hide_preview_click_marker(self):
-        """Hide preview click marker from main canvas"""
-        if self.preview_click_marker_visible and self.preview_click_marker_lines:
-            for line_id in self.preview_click_marker_lines:
+        """Hide preview click marker from main canvas and clean up PIL resources"""
+        if self.preview_click_marker_visible:
+            # Delete canvas image if it exists
+            if self.marker_canvas_image_id is not None:
                 try:
-                    self.canvas.delete(line_id)
+                    self.canvas.delete(self.marker_canvas_image_id)
                 except:
                     pass
-            self.preview_click_marker_lines = []
+                self.marker_canvas_image_id = None
+
+            # Clean up PIL Image reference
+            self.marker_overlay_image = None
+
+            # Clean up legacy marker lines (backward compatibility)
+            if self.preview_click_marker_lines:
+                for line_id in self.preview_click_marker_lines:
+                    try:
+                        self.canvas.delete(line_id)
+                    except:
+                        pass
+                self.preview_click_marker_lines = []
+
             self.preview_click_marker_visible = False
             DEBUG("Preview click marker hidden")
 
