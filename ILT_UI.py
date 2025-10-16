@@ -99,6 +99,8 @@ class UI:
 
         # Initialize preview click marker state
         self.marker_alpha = 200  # Default alpha value (0-255)
+        self.marker_outer_color = config_utils.get_marker_outer_color()  # Outer border color
+        self.marker_inner_color = config_utils.get_marker_inner_color()  # Inner border color
         self.marker_overlay_image = None  # PIL Image for transparent marker
         self.marker_canvas_image_id = None  # Canvas image ID for marker overlay
         self.preview_click_marker_lines = []
@@ -653,6 +655,40 @@ class UI:
         )
         self.marker_alpha_label.pack(side="left", padx=5)
 
+        # Outer color picker
+        tk.Label(marker_toolbar, text="外框:", bg="#FAFAFA", fg="#666666",
+                font=("Segoe UI", 9)).pack(side="left", padx=(10, 2))
+
+        self.marker_outer_color_button = tk.Button(
+            marker_toolbar,
+            text="  ",
+            command=self.choose_marker_outer_color,
+            bg=self.marker_outer_color,
+            width=2,
+            relief="solid",
+            bd=1,
+            highlightthickness=1,
+            highlightbackground="#888888"
+        )
+        self.marker_outer_color_button.pack(side="left", padx=2)
+
+        # Inner color picker
+        tk.Label(marker_toolbar, text="內框:", bg="#FAFAFA", fg="#666666",
+                font=("Segoe UI", 9)).pack(side="left", padx=(5, 2))
+
+        self.marker_inner_color_button = tk.Button(
+            marker_toolbar,
+            text="  ",
+            command=self.choose_marker_inner_color,
+            bg=self.marker_inner_color,
+            width=2,
+            relief="solid",
+            bd=1,
+            highlightthickness=1,
+            highlightbackground="#888888"
+        )
+        self.marker_inner_color_button.pack(side="left", padx=2)
+
         self._create_canvas_with_scrollbars("crop", parent_override=self.crop_container)
 
         # Right: Original
@@ -1086,6 +1122,64 @@ class UI:
             canvas_x, canvas_y = self._last_marker_pos
             self.show_preview_click_marker(canvas_x, canvas_y)
             DEBUG("Marker redrawn with new alpha: {}", alpha)
+
+    def choose_marker_outer_color(self):
+        """Open color picker for marker outer border color"""
+        from tkinter import colorchooser
+
+        # Open color picker with current color as default
+        color = colorchooser.askcolor(
+            color=self.marker_outer_color,
+            title="選擇外框顏色"
+        )
+
+        # color returns ((r, g, b), "#rrggbb") or (None, None) if cancelled
+        if color[1] is not None:
+            hex_color = color[1]
+            self.marker_outer_color = hex_color
+
+            # Update button background
+            self.marker_outer_color_button.config(bg=hex_color)
+
+            # Save to config
+            config_utils.save_marker_colors(self.marker_outer_color, self.marker_inner_color)
+
+            DEBUG("Marker outer color changed to: {}", hex_color)
+
+            # Redraw marker if visible
+            if self.preview_click_marker_visible and hasattr(self, '_last_marker_pos'):
+                canvas_x, canvas_y = self._last_marker_pos
+                self.show_preview_click_marker(canvas_x, canvas_y)
+                DEBUG("Marker redrawn with new outer color")
+
+    def choose_marker_inner_color(self):
+        """Open color picker for marker inner border color"""
+        from tkinter import colorchooser
+
+        # Open color picker with current color as default
+        color = colorchooser.askcolor(
+            color=self.marker_inner_color,
+            title="選擇內框顏色"
+        )
+
+        # color returns ((r, g, b), "#rrggbb") or (None, None) if cancelled
+        if color[1] is not None:
+            hex_color = color[1]
+            self.marker_inner_color = hex_color
+
+            # Update button background
+            self.marker_inner_color_button.config(bg=hex_color)
+
+            # Save to config
+            config_utils.save_marker_colors(self.marker_outer_color, self.marker_inner_color)
+
+            DEBUG("Marker inner color changed to: {}", hex_color)
+
+            # Redraw marker if visible
+            if self.preview_click_marker_visible and hasattr(self, '_last_marker_pos'):
+                canvas_x, canvas_y = self._last_marker_pos
+                self.show_preview_click_marker(canvas_x, canvas_y)
+                DEBUG("Marker redrawn with new inner color")
 
     def update_original_preview(self, original_image):
         """Update original preview tab with auto-scaled original image
@@ -1585,7 +1679,7 @@ class UI:
         """Show a crosshair marker on main canvas at the specified position
 
         Uses PIL to create a transparent overlay with double border design
-        (black outer + bright green inner) for maximum visibility.
+        for maximum visibility. Colors are customizable via color pickers.
 
         Args:
             canvas_x, canvas_y: Coordinates on main canvas where to show marker
@@ -1613,9 +1707,18 @@ class UI:
         circle_radius = 6
         alpha = self.marker_alpha
 
+        # Convert hex colors to RGBA tuples
+        def hex_to_rgba(hex_color, alpha_value):
+            """Convert hex color string to RGBA tuple"""
+            hex_color = hex_color.lstrip('#')
+            r = int(hex_color[0:2], 16)
+            g = int(hex_color[2:4], 16)
+            b = int(hex_color[4:6], 16)
+            return (r, g, b, alpha_value)
+
         # Create RGBA colors with transparency
-        outer_color = (0, 0, 0, alpha)  # Black with alpha
-        inner_color = (0, 255, 0, alpha)  # Bright green with alpha
+        outer_color = hex_to_rgba(self.marker_outer_color, alpha)
+        inner_color = hex_to_rgba(self.marker_inner_color, alpha)
 
         # Create transparent RGBA image
         marker_image = Image.new('RGBA', (canvas_width, canvas_height), (0, 0, 0, 0))

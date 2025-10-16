@@ -536,3 +536,30 @@ def get_hotkey_action_name(action_key):
     """Get friendly name for hotkey action"""
     return HOTKEY_ACTION_NAMES.get(action_key, action_key)
 
+
+# Marker color configuration functions
+def get_marker_outer_color():
+    """Get marker outer border color"""
+    try:
+        return config.get("MarkerSettings", "outer_color")
+    except:
+        return "#000000"  # Default to black
+
+def get_marker_inner_color():
+    """Get marker inner border color"""
+    try:
+        return config.get("MarkerSettings", "inner_color")
+    except:
+        return "#00FF00"  # Default to bright green
+
+def save_marker_colors(outer_color, inner_color):
+    """Save marker colors to config file"""
+    if not config.has_section("MarkerSettings"):
+        config.add_section("MarkerSettings")
+
+    config.set("MarkerSettings", "outer_color", outer_color)
+    config.set("MarkerSettings", "inner_color", inner_color)
+
+    with open(DEFAULT_CONFI_PATH, "w") as f:
+        config.write(f)
+
