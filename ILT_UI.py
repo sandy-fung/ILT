@@ -446,6 +446,22 @@ class UI:
         )
         self.jump_first_button.pack(side = "left", padx = (0, 3))
 
+        # Button to go to previous page
+        self.previous_page_button = tk.Button(
+            self.index_frame,
+            text = "◀",
+            bg = "#FAFAFA",
+            fg = "#C0C00C",
+            font = ("Segoe UI", 14),
+            relief = "solid",
+            bd = 0,
+            padx = 3,
+            pady = 1,
+            cursor = "hand2",
+            command = lambda: self.dispatch(UIEvent.PREVIOUS_IMAGE, {}) if self.dispatch else None
+        )
+        self.previous_page_button.pack(side = "left", padx = (0, 3))
+
         # Entry for current page number (editable)
         self.index_entry = tk.Entry(
             self.index_frame,
@@ -466,6 +482,22 @@ class UI:
         # Label for total pages (read-only)
         self.index_total_label = tk.Label(self.index_frame, bg = "#FAFAFA", fg = "#C0C00C", font = ("Segoe UI", 11), text = "/0")
         self.index_total_label.pack(side = "left")
+
+        # Button to go to next page
+        self.next_page_button = tk.Button(
+            self.index_frame,
+            text = "▶",
+            bg = "#FAFAFA",
+            fg = "#C0C00C",
+            font = ("Segoe UI", 14),
+            relief = "solid",
+            bd = 0,
+            padx = 3,
+            pady = 1,
+            cursor = "hand2",
+            command = lambda: self.dispatch(UIEvent.NEXT_IMAGE, {}) if self.dispatch else None
+        )
+        self.next_page_button.pack(side = "left", padx = (3, 0))
 
         # Button to jump to last page
         self.jump_last_button = tk.Button(
@@ -488,17 +520,18 @@ class UI:
 
     # Add drawing mode status display
         self.drawing_mode_label = tk.Label(
-            self.hint_frame, bg = "#FAFAFA", text = "普通模式", 
-            fg = "#8E8E79", font = ("Segoe UI", 11)
+            self.hint_frame, bg = "#FAFAFA", text = "普通模式",
+            fg = "#8E8E79", font = ("Segoe UI", 11),
+            width = 10, anchor = "w"
         )
         self.drawing_mode_label.grid(row = 0, column = 0, sticky = "nw")
         
         # Add selection status display
         self.selection_status_label = tk.Label(
-            self.hint_frame, bg = "#FAFAFA", text = "未選中任何框", 
+            self.hint_frame, bg = "#FAFAFA", text = "未選中任何框",
             fg = "#8E8E79", font = ("Segoe UI", 11)
         )
-        self.selection_status_label.grid(row = 0, column = 1, sticky = "nw", padx = (20, 20))
+        self.selection_status_label.grid(row = 0, column = 99, sticky = "ne", padx = (20, 0))
         
         # Add quick correct button
         self.quick_correct_button = tk.Button(
