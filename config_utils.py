@@ -563,3 +563,20 @@ def save_marker_colors(outer_color, inner_color):
     with open(DEFAULT_CONFI_PATH, "w") as f:
         config.write(f)
 
+def get_marker_alpha():
+    """Get marker transparency alpha value (0-255)"""
+    try:
+        return config.getint("MarkerSettings", "alpha")
+    except:
+        return 200  # Default alpha value
+
+def save_marker_alpha(alpha):
+    """Save marker alpha transparency to config file"""
+    if not config.has_section("MarkerSettings"):
+        config.add_section("MarkerSettings")
+
+    config.set("MarkerSettings", "alpha", str(alpha))
+
+    with open(DEFAULT_CONFI_PATH, "w") as f:
+        config.write(f)
+

@@ -98,7 +98,7 @@ class UI:
         self.plate_memory_buttons = []
 
         # Initialize preview click marker state
-        self.marker_alpha = 200  # Default alpha value (0-255)
+        self.marker_alpha = config_utils.get_marker_alpha()  # Load alpha from config (0-255)
         self.marker_outer_color = config_utils.get_marker_outer_color()  # Outer border color
         self.marker_inner_color = config_utils.get_marker_inner_color()  # Inner border color
         self.marker_overlay_image = None  # PIL Image for transparent marker
@@ -661,6 +661,8 @@ class UI:
         )
         self.marker_alpha_slider.set(self.marker_alpha)
         self.marker_alpha_slider.pack(side="left", padx=5)
+        # Bind ButtonRelease to save alpha when slider is released
+        self.marker_alpha_slider.bind("<ButtonRelease-1>", self.on_marker_alpha_saved)
 
         # Increase button
         tk.Button(
@@ -1155,6 +1157,15 @@ class UI:
             canvas_x, canvas_y = self._last_marker_pos
             self.show_preview_click_marker(canvas_x, canvas_y)
             DEBUG("Marker redrawn with new alpha: {}", alpha)
+
+    def on_marker_alpha_saved(self, event):
+        """Save marker alpha to config when slider is released
+
+        Args:
+            event: Tkinter ButtonRelease event
+        """
+        config_utils.save_marker_alpha(self.marker_alpha)
+        DEBUG("Marker alpha saved to config: {}", self.marker_alpha)
 
     def choose_marker_outer_color(self):
         """Open color picker for marker outer border color"""
