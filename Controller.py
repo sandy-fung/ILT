@@ -475,7 +475,20 @@ class Controller:
                 self.view.update_drawing_mode_display()
                 DEBUG("Exited drawing mode due to vertical line press")
             
-
+        elif event_type == UIEvent.ADJUST_BOX:
+            DEBUG("Controller: Adjust box button pressed.")
+            
+            eventKey = event_data.get("key", "")
+            DEBUG("eventKey  :", eventKey)
+            self.adjust_selected_bbox(eventKey)
+            
+        elif event_type == UIEvent.PAGE_DOWN:
+            DEBUG("Controller: Page down pressed.")
+            self.next_image()
+        elif event_type == UIEvent.PAGE_UP:
+            DEBUG("Controller: Page up pressed.")
+            self.previous_image()
+            
         elif event_type == UIEvent.INPUT_ENTER:
             DEBUG("Controller: Input enter pressed.")
             input_text = event_data.get("text", "")
@@ -1187,6 +1200,62 @@ class Controller:
             dest_folder_path
         )
         
+    def adjust_selected_bbox(self, eventKey):
+        """Adjust the selected bounding box based on the adjust_type"""
+        # 取得 bbox_controller 從 view
+        bbox_controller = getattr(self.view, 'bbox_controller', None)
+        if not bbox_controller:
+            DEBUG("No bbox_controller found in view")
+            return
+
+        # 獲取選中的標籤
+        selected_label = bbox_controller.get_selected_label()
+        if not selected_label:
+            DEBUG("No label selected for adjustment")
+            return
+        print("Adjusting label:", selected_label.class_id, eventKey)
+        try:
+            # 根據 adjust_type 調整標籤
+            if eventKey == 'f':
+                # adjust_type == "move_left":
+                print("Move left selected_label.cx_ratio =", selected_label.cx_ratio)
+                selected_label.cx_ratio = selected_label.cx_ratio - 0.0005
+                print("After move left selected_label.cx_ratio =", selected_label.cx_ratio)
+                
+            elif eventKey == 'h':
+                # adjust_type == "move_right":
+                selected_label.cx_ratio = selected_label.cx_ratio + 0.0005
+            elif eventKey == 't':
+            # adjust_type == "move_up":
+                selected_label.cy_ratio = selected_label.cy_ratio - 0.001
+            elif eventKey == 'g':
+            # adjust_type == "move_down":
+                selected_label.cy_ratio = selected_label.cy_ratio +0.001
+                
+
+            elif eventKey == 'a':
+                # adjust_type == "shrink_width":
+                selected_label.w_ratio = selected_label.w_ratio -0.0006
+            elif eventKey == 'd':
+                # adjust_type == "expand_width":
+                selected_label.w_ratio = selected_label.w_ratio + 0.0006
+            elif eventKey == 'w':
+            # adjust_type == "shrink_height":
+                selected_label.h_ratio = selected_label.h_ratio +0.0006
+            elif eventKey == 's':
+                # adjust_type == "expand_height":
+                selected_label.h_ratio = selected_label.h_ratio - 0.0006
+            else:
+                DEBUG("Unknown adjust type: {}", eventKey)
+                return
+            self.handle_resized_bbox(selected_label)
+            DEBUG("Adjusted label with class_id: {} using {}", selected_label.class_id, eventKey)
+
+            # 刷新顯示
+            self.refresh()
+
+        except Exception as e:
+            ERROR("Error adjusting selected bbox: {}", e)
     def handle_configuration_button(self):
         """Handle configuration button click"""
         try:

@@ -1907,6 +1907,17 @@ class UI:
         else:
             print("Cut line does not exist.")
         
+    def on_shift_combo_clicked(self, event):
+        print("Shift + key pressed:", event.keysym)
+    
+        self.dispatch(UIEvent.ADJUST_BOX, {"key": event.keysym.lower()})
+        
+    def on_page_down_up(self, event):
+        if event.keysym == "Next":
+            self.dispatch(UIEvent.PAGE_DOWN, None)
+        elif event.keysym == "Prior":   
+            self.dispatch(UIEvent.PAGE_UP, None)
+        
     def update_image_canvas(self, image= None):
         DEBUG("update_image_canvas")
         self.canvas.delete("all")
@@ -3021,6 +3032,17 @@ class UI:
         self.window.bind("<T>", self.on_t_key)
 
         self.window.bind("<Shift-C>", self.on_cut_image)
+        self.window.bind("<Shift-A>", self.on_shift_combo_clicked)
+        self.window.bind("<Shift-W>", self.on_shift_combo_clicked)
+        self.window.bind("<Shift-S>", self.on_shift_combo_clicked)
+        self.window.bind("<Shift-D>", self.on_shift_combo_clicked)
+        self.window.bind("<Shift-F>", self.on_shift_combo_clicked)
+        self.window.bind("<Shift-T>", self.on_shift_combo_clicked)
+        self.window.bind("<Shift-H>", self.on_shift_combo_clicked)
+        self.window.bind("<Shift-G>", self.on_shift_combo_clicked)
+        
+        self.window.bind("<Next>", self.on_page_down_up)
+        self.window.bind("<Prior>", self.on_page_down_up)
         
         # Mouse event binding (support drawing functionality)
         self.canvas.bind("<Button-1>", self.on_mouse_press)

@@ -67,7 +67,7 @@ def crop_and_save_labels(image_path, labels, current_label_path, output_dir):
         # Construct the output file name
         output_file_name = f"{Path(current_label_path).stem}_{label_index}.jpg"
         output_file_path = os.path.join(output_dir, output_file_name)
-
+        print(f"output_file_path: {output_file_path}")
         # Save the cropped image
-        cv2.imwrite(output_file_path, cropped_image)
+        cv2.imwrite(output_file_path, cropped_image, [cv2.IMWRITE_JPEG_QUALITY, 100])
         DEBUG(f"Saved cropped image: {output_file_path}")

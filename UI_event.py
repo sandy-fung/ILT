@@ -22,6 +22,9 @@ class UIEvent(Enum):
     SEARCH_FILE = auto()
     CUT_IMAGE = auto()
     VERTICAL_LINE_PRESS = auto()
+    ADJUST_BOX = auto()
+    PAGE_DOWN = auto()
+    PAGE_UP = auto()
 
     RESELECT_BT_CLICK = auto()
     CROP_BT_CLICK = auto()
